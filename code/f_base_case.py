@@ -24,20 +24,27 @@ def benchmark_portfolios(chars, barra_cov, wealth, dates_oos, pf_set, settings, 
                                     wealth=wealth, gam=pf_set["gamma_rel"])
 
     print("Generating Market Portfolio...")
-    mkt = mkt_implement(chars, dates=dates_oos, wealth=wealth)
+    mkt = mkt_implement(chars, dates=dates_oos, wealth=wealth, gamma_rel=pf_set["gamma_rel"])
 
     print("Generating 1/N Portfolio...")
-    ew = ew_implement(chars, dates=dates_oos, wealth=wealth)
+    ew = ew_implement(chars, dates=dates_oos, wealth=wealth, gamma_rel=pf_set["gamma_rel"])
 
     print("Generating Rank-Weighted Portfolio...")
-    rw = rw_implement(chars, dates=dates_oos, wealth=wealth)
+    rw = rw_implement(chars, dates=dates_oos, wealth=wealth, gamma_rel=pf_set["gamma_rel"])
 
     print("Generating Minimum Variance Portfolio...")
-    mv = mv_implement(chars, cov_list=barra_cov, dates=dates_oos, wealth=wealth)
+    mv = mv_implement(chars, cov_list=barra_cov, dates=dates_oos, wealth=wealth, gamma_rel=pf_set["gamma_rel"])
 
-    print("Combining Benchmark Portfolios...")
-    bm_pfs = pd.concat([tpf["pf"], factor_ml["pf"], ew["pf"], mkt["pf"], rw["pf"], mv["pf"]])
-    bm_pfs.to_csv(f"{output_path}/bms.csv", index=False)
+    # Filter out any None values to avoid errors
+    portfolio_results = [tpf, factor_ml, ew, mkt, rw, mv]
+    valid_portfolios = [pf["pf"] for pf in portfolio_results if pf["pf"] is not None]
+
+    if valid_portfolios:
+        print("Combining Benchmark Portfolios...")
+        bm_pfs = pd.concat(valid_portfolios, ignore_index=True)
+        bm_pfs.to_csv(f"{output_path}/bms.csv", index=False)
+    else:
+        print("No valid benchmark portfolios generated.")
 
 
 def static_ml(chars, barra_cov, lambda_list, risk_free, wealth, pf_set, settings, dates_m1, dates_oos, dates_hp,

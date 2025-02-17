@@ -138,17 +138,32 @@ def tpf_implement(data, cov_list, wealth, dates, gam):
     # Compute desired weights for each date
     tpf_opt = []
     for d in dates:
-        data_sub = data_split[d]
-        ids = data_sub['id'].tolist()
-        sigma = cov_list[d]
-        pred_ld1 = data_sub['pred_ld1'].to_numpy()
+        data_sub = data_split.get(d, pd.DataFrame())  # Prevent KeyError
+        if data_sub.empty:
+            continue  # Skip if no data available
 
-        # Compute weights using the tangency portfolio formula
-        w_opt = np.linalg.solve(sigma, pred_ld1) / gam
+        sigma = cov_list.get(d, None)  # Ensure sigma exists
+
+        if sigma is None or sigma.shape[0] != sigma.shape[1]:
+            continue  # Skip if covariance matrix is missing or invalid
+
+        pred_ld1 = data_sub['pred_ld1'].dropna().to_numpy()
+        if pred_ld1.size == 0:
+            continue  # Skip empty predictions
+
+        try:
+            # Compute weights using the tangency portfolio formula
+            w_opt = np.dot(np.linalg.pinv(sigma), pred_ld1) / gam  # Use pseudo-inverse for robustness
+        except np.linalg.LinAlgError:
+            continue  # Skip if there's a numerical issue
+
         data_sub = data_sub.assign(w=w_opt)
         tpf_opt.append(data_sub[['id', 'eom', 'w']])
 
     # Combine weights for all dates
+    if not tpf_opt:
+        return {"w": pd.DataFrame(), "pf": pd.DataFrame()}  # Return empty results if no valid weights
+
     tpf_opt = pd.concat(tpf_opt, ignore_index=True)
 
     # Compute actual weights
@@ -160,6 +175,7 @@ def tpf_implement(data, cov_list, wealth, dates, gam):
 
     # Output
     return {"w": tpf_w, "pf": tpf_pf}
+
 
 
 def tpf_cf_fun(data, cf_cluster, er_models, cluster_labels, wealth, gamma_rel, cov_list, dates, seed, features):
@@ -277,52 +293,63 @@ def mv_risky_fun(data, cov_list, wealth, dates, gam, u_vec):
 
 def factor_ml_implement(data, wealth, dates, n_pfs, gam):
     """
-    High Minus Low (HML) portfolio implementation based on predicted returns.
+    Implements a High Minus Low (HML) portfolio strategy using predicted returns.
 
     Parameters:
-        data (pd.DataFrame): DataFrame containing portfolio data with columns such as `id`, `eom` (end of month), `me` (market equity),
-                             `pred_ld1` (predicted returns), and a `valid` column indicating valid rows.
-        wealth (pd.DataFrame or list): Wealth data required for weight adjustments.
-        dates (list): List of dates for which the portfolio is to be constructed.
-        n_pfs (int): Number of portfolios (e.g., quintiles or deciles) for ranking stocks into HML portfolios.
-        gam (float): Risk-aversion parameter used in portfolio construction.
+        data (pd.DataFrame): Contains portfolio data, including `id`, `eom`, `me` (market equity),
+                             `pred_ld1` (predicted returns), and `valid` (filter column).
+        wealth (pd.DataFrame or list): Wealth data used for weight adjustments.
+        dates (list): List of dates for portfolio construction.
+        n_pfs (int): Number of portfolios for ranking stocks (e.g., quintiles or deciles).
+        gam (float): Risk-aversion parameter.
 
     Returns:
-        dict: A dictionary containing:
-            - "w": DataFrame with the calculated portfolio weights.
-            - "pf": DataFrame with the portfolio performance metrics.
+        dict: A dictionary with:
+            - "w": Portfolio weights.
+            - "pf": Portfolio performance metrics.
     """
 
-    # Divide data by dates and prepare HML optimal weights
-    data_split = {date: sub_df for date, sub_df in
-                  data[(data['valid'] == True) & (data['eom'].isin(dates))][['id', 'eom', 'me', 'pred_ld1']].groupby('eom')}
+    # Filter data to valid observations within the selected dates
+    data_rel = data[(data["valid"] == True) & (data["eom"].isin(dates))].copy()
+    data_rel = data_rel[['id', 'eom', 'me', 'pred_ld1']].sort_values(by=['id', 'eom'])
 
+    # Split data by date
+    data_split = {date: group.copy() for date, group in data_rel.groupby("eom")}
+
+    # Store optimal weights
     hml_opt = []
+
     for d in dates:
-        data_sub = data_split[d]
+        if d not in data_split:
+            continue  # Skip missing dates
+
+        data_sub = data_split[d].copy()  # Ensure modification safety
+
+        # Compute percentile ranks of predicted returns
         er = data_sub['pred_ld1'].values
-        er_prank = pd.Series(er).rank(pct=True).values
+        er_prank = pd.Series(er).rank(pct=True).values  # Percentile rank of predicted returns
 
-        # Assign positions for HML portfolio
-        positions = np.where(er_prank >= 1 - 1 / n_pfs, 1,
-                             np.where(er_prank <= 1 / n_pfs, -1, 0))
+        # Assign portfolio positions
+        data_sub['pos'] = np.where(er_prank >= 1 - (1 / n_pfs), 1,  # Top X% (long)
+                                   np.where(er_prank <= 1 / n_pfs, -1, 0))  # Bottom X% (short)
 
-        # Compute weights based on market equity and positions
-        data_sub['pos'] = positions
-        data_sub['w'] = data_sub['me'] / data_sub.groupby('pos')['me'].transform('sum') * data_sub['pos']
-        data_sub = data_sub[['id', 'eom', 'w']]
-        hml_opt.append(data_sub)
+        # Ensure no division by zero (skip if no stocks in group)
+        grouped_me = data_sub.groupby("pos")["me"].transform("sum")
+        data_sub["w"] = np.where(grouped_me != 0, (data_sub["me"] / grouped_me) * data_sub["pos"], 0)
 
+        hml_opt.append(data_sub[['id', 'eom', 'w']])
+
+    # Combine all computed weights
     hml_opt = pd.concat(hml_opt, ignore_index=True)
 
-    # Calculate actual weights
-    hml_w = w_fun(data[data['eom'].isin(dates) & data['valid']], dates, hml_opt, wealth)
+    # Compute actual portfolio weights
+    hml_w = w_fun(data[data["eom"].isin(dates) & data["valid"]], dates, hml_opt, wealth)
 
-    # Calculate portfolio performance
+    # Compute portfolio performance
     hml_pf = pf_ts_fun(hml_w, data, wealth, gam)
-    hml_pf['type'] = "Factor-ML"
+    hml_pf["type"] = "Factor-ML"
 
-    # Return weights and portfolio performance
+    # Output dictionary
     return {"w": hml_w, "pf": hml_pf}
 
 
@@ -343,24 +370,23 @@ def ew_implement(data, wealth, dates, gamma_rel):
             - "pf": DataFrame with the portfolio performance metrics.
     """
 
-    # Calculate equal weights
-    ew_opt = (
-        data[(data['valid'] == True) & (data['eom'].isin(dates))]
-        .groupby('eom')
-        .apply(lambda group: group.assign(w=1 / len(group)))
-        .reset_index(drop=True)
-    )
+    # Filter valid stocks for relevant dates
+    data_valid = data[(data['valid'] == True) & (data['eom'].isin(dates))].copy()
 
-    # Calculate actual weights using the helper function `w_fun`
-    ew_w = w_fun(data[data['eom'].isin(dates) & data['valid']], dates, ew_opt[['id', 'eom', 'w']], wealth)
+    # Compute equal-weighted portfolio (1/N for each stock in the month)
+    data_valid['n'] = data_valid.groupby('eom')['id'].transform('count')
+    ew_opt = data_valid[['id', 'eom']].copy()
+    ew_opt['w'] = 1 / data_valid['n']
 
-    # Calculate portfolio performance using the helper function `pf_ts_fun`
+    # Compute actual weights
+    ew_w = w_fun(data_valid, dates, ew_opt[['id', 'eom', 'w']], wealth)
+
+    # Compute portfolio performance
     ew_pf = pf_ts_fun(ew_w, data, wealth, gamma_rel)
     ew_pf['type'] = "1/N"
 
     # Return weights and portfolio performance
     return {"w": ew_w, "pf": ew_pf}
-
 
 
 def mkt_implement(data, wealth, dates, gamma_rel):
@@ -380,24 +406,28 @@ def mkt_implement(data, wealth, dates, gamma_rel):
             - "pf": DataFrame with the portfolio performance metrics.
     """
 
-    # Calculate market-cap weights
+    # Filter valid stocks within the specified dates
+    data_valid = data[(data['valid'] == True) & (data['eom'].isin(dates))].copy()
+
+    # Ensure `eom` is treated correctly (align to last trading day if necessary)
+    data_valid['eom'] = pd.to_datetime(data_valid['eom'])
+
+    # Compute market-cap weights
     mkt_opt = (
-        data[(data['valid'] == True) & (data['eom'].isin(dates))]
-        .groupby('eom')
+        data_valid.groupby('eom', group_keys=False)
         .apply(lambda group: group.assign(w=group['me'] / group['me'].sum()))
         .reset_index(drop=True)
     )
 
-    # Calculate actual weights using the helper function `w_fun`
-    mkt_w = w_fun(data[data['eom'].isin(dates) & data['valid']], dates, mkt_opt[['id', 'eom', 'w']], wealth)
+    # Compute actual weights
+    mkt_w = w_fun(data_valid, dates, mkt_opt[['id', 'eom', 'w']], wealth)
 
-    # Calculate portfolio performance using the helper function `pf_ts_fun`
+    # Compute portfolio performance
     mkt_pf = pf_ts_fun(mkt_w, data, wealth, gamma_rel)
     mkt_pf['type'] = "Market"
 
     # Return weights and portfolio performance
     return {"w": mkt_w, "pf": mkt_pf}
-
 
 
 def rw_implement(data, wealth, dates, gamma_rel):
@@ -417,29 +447,28 @@ def rw_implement(data, wealth, dates, gamma_rel):
             - "pf": DataFrame with the portfolio performance metrics.
     """
 
-    # Calculate rank-based weights
-    data_split = {
-        date: sub_df for date, sub_df in data[
-            (data['valid'] == True) & (data['eom'].isin(dates))
-        ][['id', 'eom', 'pred_ld1']].groupby('eom')
-    }
+    # Filter valid stocks for relevant dates
+    data_valid = data[(data['valid'] == True) & (data['eom'].isin(dates))].copy()
 
+    # Compute rank-based weights
     rw_opt = []
     for d in dates:
-        data_sub = data_split[d]
-        er = data_sub['pred_ld1'].values
-        er_rank = pd.Series(er).rank().values  # Compute ranks
-        pos = er_rank - er_rank.mean()  # Center ranks around 0
-        pos = pos * (2 / abs(pos).sum())  # Normalize ranks to ensure sum of absolute weights is 2
-        data_sub['w'] = pos
+        data_sub = data_valid[data_valid['eom'] == d][['id', 'eom', 'pred_ld1']].copy()
+
+        # Compute ranks (equivalent to `frank()` in R)
+        data_sub['rank'] = data_sub['pred_ld1'].rank(method="first").astype(float)
+
+        # Center ranks around 0 and normalize sum(abs(weights)) = 2
+        data_sub['w'] = (data_sub['rank'] - data_sub['rank'].mean()) * (2 / data_sub['rank'].abs().sum())
+
         rw_opt.append(data_sub[['id', 'eom', 'w']])
 
     rw_opt = pd.concat(rw_opt, ignore_index=True)
 
-    # Calculate actual weights using the helper function `w_fun`
-    rw_w = w_fun(data[data['eom'].isin(dates) & data['valid']], dates, rw_opt, wealth)
+    # Compute actual weights
+    rw_w = w_fun(data_valid, dates, rw_opt, wealth)
 
-    # Calculate portfolio performance using the helper function `pf_ts_fun`
+    # Compute portfolio performance
     rw_pf = pf_ts_fun(rw_w, data, wealth, gamma_rel)
     rw_pf['type'] = "Rank-ML"
 
@@ -467,7 +496,7 @@ def mv_implement(data, cov_list, wealth, dates, gamma_rel):
 
     # Calculate minimum variance weights
     data_split = {
-        date: sub_df for date, sub_df in data[
+        date: sub_df.copy() for date, sub_df in data[
             (data['valid'] == True) & (data['eom'].isin(dates))
         ][['id', 'eom', 'me']].groupby('eom')
     }
@@ -475,27 +504,36 @@ def mv_implement(data, cov_list, wealth, dates, gamma_rel):
     mv_opt = []
     for d in dates:
         data_sub = data_split[d]
-        ids = data_sub['id'].values
+        ids = data_sub['id'].astype(str).values
+
+        if str(d) not in cov_list:
+            continue  # Skip if covariance matrix is missing
+
         sigma = cov_list[str(d)].create_cov(ids=ids)
         sigma_inv = np.linalg.inv(sigma)
 
         # Compute minimum variance weights
-        ones = np.ones(sigma_inv.shape[0])
-        weights = sigma_inv @ ones / (ones.T @ sigma_inv @ ones)
-        data_sub['w'] = weights
+        ones = np.ones((sigma_inv.shape[0], 1))
+        weights = (sigma_inv @ ones) / (ones.T @ sigma_inv @ ones)
+        data_sub['w'] = weights.flatten()
+
         mv_opt.append(data_sub[['id', 'eom', 'w']])
 
-    mv_opt = pd.concat(mv_opt, ignore_index=True)
+    if mv_opt:
+        mv_opt = pd.concat(mv_opt, ignore_index=True)
 
-    # Calculate actual weights using the helper function `w_fun`
-    mv_w = w_fun(data[data['eom'].isin(dates) & data['valid']], dates, mv_opt, wealth)
+        # Calculate actual weights using the helper function `w_fun`
+        mv_w = w_fun(data[data['eom'].isin(dates) & data['valid']], dates, mv_opt, wealth)
 
-    # Calculate portfolio performance using the helper function `pf_ts_fun`
-    mv_pf = pf_ts_fun(mv_w, data, wealth, gamma_rel)
-    mv_pf['type'] = "Minimum Variance"
+        # Calculate portfolio performance using the helper function `pf_ts_fun`
+        mv_pf = pf_ts_fun(mv_w, data, wealth, gamma_rel)
+        mv_pf['type'] = "Minimum Variance"
 
-    # Return weights and portfolio performance
-    return {"w": mv_w, "pf": mv_pf}
+        # Return weights and portfolio performance
+        return {"w": mv_w, "pf": mv_pf}
+    else:
+        return {"w": None, "pf": None}
+
 
 
 
