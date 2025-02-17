@@ -136,14 +136,14 @@ def prepare_and_fit_models(settings, pf_set, features, output_path):
 
     # -------------------- Step 2: Model Fitting --------------------
 
-    # print("Step 4: Loading monthly return data...")
+    print("Loading monthly return data...")
     data_ret = pd.read_csv(os.path.join(settings["data_path"], "data_ret_processed.csv"))
 
     # Ensure correct date formats for `data_ret`
     data_ret["eom"] = pd.to_datetime(data_ret["eom"])
     data_ret["eom_m"] = pd.to_datetime(data_ret["eom_m"])
 
-    print("Step 5: Loading preprocessed characteristics data...")
+    print("Loading preprocessed characteristics data...")
     chars = pd.read_csv(os.path.join(settings["data_path"], "chars_processed.csv"))
 
     # Ensure correct date formats for `chars`
