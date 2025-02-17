@@ -6,6 +6,7 @@ from datetime import datetime
 from b_prepare_data import load_cluster_labels, load_risk_free, load_daily_returns_pkl
 from d_estimate_cov_matrix import prepare_cluster_data  # Covariance estimation
 from e_prepare_portfolio_data import run_prepare_portfolio_data  # Portfolio prep
+from f_base_case import run_f_base_case
 from i1_Main import settings, pf_set, features
 
 # -------------------- CONFIGURATION --------------------
@@ -118,6 +119,28 @@ portfolio_data = run_prepare_portfolio_data(
 pd.to_pickle(portfolio_data["chars"], os.path.join(output_path, "chars_with_predictions.pkl"))
 pd.to_pickle(portfolio_data["lambda_list"], os.path.join(output_path, "lambda_list.pkl"))
 pd.to_pickle(portfolio_data["dates"], os.path.join(output_path, "dates.pkl"))
+
+# -------------------- Step 4: Run Base Case and Feature Importance --------------------
+
+if config_params["update_base"]:
+    print("Running Base Case...")
+    run_f_base_case(
+        chars,
+        barra_cov,
+        wealth,
+        portfolio_data["dates"],
+        pf_set,
+        settings,
+        config_params,
+        portfolio_data["lambda_list"],
+        risk_free,
+        features,
+        dates_m1,
+        dates_m2,
+        dates_hp,
+        hp_years,
+        output_path
+    )
 
 # -------------------- Finalization --------------------
 elapsed_time = time.time() - start_time

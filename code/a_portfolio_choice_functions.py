@@ -1712,42 +1712,60 @@ def mp_val_fun(data, dates, cov_list, lambda_list, wealth, risk_free, mu, gamma_
     # Return dictionary keyed by utility values otherwise
     return w_list
 
-
-
-
 def mp_implement(data_tc, cov_list, lambda_list, rf,
-                 wealth, mu, gamma_rel,
-                 dates_full, dates_oos, dates_hp, hp_years,
-                 k_vec, u_vec, g_vec, cov_type, K,
+                 wealth, gamma_rel,
+                 dates_oos, dates_hp, k_vec, u_vec, g_vec, cov_type, K,
                  iter_, validation=None, seed=None):
     """
     Multiperiod-ML full implementation.
 
     Parameters:
-        Same as before.
+        data_tc (pd.DataFrame): Data containing relevant portfolio information.
+        cov_list (dict): Covariance matrices indexed by date.
+        lambda_list (dict): Lambda matrices indexed by date.
+        rf (pd.DataFrame): Risk-free rate data.
+        wealth (pd.DataFrame): Wealth data.
+        gamma_rel (float): Relative risk-aversion parameter.
+        dates_oos (list): Out-of-sample dates.
+        dates_hp (list): Dates for hyperparameter tuning.
+        k_vec (list): List of k hyperparameter values.
+        u_vec (list): List of u hyperparameter values.
+        g_vec (list): List of g hyperparameter values.
+        cov_type (str): Covariance adjustment type.
+        K (int): Number of predicted lead variables.
+        iter_ (int): Number of iterations for optimization.
+        validation (pd.DataFrame, optional): Precomputed validation results.
+        seed (int, optional): Random seed for reproducibility.
 
     Returns:
-        dict: Results including hyperparameters, weights, and portfolio performance.
+        dict: Dictionary containing:
+            - "hps": Full validation DataFrame.
+            - "best_hps": Best hyperparameters per period.
+            - "w": Final portfolio weights.
+            - "pf": Final portfolio performance.
     """
-    # Set random seed for reproducibility
-    np.random.seed(seed)
+
+    # Set random seed if provided
+    if seed is not None:
+        np.random.seed(seed)
 
     # Generate all hyperparameter combinations
-    mp_hps = pd.DataFrame(product(k_vec, u_vec, g_vec), columns=['k', 'u', 'g'])
+    mp_hps = pd.DataFrame(product(k_vec, g_vec), columns=['k', 'g'])
 
     # Extract relevant data for the hyperparameter tuning period
     pred_columns = [f"pred_ld{i}" for i in range(1, K + 1)]
     data_rel = data_tc[
         (data_tc['eom'].isin(dates_hp)) & (data_tc['valid'])
-    ][['id', 'eom', 'me', 'tr_ld1'] + pred_columns].sort_values(['id', 'eom'])
+        ][['id', 'eom', 'me', 'tr_ld1'] + pred_columns].sort_values(['id', 'eom'])
 
     # Validation: Compute if not provided
     if validation is None:
         validation_results = []
-        for i, (k, g) in enumerate(mp_hps[['k', 'g']].drop_duplicates().itertuples(index=False), 1):
+        for i, (k, g) in enumerate(mp_hps.itertuples(index=False), 1):
             print(f"Processing hyperparameters {i}/{len(mp_hps)}: k={k}, g={g}")
+
             mp_w_list = mp_val_fun(
-                data_rel, dates_hp, cov_list, lambda_list, wealth, rf, mu, gamma_rel,
+                data_rel, dates_hp, cov_list, lambda_list, wealth, rf, gamma_rel,
                 cov_type, iter_, K, k=k, g=g, u_vec=u_vec, verbose=True
             )
             for u in u_vec:
@@ -1760,11 +1778,12 @@ def mp_implement(data_tc, cov_list, lambda_list, rf,
         validation = pd.concat(validation_results, ignore_index=True)
 
     # Compute cumulative metrics for hyperparameter optimization
-    validation['cum_var'] = validation.groupby(['k', 'g', 'u'])['r'].expanding().var().values
-    validation['cum_obj'] = validation.groupby(['k', 'g', 'u'])['r'].expanding().mean().values
+    validation['cum_var'] = validation.groupby(['k', 'g', 'u'])['r'].transform(lambda x: x.expanding().var())
+    validation['cum_obj'] = validation.groupby(['k', 'g', 'u'])['r'].transform(
+        lambda x: (x - validation['tc'] - 0.5 * validation['cum_var'] * gamma_rel).expanding().mean())
     validation['rank'] = validation.groupby('eom_ret')['cum_obj'].rank(ascending=False)
 
-    # Display validation results for inspection
+    # Display validation results
     print("Validation Results:")
     print(validation)
 
@@ -1775,10 +1794,10 @@ def mp_implement(data_tc, cov_list, lambda_list, rf,
     print("Implementing final portfolio...")
     data_rel_oos = data_tc[
         (data_tc['eom'].isin(dates_oos)) & (data_tc['valid'])
-    ][['id', 'eom', 'me', 'tr_ld1'] + pred_columns].sort_values(['id', 'eom'])
+        ][['id', 'eom', 'me', 'tr_ld1'] + pred_columns].sort_values(['id', 'eom'])
 
     final_weights = mp_val_fun(
-        data_rel_oos, dates_oos, cov_list, lambda_list, wealth, rf, mu, gamma_rel,
+        data_rel_oos, dates_oos, cov_list, lambda_list, wealth, rf, gamma_rel,
         cov_type, iter_, K, hps=optimal_hps
     )
     portfolio_performance = pf_ts_fun(final_weights, data_tc, wealth, gamma_rel)

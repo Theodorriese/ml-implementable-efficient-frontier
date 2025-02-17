@@ -82,7 +82,6 @@ def prepare_cluster_data(chars, cluster_labels, daily, settings, features):
     if settings["cov_set"]["obs"] >= len(fct_dates):
         raise ValueError("Not enough historical daily factor-return observations for the chosen window.")
 
-    # R code uses: calc_dates = cluster_data_m[eom >= floor_date(fct_dates[obs], "m") - 1]$eom
     pivot_dt = pd.to_datetime(fct_dates[settings["cov_set"]["obs"]])
     start_of_month = pivot_dt.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     start_floor = start_of_month - pd.Timedelta(days=1)
@@ -120,7 +119,6 @@ def prepare_cluster_data(chars, cluster_labels, daily, settings, features):
         factor_cov_est[d] = cov_out
 
     # 11) Specific Risk: residuals from daily cross-sectional regressions
-    #     We already have the daily fits, so we either re-run or store them. Let's re-run for clarity.
     res_list = []
     for dt in tqdm(unique_dates, desc="Estimating residuals"):
         data_slice = cluster_data_d[cluster_data_d["date"] == dt]
@@ -136,8 +134,6 @@ def prepare_cluster_data(chars, cluster_labels, daily, settings, features):
     res_df = pd.DataFrame(res_list).sort_values(["id", "date"]).reset_index(drop=True)
 
     # 12) EWMA of residual -> res_vol
-    # R code uses ewma_c(..., lambda=0.5^(1/hl_stock_var)), start=initial
-    # We'll do a straightforward EWM with halflife
     halflife_lambda = settings["cov_set"]["hl_stock_var"]
     res_df["res_vol"] = (
         res_df.groupby("id")["residual"]
@@ -146,7 +142,6 @@ def prepare_cluster_data(chars, cluster_labels, daily, settings, features):
     )
 
     # 13) Keep last daily residual in each month
-    # R code merges with trading-day range checks, etc. We'll do a simpler approach: end-of-month pivot
     res_df["date_m"] = res_df["date"].dt.to_period("M")
     spec_risk = (
         res_df.groupby(["id", "date_m"])

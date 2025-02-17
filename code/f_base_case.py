@@ -47,8 +47,8 @@ def benchmark_portfolios(chars, barra_cov, wealth, dates_oos, pf_set, settings, 
         print("No valid benchmark portfolios generated.")
 
 
-def static_ml(chars, barra_cov, lambda_list, risk_free, wealth, pf_set, settings, dates_m1, dates_oos, dates_hp,
-              hp_years, output_path):
+def static_ml(chars, barra_cov, lambda_list, wealth, pf_set, settings, dates_oos, dates_hp,
+              output_path):
     """
     Implement and save Static-ML portfolio.
 
@@ -60,10 +60,8 @@ def static_ml(chars, barra_cov, lambda_list, risk_free, wealth, pf_set, settings
         wealth (pd.DataFrame): Wealth data.
         pf_set (dict): Portfolio settings.
         settings (dict): Configuration settings.
-        dates_m1 (list): Full dates for Static-ML.
         dates_oos (list): Out-of-sample dates.
         dates_hp (list): Holding period dates.
-        hp_years (list): Holding period years.
         output_path (str): Path to save the output.
     """
     print("Implementing Static-ML...")
@@ -114,7 +112,7 @@ def portfolio_ml(chars, barra_cov, lambda_list, features, risk_free, wealth, pf_
                           hp_years=hp_years, rff_feat=True, g_vec=settings["pf_ml"]["g_vec"],
                           p_vec=settings["pf_ml"]["p_vec"], l_vec=settings["pf_ml"]["l_vec"],
                           scale=settings["pf_ml"]["scale"], orig_feat=settings["pf_ml"]["orig_feat"],
-                          iter=10, hps={}, balanced=False, seed=settings["seed_no"])
+                          iter=100, hps={}, balanced=False, seed=settings["seed_no"])
 
     if isinstance(pfml, dict) and "pf" in pfml:
         pfml_df = pfml["pf"]
@@ -124,8 +122,10 @@ def portfolio_ml(chars, barra_cov, lambda_list, features, risk_free, wealth, pf_
     pfml_df.to_pickle(f"{output_path}/portfolio-ml.pkl")
 
 
-def multiperiod_ml(config_params, chars, barra_cov, lambda_list, risk_free, wealth, pf_set, settings, dates_m1,
-                   dates_oos, dates_hp, hp_years, output_path):
+
+
+def multiperiod_ml(config_params, chars, barra_cov, lambda_list, risk_free, wealth, pf_set, settings,
+                   dates_oos, dates_hp, output_path):
     """
     Implement and save Multiperiod-ML if enabled.
 
@@ -147,8 +147,7 @@ def multiperiod_ml(config_params, chars, barra_cov, lambda_list, risk_free, weal
     if config_params["update_mp"]:
         print("Implementing Multiperiod-ML...")
         mp = mp_implement(chars, cov_list=barra_cov, lambda_list=lambda_list, rf=risk_free, wealth=wealth,
-                          mu=pf_set["mu"], gamma_rel=pf_set["gamma_rel"], dates_full=dates_m1,
-                          dates_oos=dates_oos, dates_hp=dates_hp, hp_years=hp_years,
+                          gamma_rel=pf_set["gamma_rel"], dates_oos=dates_oos, dates_hp=dates_hp,
                           k_vec=settings["pf"]["hps"]["m1"]["k"], u_vec=settings["pf"]["hps"]["m1"]["u"],
                           g_vec=settings["pf"]["hps"]["m1"]["g"], cov_type=settings["pf"]["hps"]["cov_type"],
                           validation=None, iter_=10, K=settings["pf"]["hps"]["m1"]["K"])
@@ -181,11 +180,15 @@ def run_f_base_case(chars, barra_cov, wealth, dates_oos, pf_set, settings, confi
         hp_years (list): Holding period years.
         output_path (str): Path to save the output.
     """
+    # Run benchmark portfolios
     benchmark_portfolios(chars, barra_cov, wealth, dates_oos, pf_set, settings, output_path)
-    static_ml(chars, barra_cov, lambda_list, risk_free, wealth, pf_set, settings, dates_m1, dates_oos,
-              dates_hp, hp_years, output_path)
-    portfolio_ml(chars, barra_cov, lambda_list, features, risk_free, wealth, pf_set, settings, dates_m2,
-                 dates_oos, hp_years, output_path)
-    multiperiod_ml(config_params, chars, barra_cov, lambda_list, risk_free, wealth, pf_set, settings, dates_m1,
-                   dates_oos, dates_hp, hp_years, output_path)
+
+    # Run Static-ML
+    static_ml(chars, barra_cov, lambda_list, wealth, pf_set, settings, dates_oos, dates_hp, output_path)
+
+    # Run Portfolio-ML
+    portfolio_ml(chars, barra_cov, lambda_list, features, risk_free, wealth, pf_set, settings, dates_m2, dates_oos, hp_years, output_path)
+
+    # Run Multiperiod-ML
+    multiperiod_ml(config_params, chars, barra_cov, lambda_list, risk_free, wealth, pf_set, settings, dates_m1, dates_oos, dates_hp, hp_years, output_path)
 
