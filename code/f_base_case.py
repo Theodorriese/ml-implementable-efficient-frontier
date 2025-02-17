@@ -67,12 +67,18 @@ def static_ml(chars, barra_cov, lambda_list, risk_free, wealth, pf_set, settings
         output_path (str): Path to save the output.
     """
     print("Implementing Static-ML...")
-    static = static_implement(chars, cov_list=barra_cov, lambda_list=lambda_list, rf=risk_free,
-                               wealth=wealth, mu=pf_set["mu"], gamma_rel=pf_set["gamma_rel"],
-                               dates_full=dates_m1, dates_oos=dates_oos, dates_hp=dates_hp,
-                               hp_years=hp_years, k_vec=settings["pf"]["hps"]["static"]["k"],
-                               u_vec=settings["pf"]["hps"]["static"]["u"], g_vec=settings["pf"]["hps"]["static"]["g"],
-                               cov_type=settings["pf"]["hps"]["cov_type"], validation=None)
+    static = static_implement(chars,
+                              cov_list=barra_cov,
+                              lambda_list=lambda_list,
+                              wealth=wealth,
+                              gamma_rel=pf_set["gamma_rel"],
+                              dates_oos=dates_oos,
+                              dates_hp=dates_hp,
+                              k_vec=settings["pf"]["hps"]["static"]["k"],
+                              u_vec=settings["pf"]["hps"]["static"]["u"],
+                              g_vec=settings["pf"]["hps"]["static"]["g"],
+                              cov_type=settings["pf"]["hps"]["cov_type"],
+                              validation=None)
 
     if isinstance(static, dict) and "pf" in static:
         static_df = static["pf"]
