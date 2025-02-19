@@ -167,9 +167,6 @@ if config_params["update_base"]:
         output_path=output_path
     )
 
-
-
-
 # -------------------- Finalization --------------------
 elapsed_time = time.time() - start_time
 print(f"Portfolio construction script completed in {elapsed_time:.2f} seconds.")
