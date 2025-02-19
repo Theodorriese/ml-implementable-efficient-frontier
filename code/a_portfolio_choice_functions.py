@@ -128,54 +128,52 @@ def tpf_implement(data, cov_list, wealth, dates, gam):
     Returns:
         dict: A dictionary containing portfolio weights ('w') and performance ('pf').
     """
-    # Subset the data for relevant dates and valid rows
     data_rel = data[(data['valid'] == True) & (data['eom'].isin(dates))].copy()
     data_rel = data_rel[['id', 'eom', 'me', 'tr_ld1', 'pred_ld1']].sort_values(by=['id', 'eom'])
 
-    # Split data by dates
     data_split = {date: group for date, group in data_rel.groupby('eom')}
 
-    # Compute desired weights for each date
     tpf_opt = []
     for d in dates:
-        data_sub = data_split.get(d, pd.DataFrame())  # Prevent KeyError
+        data_sub = data_split.get(d, pd.DataFrame())
         if data_sub.empty:
             continue  # Skip if no data available
 
-        sigma = cov_list.get(d, None)  # Ensure sigma exists
+        sigma_data = cov_list.get(d, None)
+        sigma = sigma_data["fct_cov"] if sigma_data and "fct_cov" in sigma_data else None
 
-        if sigma is None or sigma.shape[0] != sigma.shape[1]:
+        if sigma is None or not isinstance(sigma, (pd.DataFrame, np.ndarray)) or sigma.shape[0] != sigma.shape[1]:
             continue  # Skip if covariance matrix is missing or invalid
 
-        pred_ld1 = data_sub['pred_ld1'].dropna().to_numpy()
-        if pred_ld1.size == 0:
-            continue  # Skip empty predictions
+        ids = data_sub["id"].unique()
+        sigma = sigma.loc[ids, ids] if isinstance(sigma, pd.DataFrame) else None  # ✅ Filter sigma to match IDs
+
+        if sigma is None or sigma.shape[0] == 0:
+            continue  # Skip if no valid covariance matrix
+
+        pred_ld1 = data_sub.set_index("id")["pred_ld1"].dropna()  # ✅ Ensure pred_ld1 aligns with sigma
+        pred_ld1 = pred_ld1.loc[sigma.index].to_numpy() if sigma is not None else None  # ✅ Align shapes
+
+        if pred_ld1 is None or pred_ld1.size == 0 or sigma.shape[0] != pred_ld1.shape[0]:
+            continue  # Skip if sizes don't match
 
         try:
-            # Compute weights using the tangency portfolio formula
-            w_opt = np.dot(np.linalg.pinv(sigma), pred_ld1) / gam  # Use pseudo-inverse for robustness
+            w_opt = np.dot(np.linalg.pinv(sigma), pred_ld1) / gam  # ✅ Use pseudo-inverse for robustness
         except np.linalg.LinAlgError:
             continue  # Skip if there's a numerical issue
 
-        data_sub = data_sub.assign(w=w_opt)
+        data_sub = data_sub.loc[data_sub["id"].isin(sigma.index)].assign(w=w_opt)  # ✅ Assign weights correctly
         tpf_opt.append(data_sub[['id', 'eom', 'w']])
 
-    # Combine weights for all dates
     if not tpf_opt:
         return {"w": pd.DataFrame(), "pf": pd.DataFrame()}  # Return empty results if no valid weights
 
     tpf_opt = pd.concat(tpf_opt, ignore_index=True)
-
-    # Compute actual weights
     tpf_w = w_fun(data, dates, tpf_opt, wealth)
-
-    # Compute portfolio performance
     tpf_pf = pf_ts_fun(tpf_w, data, wealth, gam)
     tpf_pf['type'] = "Markowitz-ML"
 
-    # Output
     return {"w": tpf_w, "pf": tpf_pf}
-
 
 
 def tpf_cf_fun(data, cf_cluster, er_models, cluster_labels, wealth, gamma_rel, cov_list, dates, seed, features):

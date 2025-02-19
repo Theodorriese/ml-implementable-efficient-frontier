@@ -19,14 +19,20 @@ def add_return_predictions(chars, get_from_path_model, settings):
         model_path = f"{get_from_path_model}/model_{h}.pkl"
         model_data = pd.read_pickle(model_path)
 
-        pred_data = pd.concat(
-            [
-                model_data[val_end]["pred"]  # Extract predictions
-                for val_end in model_data
-            ]
-        ).loc[:, ["id", "eom", "pred"]].rename(columns={"pred": f"pred_ld{h}"})
+        pred_list = []
 
-        chars = pd.merge(chars, pred_data, on=["id", "eom"], how="left")
+        for val_end, model_entry in model_data.items():
+            if isinstance(model_entry, dict) and "pred" in model_entry:
+                pred_df = model_entry["pred"]
+
+                if isinstance(pred_df, pd.DataFrame) and {"id", "eom", "pred"}.issubset(pred_df.columns):
+                    pred_df = pred_df[["id", "eom", "pred"]].copy()
+                    pred_df.rename(columns={"pred": f"pred_ld{h}"}, inplace=True)
+                    pred_list.append(pred_df)
+
+        if pred_list:
+            pred_data = pd.concat(pred_list, ignore_index=True)
+            chars = pd.merge(chars, pred_data, on=["id", "eom"], how="left")
 
     return chars
 
@@ -71,31 +77,36 @@ def calculate_dates(settings, pf_set, barra_cov):
         start=settings["split"]["train_end"] + timedelta(days=1),
         end=settings["split"]["test_end"] + relativedelta(months=-1),
         freq="M"
-    ) + pd.DateOffset(days=-1)
+    ) + pd.DateOffset(days=1)
+    dates_m1 = dates_m1 - pd.offsets.MonthEnd(1)
 
     dates_m2 = pd.date_range(
         start=first_cov_date + relativedelta(months=(pf_set["lb_hor"] + 2)),
         end=settings["split"]["test_end"] + relativedelta(months=-1),
         freq="M"
-    ) + pd.DateOffset(days=-1)
+    ) + pd.DateOffset(days=1)
+    dates_m2 = dates_m2 - pd.offsets.MonthEnd(1)
 
     dates_oos = pd.date_range(
         start=pd.Timestamp(f"{start_oos}-01-01"),
         end=settings["split"]["test_end"] + relativedelta(months=-1),
         freq="M"
-    ) + pd.DateOffset(days=-1)
+    ) + pd.DateOffset(days=1)
+    dates_oos = dates_oos - pd.offsets.MonthEnd(1)
 
     dates_hp = pd.date_range(
         start=pd.Timestamp(f"{min(hp_years)}-01-01"),
         end=settings["split"]["test_end"] + relativedelta(months=-1),
         freq="M"
-    ) + pd.DateOffset(days=-1)
+    ) + pd.DateOffset(days=1)
+    dates_hp = dates_hp - pd.offsets.MonthEnd(1)
 
     return {
         "dates_m1": dates_m1,
         "dates_m2": dates_m2,
         "dates_oos": dates_oos,
         "dates_hp": dates_hp,
+        "hp_years": hp_years
     }
 
 

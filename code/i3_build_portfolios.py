@@ -1,5 +1,6 @@
 import os
 import time
+import glob
 import pandas as pd
 import openpyxl
 from datetime import datetime
@@ -16,11 +17,11 @@ config_params = {
     "wealth": pf_set["wealth"],
     "gamma_rel": pf_set["gamma_rel"],
     "industry_cov": settings["cov_set"]["industries"],
-    "update_mp": False,
-    "update_base": False,
-    "update_fi_base": False,
-    "update_fi_ief": False,
-    "update_fi_ret": False,
+    "update_mp": True,
+    "update_base": True,
+    "update_fi_base": True,
+    "update_fi_ief": True,
+    "update_fi_ret": True,
 }
 
 # Print config for verification
@@ -35,9 +36,17 @@ pf_set["wealth"] = config_params["wealth"]
 pf_set["gamma_rel"] = config_params["gamma_rel"]
 
 # -------------------- DEFINE PATHS --------------------
-
 data_path = r"C:\Master"  # Main data location
+portfolios_dir = r"C:\Master\Data\Generated\Portfolios"
 get_from_path_model = os.path.join(data_path, "Outputs")  # Model outputs
+
+# all_portfolios_dir = sorted(
+#     [f for f in glob.glob(os.path.join(portfolios_dir, "*")) if os.path.isdir(f)],
+#     key=os.path.getmtime,
+#     reverse=True
+# )
+# latest_folder = all_portfolios_dir[0]
+latest_folder = r"C:\Master\Data\Generated\Portfolios\20250219-1327_WEALTH10000000000.0_GAMMA10_SIZEperc_low50_high100_min40_INDTrue"
 
 # Create unique output folder in C:\Master\Data\Generated\Portfolios
 timestamp = datetime.now().strftime("%Y%m%d-%H%M")
@@ -75,6 +84,15 @@ if 'eom' in chars.columns:
 else:
     raise KeyError("'eom' column is missing from the chars data.")
 
+# Load wealth data
+wealth_path = os.path.join(data_path, "wealth_processed.pkl")
+if not os.path.exists(wealth_path):
+    raise FileNotFoundError(f"Wealth data file not found: {wealth_path}")
+
+wealth = pd.read_pickle(wealth_path)
+print("Loaded wealth data:")
+print(wealth.head())
+
 # Load cluster labels
 cluster_labels = load_cluster_labels(data_path)
 print("Loaded cluster labels:")
@@ -93,53 +111,117 @@ print(daily_returns.head())
 # -------------------- Step 2: Estimate Covariance Matrix --------------------
 print("Step 2: Estimating covariance matrix...")
 
-cov_results = prepare_cluster_data(
-    chars=chars,
-    cluster_labels=cluster_labels,
-    daily=daily_returns,
-    settings=settings,
-    features=features
-)
+# cov_results = prepare_cluster_data(
+#     chars=chars,
+#     cluster_labels=cluster_labels,
+#     daily=daily_returns,
+#     settings=settings,
+#     features=features
+# )
+#
+#
+# # Extract components
+# cluster_data_d = cov_results["cluster_data_d"]
+# fct_ret = cov_results["fct_ret"]
+# factor_cov = cov_results["factor_cov"]
+# spec_risk = cov_results["spec_risk"]
+# barra_cov = cov_results["barra_cov"]
+#
+# # Save covariance results
+# pd.to_pickle(cov_results, os.path.join(output_path, "cov_results.pkl"))
 
-# Save covariance results
-pd.to_pickle(cov_results, os.path.join(output_path, "covariance_matrix.pkl"))
+# Load or compute covariance results
+
+# Use the latest folder
+cov_results_path = os.path.join(latest_folder, "cov_results.pkl")
+
+# Check if file exists
+if not os.path.exists(cov_results_path):
+    raise FileNotFoundError(f"Covariance results file not found in latest folder: {cov_results_path}")
+
+# Load covariance results
+cov_results = pd.read_pickle(cov_results_path)
+print(f"Loaded covariance results from: {cov_results_path}")
+
+# Extract components
+cluster_data_d = cov_results["cluster_data_d"]
+fct_ret = cov_results["fct_ret"]
+factor_cov = cov_results["factor_cov"]
+spec_risk = cov_results["spec_risk"]
+barra_cov = cov_results["barra_cov"]
 
 # -------------------- Step 3: Prepare Portfolio Data --------------------
 print("Step 3: Preparing portfolio data...")
 
+# Run the portfolio data preparation function and extract its outputs
 portfolio_data = run_prepare_portfolio_data(
     chars=chars,
     get_from_path_model=get_from_path_model,
     settings=settings,
     pf_set=pf_set,
-    barra_cov=cov_results["factor_cov"]
+    barra_cov=cov_results["barra_cov"]
 )
 
-# Save processed portfolio data
+# Save additional processed portfolio data
 pd.to_pickle(portfolio_data["chars"], os.path.join(output_path, "chars_with_predictions.pkl"))
 pd.to_pickle(portfolio_data["lambda_list"], os.path.join(output_path, "lambda_list.pkl"))
 pd.to_pickle(portfolio_data["dates"], os.path.join(output_path, "dates.pkl"))
 
-# -------------------- Step 4: Run Base Case and Feature Importance --------------------
+# Extract dates from portfolio_data
+dates_m1, dates_m2, dates_oos, dates_hp, hp_years = (
+    portfolio_data["dates"]["dates_m1"],
+    portfolio_data["dates"]["dates_m2"],
+    portfolio_data["dates"]["dates_oos"],
+    portfolio_data["dates"]["dates_hp"],
+    portfolio_data["dates"]["hp_years"]
+)
 
+# chars_path = os.path.join(latest_folder, "chars_with_predictions.pkl")
+# lambda_list_path = os.path.join(latest_folder, "lambda_list.pkl")
+# dates_path = os.path.join(latest_folder, "dates.pkl")
+#
+# # Check existence
+# for path in [chars_path, lambda_list_path, dates_path]:
+#     if not os.path.exists(path):
+#         raise FileNotFoundError(f"Required file not found: {path}")
+#
+# # Load data
+# portfolio_data = {
+#     "chars": pd.read_pickle(chars_path),
+#     "lambda_list": pd.read_pickle(lambda_list_path),
+#     "dates": pd.read_pickle(dates_path)
+# }
+#
+# # Extract dates
+# dates_m1, dates_m2, dates_oos, dates_hp, hp_years = (
+#     portfolio_data["dates"]["dates_m1"],
+#     portfolio_data["dates"]["dates_m2"],
+#     portfolio_data["dates"]["dates_oos"],
+#     portfolio_data["dates"]["dates_hp"],
+#     portfolio_data["dates"]["hp_years"]
+# )
+
+print("Loaded portfolio data from latest folder.")
+
+# -------------------- Step 4: Run Base Case and Feature Importance --------------------
 if config_params["update_base"]:
     print("Running Base Case...")
     run_f_base_case(
-        chars,
-        barra_cov,
-        wealth,
-        portfolio_data["dates"],
-        pf_set,
-        settings,
-        config_params,
-        portfolio_data["lambda_list"],
-        risk_free,
-        features,
-        dates_m1,
-        dates_m2,
-        dates_hp,
-        hp_years,
-        output_path
+        chars=portfolio_data["chars"],
+        barra_cov=barra_cov,
+        wealth=wealth,
+        dates_oos=dates_oos,
+        pf_set=pf_set,
+        settings=settings,
+        config_params=config_params,
+        lambda_list=portfolio_data["lambda_list"],
+        risk_free=risk_free,
+        features=features,
+        dates_m1=dates_m1,
+        dates_m2=dates_m2,
+        dates_hp=dates_hp,
+        hp_years=hp_years,
+        output_path=output_path
     )
 
 # -------------------- Finalization --------------------

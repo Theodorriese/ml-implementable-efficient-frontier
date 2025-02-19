@@ -160,8 +160,8 @@ def multiperiod_ml(config_params, chars, barra_cov, lambda_list, risk_free, weal
         mp_df.to_pickle(f"{output_path}/multiperiod-ml.pkl")
 
 
-def run_f_base_case(chars, barra_cov, wealth, dates_oos, pf_set, settings, config_params, lambda_list, risk_free, features,
-         dates_m1, dates_m2, dates_hp, hp_years, output_path):
+def run_f_base_case(chars, barra_cov, wealth, dates_oos, pf_set, settings, config_params, lambda_list, risk_free,
+                    features, dates_m1, dates_m2, dates_hp, hp_years, output_path):
     """
     Main function to run portfolio implementation steps.
 
@@ -190,5 +190,7 @@ def run_f_base_case(chars, barra_cov, wealth, dates_oos, pf_set, settings, confi
     portfolio_ml(chars, barra_cov, lambda_list, features, risk_free, wealth, pf_set, settings, dates_m2, dates_oos, hp_years, output_path)
 
     # Run Multiperiod-ML
-    multiperiod_ml(config_params, chars, barra_cov, lambda_list, risk_free, wealth, pf_set, settings, dates_m1, dates_oos, dates_hp, hp_years, output_path)
+    multiperiod_ml(config_params, chars, barra_cov, lambda_list, risk_free, wealth, pf_set, settings,
+                   dates_oos, dates_hp, output_path)
+
 
