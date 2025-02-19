@@ -128,23 +128,21 @@ def tpf_implement(data, cov_list, wealth, dates, gam):
     Returns:
         dict: A dictionary containing portfolio weights ('w') and performance ('pf').
     """
-    # Subset the data for relevant dates and valid rows
     data_rel = data[(data['valid'] == True) & (data['eom'].isin(dates))].copy()
     data_rel = data_rel[['id', 'eom', 'me', 'tr_ld1', 'pred_ld1']].sort_values(by=['id', 'eom'])
 
-    # Split data by dates
     data_split = {date: group for date, group in data_rel.groupby('eom')}
 
-    # Compute desired weights for each date
     tpf_opt = []
     for d in dates:
-        data_sub = data_split.get(d, pd.DataFrame())  # Prevent KeyError
+        data_sub = data_split.get(d, pd.DataFrame())
         if data_sub.empty:
             continue  # Skip if no data available
 
-        sigma = cov_list.get(d, None)  # Ensure sigma exists
+        sigma_data = cov_list.get(d, None)  # Get dictionary for this date
+        sigma = sigma_data["fct_cov"] if sigma_data and "fct_cov" in sigma_data else None
 
-        if sigma is None or sigma.shape[0] != sigma.shape[1]:
+        if sigma is None or not isinstance(sigma, (pd.DataFrame, np.ndarray)) or sigma.shape[0] != sigma.shape[1]:
             continue  # Skip if covariance matrix is missing or invalid
 
         pred_ld1 = data_sub['pred_ld1'].dropna().to_numpy()
@@ -152,7 +150,6 @@ def tpf_implement(data, cov_list, wealth, dates, gam):
             continue  # Skip empty predictions
 
         try:
-            # Compute weights using the tangency portfolio formula
             w_opt = np.dot(np.linalg.pinv(sigma), pred_ld1) / gam  # Use pseudo-inverse for robustness
         except np.linalg.LinAlgError:
             continue  # Skip if there's a numerical issue
@@ -160,21 +157,16 @@ def tpf_implement(data, cov_list, wealth, dates, gam):
         data_sub = data_sub.assign(w=w_opt)
         tpf_opt.append(data_sub[['id', 'eom', 'w']])
 
-    # Combine weights for all dates
     if not tpf_opt:
         return {"w": pd.DataFrame(), "pf": pd.DataFrame()}  # Return empty results if no valid weights
 
     tpf_opt = pd.concat(tpf_opt, ignore_index=True)
-
-    # Compute actual weights
     tpf_w = w_fun(data, dates, tpf_opt, wealth)
-
-    # Compute portfolio performance
     tpf_pf = pf_ts_fun(tpf_w, data, wealth, gam)
     tpf_pf['type'] = "Markowitz-ML"
 
-    # Output
     return {"w": tpf_w, "pf": tpf_pf}
+
 
 
 

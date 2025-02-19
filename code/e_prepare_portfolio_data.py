@@ -71,31 +71,36 @@ def calculate_dates(settings, pf_set, barra_cov):
         start=settings["split"]["train_end"] + timedelta(days=1),
         end=settings["split"]["test_end"] + relativedelta(months=-1),
         freq="M"
-    ) + pd.DateOffset(days=-1)
+    ) + pd.DateOffset(days=1)
+    dates_m1 = dates_m1 - pd.offsets.MonthEnd(1)
 
     dates_m2 = pd.date_range(
         start=first_cov_date + relativedelta(months=(pf_set["lb_hor"] + 2)),
         end=settings["split"]["test_end"] + relativedelta(months=-1),
         freq="M"
-    ) + pd.DateOffset(days=-1)
+    ) + pd.DateOffset(days=1)
+    dates_m2 = dates_m2 - pd.offsets.MonthEnd(1)
 
     dates_oos = pd.date_range(
         start=pd.Timestamp(f"{start_oos}-01-01"),
         end=settings["split"]["test_end"] + relativedelta(months=-1),
         freq="M"
-    ) + pd.DateOffset(days=-1)
+    ) + pd.DateOffset(days=1)
+    dates_oos = dates_oos - pd.offsets.MonthEnd(1)
 
     dates_hp = pd.date_range(
         start=pd.Timestamp(f"{min(hp_years)}-01-01"),
         end=settings["split"]["test_end"] + relativedelta(months=-1),
         freq="M"
-    ) + pd.DateOffset(days=-1)
+    ) + pd.DateOffset(days=1)
+    dates_hp = dates_hp - pd.offsets.MonthEnd(1)
 
     return {
         "dates_m1": dates_m1,
         "dates_m2": dates_m2,
         "dates_oos": dates_oos,
         "dates_hp": dates_hp,
+        "hp_years": hp_years
     }
 
 

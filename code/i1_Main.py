@@ -91,7 +91,7 @@ settings = {
         "dates": {
             "start_year": 2015,
             "end_yr": 2020,
-            "split_years": 10
+            "split_years": 4
         },
         "hps": {
             "cov_type": "cov_add",

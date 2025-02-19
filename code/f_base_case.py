@@ -193,3 +193,4 @@ def run_f_base_case(chars, barra_cov, wealth, dates_oos, pf_set, settings, confi
     multiperiod_ml(config_params, chars, barra_cov, lambda_list, risk_free, wealth, pf_set, settings,
                    dates_oos, dates_hp, output_path)
 
+
