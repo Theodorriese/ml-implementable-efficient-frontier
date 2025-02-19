@@ -85,6 +85,8 @@ def prepare_and_fit_models(settings, pf_set, features, output_path):
     #     risk_free=risk_free
     # )
     #
+    # wealth.to_pickle(os.path.join(settings["data_path"], "wealth_processed.pkl"))
+    #
     # print("Step 4: Loading monthly return data...")
     # data_ret = load_monthly_data(
     #     settings["data_path"],

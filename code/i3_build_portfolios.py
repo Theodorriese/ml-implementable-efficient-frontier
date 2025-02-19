@@ -35,7 +35,6 @@ pf_set["wealth"] = config_params["wealth"]
 pf_set["gamma_rel"] = config_params["gamma_rel"]
 
 # -------------------- DEFINE PATHS --------------------
-
 data_path = r"C:\Master"  # Main data location
 get_from_path_model = os.path.join(data_path, "Outputs")  # Model outputs
 
@@ -75,6 +74,15 @@ if 'eom' in chars.columns:
 else:
     raise KeyError("'eom' column is missing from the chars data.")
 
+# Load wealth data
+wealth_path = os.path.join(data_path, "wealth_processed.pkl")
+if not os.path.exists(wealth_path):
+    raise FileNotFoundError(f"Wealth data file not found: {wealth_path}")
+
+wealth = pd.read_pickle(wealth_path)
+print("Loaded wealth data:")
+print(wealth.head())
+
 # Load cluster labels
 cluster_labels = load_cluster_labels(data_path)
 print("Loaded cluster labels:")
@@ -101,8 +109,16 @@ cov_results = prepare_cluster_data(
     features=features
 )
 
+
+# Extract components
+cluster_data_d = cov_results["cluster_data_d"]
+fct_ret = cov_results["fct_ret"]
+factor_cov = cov_results["factor_cov"]
+spec_risk = cov_results["spec_risk"]
+barra_cov = cov_results["barra_cov"]
+
 # Save covariance results
-pd.to_pickle(cov_results, os.path.join(output_path, "covariance_matrix.pkl"))
+pd.to_pickle(cov_results, os.path.join(output_path, "cov_results.pkl"))
 
 # -------------------- Step 3: Prepare Portfolio Data --------------------
 print("Step 3: Preparing portfolio data...")
@@ -113,49 +129,45 @@ portfolio_data = run_prepare_portfolio_data(
     get_from_path_model=get_from_path_model,
     settings=settings,
     pf_set=pf_set,
-    barra_cov=cov_results["factor_cov"]
+    barra_cov=cov_results["barra_cov"]
 )
-
-# Extract components
-cluster_data_d = portfolio_data["cluster_data_d"]
-fct_ret = portfolio_data["fct_ret"]
-factor_cov = portfolio_data["factor_cov"]
-spec_risk = portfolio_data["spec_risk"]
-barra_cov = portfolio_data["barra_cov"]
-
-# Save all extracted components
-pd.to_pickle(cluster_data_d, os.path.join(output_path, "cluster_data_d.pkl"))
-pd.to_pickle(fct_ret, os.path.join(output_path, "fct_ret.pkl"))
-pd.to_pickle(factor_cov, os.path.join(output_path, "factor_cov.pkl"))
-pd.to_pickle(spec_risk, os.path.join(output_path, "spec_risk.pkl"))
-pd.to_pickle(barra_cov, os.path.join(output_path, "barra_cov.pkl"))
 
 # Save additional processed portfolio data
 pd.to_pickle(portfolio_data["chars"], os.path.join(output_path, "chars_with_predictions.pkl"))
 pd.to_pickle(portfolio_data["lambda_list"], os.path.join(output_path, "lambda_list.pkl"))
 pd.to_pickle(portfolio_data["dates"], os.path.join(output_path, "dates.pkl"))
 
-# -------------------- Step 4: Run Base Case and Feature Importance --------------------
+# Extract dates from portfolio_data
+dates_m1, dates_m2, dates_oos, dates_hp, hp_years = (
+    portfolio_data["dates"]["dates_m1"],
+    portfolio_data["dates"]["dates_m2"],
+    portfolio_data["dates"]["dates_oos"],
+    portfolio_data["dates"]["dates_hp"],
+    portfolio_data["dates"]["hp_years"]
+)
 
+# -------------------- Step 4: Run Base Case and Feature Importance --------------------
 if config_params["update_base"]:
     print("Running Base Case...")
     run_f_base_case(
-        chars,
-        barra_cov,
-        wealth,
-        portfolio_data["dates"],
-        pf_set,
-        settings,
-        config_params,
-        portfolio_data["lambda_list"],
-        risk_free,
-        features,
-        dates_m1,
-        dates_m2,
-        dates_hp,
-        hp_years,
-        output_path
+        chars=portfolio_data["chars"],
+        barra_cov=barra_cov,
+        wealth=wealth,
+        dates_oos=dates_oos,
+        pf_set=pf_set,
+        settings=settings,
+        config_params=config_params,
+        lambda_list=portfolio_data["lambda_list"],
+        risk_free=risk_free,
+        features=features,
+        dates_m1=dates_m1,
+        dates_m2=dates_m2,
+        dates_hp=dates_hp,
+        hp_years=hp_years,
+        output_path=output_path
     )
+
+
 
 
 # -------------------- Finalization --------------------
