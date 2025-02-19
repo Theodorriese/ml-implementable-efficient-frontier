@@ -107,6 +107,7 @@ pd.to_pickle(cov_results, os.path.join(output_path, "covariance_matrix.pkl"))
 # -------------------- Step 3: Prepare Portfolio Data --------------------
 print("Step 3: Preparing portfolio data...")
 
+# Run the portfolio data preparation function and extract its outputs
 portfolio_data = run_prepare_portfolio_data(
     chars=chars,
     get_from_path_model=get_from_path_model,
@@ -115,7 +116,21 @@ portfolio_data = run_prepare_portfolio_data(
     barra_cov=cov_results["factor_cov"]
 )
 
-# Save processed portfolio data
+# Extract components
+cluster_data_d = portfolio_data["cluster_data_d"]
+fct_ret = portfolio_data["fct_ret"]
+factor_cov = portfolio_data["factor_cov"]
+spec_risk = portfolio_data["spec_risk"]
+barra_cov = portfolio_data["barra_cov"]
+
+# Save all extracted components
+pd.to_pickle(cluster_data_d, os.path.join(output_path, "cluster_data_d.pkl"))
+pd.to_pickle(fct_ret, os.path.join(output_path, "fct_ret.pkl"))
+pd.to_pickle(factor_cov, os.path.join(output_path, "factor_cov.pkl"))
+pd.to_pickle(spec_risk, os.path.join(output_path, "spec_risk.pkl"))
+pd.to_pickle(barra_cov, os.path.join(output_path, "barra_cov.pkl"))
+
+# Save additional processed portfolio data
 pd.to_pickle(portfolio_data["chars"], os.path.join(output_path, "chars_with_predictions.pkl"))
 pd.to_pickle(portfolio_data["lambda_list"], os.path.join(output_path, "lambda_list.pkl"))
 pd.to_pickle(portfolio_data["dates"], os.path.join(output_path, "dates.pkl"))
@@ -141,6 +156,7 @@ if config_params["update_base"]:
         hp_years,
         output_path
     )
+
 
 # -------------------- Finalization --------------------
 elapsed_time = time.time() - start_time

@@ -104,11 +104,13 @@ def prepare_cluster_data(chars, cluster_labels, daily, settings, features):
         sub_dates = fct_dates[first_idx : idx_d + 1]
         cov_data = fct_ret[fct_ret["date"].isin(sub_dates)].drop(columns="date")
         t = len(cov_data)
+
         # Weighted correlation
         w_cur = w_cor[-t:]
         mean_c = np.average(cov_data, axis=0, weights=w_cur)
         centered_c = cov_data - mean_c
         cor_est = (w_cur * centered_c.T) @ centered_c / (w_cur @ w_cur)
+
         # Weighted variance
         wv_cur = w_var[-t:]
         mean_v = np.average(cov_data, axis=0, weights=wv_cur)
@@ -143,13 +145,16 @@ def prepare_cluster_data(chars, cluster_labels, daily, settings, features):
 
     # 13) Keep last daily residual in each month
     res_df["date_m"] = res_df["date"].dt.to_period("M")
+
     spec_risk = (
         res_df.groupby(["id", "date_m"])
         .last()
         .reset_index()
         .rename(columns={"date_m": "month_period"})
     )
-    spec_risk["eom_ret"] = spec_risk["month_period"].dt.to_timestamp(how="end")
+
+    spec_risk["eom_ret"] = pd.to_datetime(spec_risk["month_period"].dt.to_timestamp(freq="M"))
+    spec_risk["eom_ret"] = spec_risk["eom_ret"].dt.normalize()
     spec_risk = spec_risk[["id", "eom_ret", "res_vol"]]
 
     # 14) Stock-level data for each calc_date
