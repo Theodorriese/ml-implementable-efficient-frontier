@@ -11,16 +11,16 @@ import shutil
 print('Running new code (loop)')
 
 # Define main directories
-main_folder = r"C:\Users\Wiingaard\OneDrive\CBS\0_Speciale FIN\Data\0_TSV_History_US"
-output_folder = r"C:\Users\Wiingaard\OneDrive\CBS\0_Speciale FIN\Data\0_CSV_US"
-extract_root = r"C:\Users\Wiingaard\OneDrive\CBS\0_Speciale FIN\Data\0_Extraction_US"
+main_folder = r"C:\Users\Wiingaard\OneDrive\CBS\0_Speciale FIN\Data\1_TSV_History_Other" # Change accordingly
+output_folder = r"C:\Users\Wiingaard\OneDrive\CBS\0_Speciale FIN\Data\1_CSV_Other" # Change accordingly
+extract_root = r"C:\Users\Wiingaard\OneDrive\CBS\0_Speciale FIN\Data\1_Extraction_Other" # Change accordingly
 
 # Ensure output and extraction directories exist
 os.makedirs(output_folder, exist_ok=True)
 os.makedirs(extract_root, exist_ok=True)
 
 # List of all relevant year folders (2002-2024)
-year_folders = sorted([f for f in os.listdir(main_folder) if re.match(r"\d{4}(-\d{4})?_BuySideInstP_All_AmerEqty", f)])
+year_folders = sorted([f for f in os.listdir(main_folder) if re.match(r"\d{4}(-\d{4})?_BuySideInstP_All_OtherEqty", f)]) # Change according to folder names
 
 # Required columns (with corrected spacing)
 required_columns = [
@@ -33,8 +33,8 @@ required_columns = [
 for year_folder in year_folders:
     year = year_folder.split("_")[0]  # Extract year (or year range)
     zip_folder = os.path.join(main_folder, year_folder)  # Folder with ZIP files
-    extract_folder = os.path.join(extract_root, f"{year}_Extracted_US")  # Folder for extracted TSVs
-    output_csv = os.path.join(output_folder, f"{year}_Shortfees_US.csv")  # Final merged file
+    extract_folder = os.path.join(extract_root, f"{year}_Extracted_Other")  # Folder for extracted TSVs      # Change accordingly
+    output_csv = os.path.join(output_folder, f"{year}_Shortfees_Other.csv")  # Final merged file      # Change accordingly
 
     print(f"Processing {year_folder}...")
 
@@ -85,48 +85,49 @@ for year_folder in year_folders:
     # Concatenate all data and save to CSV
     if all_data:
         final_df = pd.concat(all_data, ignore_index=True)
-        final_df.to_csv(output_csv, index=False)
+        final_df.to_csv(output_csv, index=False, encoding="utf-8-sig", sep=",")
         print(f"CSV file saved at: {output_csv}")
-        shutil.rmtree(extract_folder, ignore_errors=True) # Delete extraction files in extraction folder in each loop
-        print(f"Deleted extracted files for {year_folder}.")
+
+        # Check if extraction folder exists before deleting
+        if os.path.exists(extract_folder):
+            print(f"Deleting extracted files: {extract_folder}")  # Debugging output
+            shutil.rmtree(extract_folder, ignore_errors=True)
+            print(f"Deleted extracted files for {year_folder}.")
+        else:
+            print(f"WARNING: Extraction folder not found! {extract_folder}")
+
     else:
         print(f"No valid TSV files found for {year_folder}. No CSV file was created.")
 
 print("Processing complete for all years.")
 
-
-#%%
 print('Merging csv files...')
 import os
 import pandas as pd
 from glob import glob
 
 # Define folder paths
-csv_folder = r"C:\Users\Wiingaard\OneDrive\CBS\0_Speciale FIN\Data\0_CSV_US"
-output_csv = os.path.join(csv_folder, "Shortfees_US_2002_2024.csv")
+csv_folder = r"C:\Users\Wiingaard\OneDrive\CBS\0_Speciale FIN\Data\1_CSV_Other"
+output_csv = os.path.join(csv_folder, "Shortfees_Other_2002_2024.csv")
 
 # Get all CSV files in the folder
 csv_files = sorted(glob(os.path.join(csv_folder, "*.csv")))  # Sorted ensures files are read in order
 
 # Merge data
 all_data = []
-
 print(f"Found {len(csv_files)} CSV files. Processing...")
-
 for file in csv_files:
     print(f"Reading {file}...")
 
     try:
-        # Read CSV file
-        df = pd.read_csv(file, low_memory=False)
+        df = pd.read_csv(file, low_memory=False) # Read CSV file
 
         # Apply filters
         df = df[(df["Record Type"] == 1) &  # Filter: 'Record Type' = 1
-                (df["Market Area (Country level)"] == "USA Equity") &  # Filter: 'Market Area' = 'USA Equity'
+                # (df["Market Area (Country level)"] == "USA Equity") &  # Filter: 'Market Area' = 'USA Equity'
+                # Change filtering above accordingly
                 (df["DCBS"].notna())]  # Filter: 'DCBS' must be non-empty
-
-        # Append filtered data
-        all_data.append(df)
+        all_data.append(df) # Append filtered data
 
     except Exception as e:
         print(f"Error reading {file}: {e}")
@@ -134,16 +135,34 @@ for file in csv_files:
 # Concatenate all data
 if all_data:
     merged_df = pd.concat(all_data, ignore_index=True)
-
-    # Sort by Date and ISIN
-    merged_df = merged_df.sort_values(by=["Date", "ISIN"])
-
-    # Save merged CSV
-    merged_df.to_csv(output_csv, index=False)
+    merged_df["Date"] = pd.to_datetime(merged_df["Date"], errors="coerce")
+    merged_df = merged_df.sort_values(by=["Date", "ISIN"]) # Sort by Date and ISIN
+    merged_df.to_csv(output_csv, index=False, encoding="utf-8-sig", sep=",") # Save merged CSV with encoding/delimiter
     print(f"Merged CSV saved at: {output_csv}")
-
 else:
     print("No valid data found. Merged CSV was not created.")
+
+#%%
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 #%%
@@ -156,6 +175,21 @@ print("Rewritten CSV with UTF-8 encoding.")
 
 
 #%%
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -324,13 +358,51 @@ else:
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 #%%
 # Checking data in dfs
 import pandas as pd
+csv_file_check = r"C:\Users\Wiingaard\OneDrive\CBS\0_Speciale FIN\Data\1_CSV_Other\Shortfees_Other_2002_2024.csv" # Change accordingly
+df = pd.read_csv(csv_file_check)
+# pd.set_option('display.max_columns', None)
+# print(df.head())
+
+#%%
+chunk_size = 1000000  # Adjust based on Excel limit
+
+for i, chunk in enumerate(pd.read_csv(csv_file_check, chunksize=chunk_size)):
+    chunk.to_csv(f"{csv_file_check}_part_{i}.csv", index=False)
+
+#%%
+
+#%%
+df.to_csv(csv_file_check)
+#%%
+
+import pandas as pd
+
+# Load CSV
 csv_file_check = r"C:\Users\Wiingaard\OneDrive\CBS\0_Speciale FIN\Data\0_CSV_US\Shortfees_US_2002_2024.csv"
 df = pd.read_csv(csv_file_check)
-pd.set_option('display.max_columns', None)
-print(df.head())
+# Check if any values are non-null in the specified columns
+columns_to_check = ['SAF', 'SAR', 'Indicative Fee', 'Indicative Rebate']
+# Check for non-null values in each column
+non_null_counts = df[columns_to_check].notnull().sum()
+# Print results
+print(non_null_counts)
 
 #%%
 
