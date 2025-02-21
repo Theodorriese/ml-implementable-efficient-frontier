@@ -5,24 +5,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="001ad656-4e1d-41a9-98d4-c3629915c329" name="Changes" comment="Push">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/code/Outputs/fitted_models.pkl" beforeDir="false" afterPath="$PROJECT_DIR$/code/Outputs/fitted_models.pkl" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/code/Outputs/model_1.pkl" beforeDir="false" afterPath="$PROJECT_DIR$/code/Outputs/model_1.pkl" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/code/Outputs/model_10.pkl" beforeDir="false" afterPath="$PROJECT_DIR$/code/Outputs/model_10.pkl" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/code/Outputs/model_11.pkl" beforeDir="false" afterPath="$PROJECT_DIR$/code/Outputs/model_11.pkl" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/code/Outputs/model_12.pkl" beforeDir="false" afterPath="$PROJECT_DIR$/code/Outputs/model_12.pkl" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/code/Outputs/model_2.pkl" beforeDir="false" afterPath="$PROJECT_DIR$/code/Outputs/model_2.pkl" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/code/Outputs/model_3.pkl" beforeDir="false" afterPath="$PROJECT_DIR$/code/Outputs/model_3.pkl" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/code/Outputs/model_4.pkl" beforeDir="false" afterPath="$PROJECT_DIR$/code/Outputs/model_4.pkl" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/code/Outputs/model_5.pkl" beforeDir="false" afterPath="$PROJECT_DIR$/code/Outputs/model_5.pkl" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/code/Outputs/model_6.pkl" beforeDir="false" afterPath="$PROJECT_DIR$/code/Outputs/model_6.pkl" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/code/Outputs/model_7.pkl" beforeDir="false" afterPath="$PROJECT_DIR$/code/Outputs/model_7.pkl" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/code/Outputs/model_8.pkl" beforeDir="false" afterPath="$PROJECT_DIR$/code/Outputs/model_8.pkl" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/code/Outputs/model_9.pkl" beforeDir="false" afterPath="$PROJECT_DIR$/code/Outputs/model_9.pkl" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/code/Outputs/model_full.pkl" beforeDir="false" afterPath="$PROJECT_DIR$/code/Outputs/model_full.pkl" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/code/a_portfolio_choice_functions.py" beforeDir="false" afterPath="$PROJECT_DIR$/code/a_portfolio_choice_functions.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/code/i1_Main.py" beforeDir="false" afterPath="$PROJECT_DIR$/code/i1_Main.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/code/i2_fit_models.py" beforeDir="false" afterPath="$PROJECT_DIR$/code/i2_fit_models.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -176,15 +159,7 @@
       <workItem from="1739802338121" duration="24000" />
       <workItem from="1739809176621" duration="5319000" />
       <workItem from="1739815076846" duration="681000" />
-      <workItem from="1739952564672" duration="24090000" />
-    </task>
-    <task id="LOCAL-00032" summary="Push">
-      <option name="closed" value="true" />
-      <created>1738172619223</created>
-      <option name="number" value="00032" />
-      <option name="presentableId" value="LOCAL-00032" />
-      <option name="project" value="LOCAL" />
-      <updated>1738172619223</updated>
+      <workItem from="1739952564672" duration="24362000" />
     </task>
     <task id="LOCAL-00033" summary="Push">
       <option name="closed" value="true" />
@@ -570,7 +545,15 @@
       <option name="project" value="LOCAL" />
       <updated>1739976452844</updated>
     </task>
-    <option name="localTasksCounter" value="81" />
+    <task id="LOCAL-00081" summary="Push">
+      <option name="closed" value="true" />
+      <created>1739981204479</created>
+      <option name="number" value="00081" />
+      <option name="presentableId" value="LOCAL-00081" />
+      <option name="project" value="LOCAL" />
+      <updated>1739981204484</updated>
+    </task>
+    <option name="localTasksCounter" value="82" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -600,6 +583,11 @@
           <url>file://$PROJECT_DIR$/code/f_base_case.py</url>
           <line>19</line>
           <option name="timeStamp" value="53" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/code/a_portfolio_choice_functions.py</url>
+          <line>133</line>
+          <option name="timeStamp" value="59" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>
