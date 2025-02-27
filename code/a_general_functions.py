@@ -221,7 +221,7 @@ def initial_weights_new(data, w_type, udf_weights=None):
         ValueError: If `w_type` is unknown or if `udf_weights` is required but not provided.
     """
     if w_type == "vw":
-        data["w_start"] = data.groupby("eom")["me"].apply(lambda x: x / x.sum())
+        data["w_start"] = data.groupby("eom")["me"].transform(lambda x: x / x.sum())
     elif w_type == "ew":
         data["w_start"] = 1 / len(data)
     elif w_type == "rand_pos":
@@ -249,8 +249,8 @@ def pf_ts_fun(weights, data, wealth, gam):
     Parameters:
         weights (pd.DataFrame): Portfolio weights for each 'id' and 'eom'.
                                 Expected columns: ['id', 'eom', 'w', 'w_start'].
-        data (pd.DataFrame): Stock return data with 'id', 'eom', and 'ret_ld1' columns.
-        wealth (pd.DataFrame): Wealth data with 'eom' and 'wealth' columns.
+        data (pd.DataFrame): Stock return data with 'id', 'eom', and 'ret_ld1', 'lambda'.
+        wealth (pd.DataFrame): Wealth data with 'eom' and 'wealth'.
         gam (float): Risk-aversion parameter.
 
     Returns:
@@ -262,21 +262,27 @@ def pf_ts_fun(weights, data, wealth, gam):
                       - 'tc': Transaction costs.
                       - 'eom_ret': End-of-month return date.
     """
-    # Merge weights, return data, and wealth data
-    comb = pd.merge(data, weights, on=["id", "eom"], how="left")
-    comb = pd.merge(comb, wealth, on="eom", how="left")
+    # Merge weights with data and wealth
+    comb = data[['id', 'eom', 'ret_ld1', 'lambda']].merge(weights, on=["id", "eom"], how="left")
+    comb = comb.merge(wealth[['eom', 'wealth']], on="eom", how="left")
+
+    # Ensure 'w' is properly handled for calculations
+    comb['w'] = comb['w'].fillna(0)
 
     # Compute portfolio metrics
-    comb["inv"] = comb["w"].abs().sum()  # Total invested (sum of absolute weights)
-    comb["shorting"] = comb[comb["w"] < 0]["w"].abs().sum()  # Total short positions
-    comb["turnover"] = (comb["w"] - comb["w_start"]).abs().sum()  # Portfolio turnover
-    comb["r"] = (comb["w"] * comb["ret_ld1"]).sum()  # Portfolio return
-    comb["tc"] = comb["wealth"].iloc[0] / 2 * (
-                comb["lambda"] * ((comb["w"] - comb["w_start"]) ** 2)).sum()  # Transaction costs
-    comb["eom_ret"] = comb["eom"] + 1  # Adjust end-of-month return date
-    comb.drop(columns=["eom"], inplace=True)  # Remove 'eom' as it's redundant
+    summary = comb.groupby("eom").agg(
+        inv=("w", lambda x: x.abs().sum()),  # Total invested (sum of absolute weights)
+        shorting=("w", lambda x: x[x < 0].abs().sum()),  # Total short positions
+        turnover=("w", lambda x: np.sum(np.abs(x - comb.loc[x.index, "w_start"]))),  # Portfolio turnover
+        r=("w", lambda x: np.sum(x * comb.loc[x.index, "ret_ld1"])),  # Portfolio return
+        tc=("w", lambda x: (comb["wealth"].iloc[0] / 2) * np.sum(comb.loc[x.index, "lambda"] * (x - comb.loc[x.index, "w_start"]) ** 2))  # Transaction costs
+    ).reset_index()
 
-    return comb
+    # Adjust end-of-month return date
+    summary["eom_ret"] = summary["eom"] + pd.DateOffset(months=1) - pd.DateOffset(days=1)
+
+    return summary
+
 
 
 # Size-based screen

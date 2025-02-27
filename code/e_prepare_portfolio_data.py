@@ -39,22 +39,23 @@ def add_return_predictions(chars, get_from_path_model, settings):
 
 def create_lambda_list(chars):
     """
-    Create a dictionary mapping lambda values to dates.
+    Create a dictionary mapping lambda values to dates with `pd.Timestamp` keys.
 
     Parameters:
         chars (pd.DataFrame): Characteristics dataframe.
 
     Returns:
-        dict: Dictionary of lambda values keyed by date.
+        dict: Dictionary of lambda values keyed by `pd.Timestamp` dates.
     """
     lambda_dates = chars["eom"].unique()
     return {
-        str(d): chars.loc[chars["eom"] == d, ["id", "lambda"]]
+        pd.Timestamp(d): chars.loc[chars["eom"] == d, ["id", "lambda"]]
         .sort_values("id")
         .set_index("id")["lambda"]
         .to_dict()
         for d in lambda_dates
     }
+
 
 
 def calculate_dates(settings, pf_set, barra_cov):
