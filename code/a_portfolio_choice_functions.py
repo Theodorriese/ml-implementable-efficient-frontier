@@ -135,6 +135,7 @@ def tpf_implement(data, cov_list, wealth, dates, gam):
 
     tpf_opt = []
     for d in dates:
+        print(d)
         data_sub = data_split.get(d, pd.DataFrame())
         if data_sub.empty:
             continue  # Skip if no data available
@@ -152,7 +153,12 @@ def tpf_implement(data, cov_list, wealth, dates, gam):
             continue  # Skip if no valid covariance matrix
 
         pred_ld1 = data_sub.set_index("id")["pred_ld1"].dropna()  # Ensure pred_ld1 aligns with sigma
-        pred_ld1 = pred_ld1.loc[sigma.index].to_numpy() if sigma is not None else None  # Align shapes
+        sigma = pd.DataFrame(sigma)
+        sigma.index = sigma.index.astype(str)
+        print(sigma)
+        pred_ld1.index = pred_ld1.index.astype(str)
+        print(pred_ld1)
+        pred_ld1 = pred_ld1.loc[sigma.index].to_numpy()  # Align shapes
 
         if pred_ld1 is None or pred_ld1.size == 0 or sigma.shape[0] != pred_ld1.shape[0]:
             continue  # Skip if sizes don't match
@@ -162,6 +168,7 @@ def tpf_implement(data, cov_list, wealth, dates, gam):
         except np.linalg.LinAlgError:
             continue  # Skip if there's a numerical issue
 
+        data_sub["id"] = data_sub["id"].astype(str)
         data_sub = data_sub.loc[data_sub["id"].isin(sigma.index)].assign(w=w_opt)  # Assign weights correctly
         tpf_opt.append(data_sub[['id', 'eom', 'w']])
 

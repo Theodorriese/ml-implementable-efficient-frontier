@@ -36,9 +36,9 @@ pf_set["wealth"] = config_params["wealth"]
 pf_set["gamma_rel"] = config_params["gamma_rel"]
 
 # -------------------- DEFINE PATHS --------------------
-data_path = r"C:\Master"  # Main data location
+data_path = r"C:\Master"
 portfolios_dir = r"C:\Master\Data\Generated\Portfolios"
-get_from_path_model = os.path.join(data_path, "Outputs")  # Model outputs
+get_from_path_model = os.path.join(data_path, "Outputs")
 
 # all_portfolios_dir = sorted(
 #     [f for f in glob.glob(os.path.join(portfolios_dir, "*")) if os.path.isdir(f)],
@@ -111,37 +111,14 @@ print(daily_returns.head())
 # -------------------- Step 2: Estimate Covariance Matrix --------------------
 print("Step 2: Estimating covariance matrix...")
 
-# cov_results = prepare_cluster_data(
-#     chars=chars,
-#     cluster_labels=cluster_labels,
-#     daily=daily_returns,
-#     settings=settings,
-#     features=features
-# )
-#
-#
-# # Extract components
-# cluster_data_d = cov_results["cluster_data_d"]
-# fct_ret = cov_results["fct_ret"]
-# factor_cov = cov_results["factor_cov"]
-# spec_risk = cov_results["spec_risk"]
-# barra_cov = cov_results["barra_cov"]
-#
-# # Save covariance results
-# pd.to_pickle(cov_results, os.path.join(output_path, "cov_results.pkl"))
+cov_results = prepare_cluster_data(
+    chars=chars,
+    cluster_labels=cluster_labels,
+    daily=daily_returns,
+    settings=settings,
+    features=features
+)
 
-# Load or compute covariance results
-
-# Use the latest folder
-cov_results_path = os.path.join(latest_folder, "cov_results.pkl")
-
-# Check if file exists
-if not os.path.exists(cov_results_path):
-    raise FileNotFoundError(f"Covariance results file not found in latest folder: {cov_results_path}")
-
-# Load covariance results
-cov_results = pd.read_pickle(cov_results_path)
-print(f"Loaded covariance results from: {cov_results_path}")
 
 # Extract components
 cluster_data_d = cov_results["cluster_data_d"]
@@ -149,6 +126,29 @@ fct_ret = cov_results["fct_ret"]
 factor_cov = cov_results["factor_cov"]
 spec_risk = cov_results["spec_risk"]
 barra_cov = cov_results["barra_cov"]
+
+# Save covariance results
+pd.to_pickle(cov_results, os.path.join(output_path, "cov_results.pkl"))
+
+# # Load or compute covariance results
+#
+# # Use the latest folder
+# cov_results_path = os.path.join(latest_folder, "cov_results.pkl")
+#
+# # Check if file exists
+# if not os.path.exists(cov_results_path):
+#     raise FileNotFoundError(f"Covariance results file not found in latest folder: {cov_results_path}")
+#
+# # Load covariance results
+# cov_results = pd.read_pickle(cov_results_path)
+# print(f"Loaded covariance results from: {cov_results_path}")
+#
+# # Extract components
+# cluster_data_d = cov_results["cluster_data_d"]
+# fct_ret = cov_results["fct_ret"]
+# factor_cov = cov_results["factor_cov"]
+# spec_risk = cov_results["spec_risk"]
+# barra_cov = cov_results["barra_cov"]
 
 # -------------------- Step 3: Prepare Portfolio Data --------------------
 print("Step 3: Preparing portfolio data...")

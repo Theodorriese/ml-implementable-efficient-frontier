@@ -118,7 +118,11 @@ def prepare_cluster_data(chars, cluster_labels, daily, settings, features):
         var_est = (wv_cur * centered_v.T) @ centered_v / wv_cur.sum()
         sd_diag = np.diag(np.sqrt(np.diag(var_est)))
         cov_out = sd_diag @ cor_est @ sd_diag
-        factor_cov_est[d] = cov_out
+
+        factor_names = list(fct_ret.columns[1:])
+        factor_cov_est[d] = pd.DataFrame(cov_out)
+        factor_cov_est[d].index = factor_names
+        factor_cov_est[d].columns = factor_names
 
     # 11) Specific Risk: residuals from daily cross-sectional regressions
     res_list = []
@@ -157,31 +161,56 @@ def prepare_cluster_data(chars, cluster_labels, daily, settings, features):
     spec_risk["eom_ret"] = spec_risk["eom_ret"].dt.normalize()
     spec_risk = spec_risk[["id", "eom_ret", "res_vol"]]
 
+
     # 14) Stock-level data for each calc_date
     barra_cov = {}
     for d in tqdm(calc_dates, desc="Stock-level covariances"):
+        # Step 1: Extract stock-level characteristics
         char_data = cluster_data_m[cluster_data_m["eom"] == d].copy()
-        char_data = char_data.merge(spec_risk, on=["id", "eom_ret"], how="left")
+        char_data = char_data.merge(spec_risk, on=["id", "eom_ret"], how="left")  # Corrected merge
 
-        # Fill missing residual vol by size_grp median, then overall median
+        # Step 2: Impute missing residual volatility (res_vol)
         grp_med = char_data.groupby(["size_grp", "eom"])["res_vol"].transform("median")
         grp_all = char_data.groupby("eom")["res_vol"].transform("median")
         char_data["res_vol"] = char_data["res_vol"].fillna(grp_med).fillna(grp_all)
 
-        # Get (annualized) factor covariance
+        # Step 3: Retrieve factor covariance and annualize it
         fct_cov = factor_cov_est.get(d)
         if fct_cov is None:
+            print(f"Warning: No factor covariance matrix for date {d}")
             continue
-        fct_cov_annual = fct_cov * 21
 
-        # Build factor loadings from monthly exposures
-        X = char_data[ind_factors + list(clusters)].fillna(0).values
-        ivol_vec = (char_data["res_vol"] ** 2 * 21).values
+        fct_cov_annual = fct_cov * 21  # Annualization factor
 
+        # Step 4: Ensure factor covariance is a DataFrame with correct index/columns
+        if not isinstance(fct_cov, pd.DataFrame):
+            factor_names = list(fct_ret.columns[1:])  # Extract factor names from fct_ret (excluding date column)
+            fct_cov_annual = pd.DataFrame(fct_cov_annual, index=factor_names, columns=factor_names)
+
+        # Step 5: Extract factor loadings, ensuring alignment with factor covariance
+        char_data = char_data.sort_values("id")  # Sort by asset ID
+        asset_ids = char_data["id"].values
+
+        factor_names = fct_cov_annual.columns.tolist()  # Extract factor names from covariance matrix
+        if not all(f in char_data.columns for f in factor_names):
+            print(f"Warning: Missing factor names in char_data for {d}")
+            continue  # Skip if factor exposures are not properly available
+
+        X = char_data[factor_names].fillna(0).values  # Extract factor exposures, fill NaNs with 0
+
+        # Step 6.1: Compute stock covariance matrix (asset-level covariance)
+        asset_cov = X @ fct_cov_annual @ X.T + np.diag((char_data["res_vol"] ** 2 * 21).values)
+
+        # Step 6.2: Convert `asset_cov` into a DataFrame before storing it
+        asset_cov_df = pd.DataFrame(asset_cov)  # First, create DataFrame
+        asset_cov_df.index = asset_ids  # Assign asset IDs as index
+        asset_cov_df.columns = asset_ids  # Assign asset IDs as columns
+
+        # Step 7: Store results in dictionary (barra_cov)
         barra_cov[d] = {
-            "fct_load": X,
-            "fct_cov": fct_cov_annual,
-            "ivol_vec": ivol_vec
+            "fct_load": X,  # Factor exposures
+            "fct_cov": asset_cov_df,  # Asset covariance matrix
+            "ivol_vec": pd.Series((char_data["res_vol"] ** 2 * 21).values, index=asset_ids)  # Idiosyncratic risk
         }
 
     return {
