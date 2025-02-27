@@ -64,7 +64,7 @@ settings = {
     "months": False,
     "split": {
         "train_end": pd.Timestamp("2015-12-31"), # obs
-        "test_end": pd.Timestamp("2020-12-31"),
+        "test_end": pd.Timestamp("2019-12-31"), # just changed
         "val_years": 2,
         "model_update_freq": "yearly",  # Options: "once", "yearly", "decade"
         "train_lookback": 1,

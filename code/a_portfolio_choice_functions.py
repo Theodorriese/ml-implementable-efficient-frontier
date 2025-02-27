@@ -72,43 +72,53 @@ def m_static(sigma_gam, w, lambda_mat, phi):
 
 def w_fun(data, dates, w_opt, wealth):
     """
-    Computes weights for the portfolio based on input data and desired optimal weights.
+    Computes portfolio weights based on input data and desired optimal weights.
 
     Parameters:
-        data (pd.DataFrame): The dataset containing portfolio information.
-        dates (list): List of dates for the portfolio.
-        w_opt (pd.DataFrame): Optimal weights dataframe with columns ['id', 'eom', 'w'].
-        wealth (pd.DataFrame): Wealth information with columns ['eom', 'mu_ld1'].
+        data (pd.DataFrame): Portfolio dataset containing ['id', 'eom', 'tr_ld1'].
+        dates (list): List of timestamps for portfolio calculations.
+        w_opt (pd.DataFrame): Optimal weights with ['id', 'eom', 'w'].
+        wealth (pd.DataFrame): Wealth data with ['eom', 'mu_ld1'].
 
     Returns:
-        pd.DataFrame: Weights for the portfolio.
+        pd.DataFrame: Dataframe with updated portfolio weights.
     """
-    # Create previous dates mapping
+
+    # Ensure 'id' is the same type across all DataFrames
+    data["id"] = data["id"].astype(str)
+    w_opt["id"] = w_opt["id"].astype(str)
+
+    # Ensure 'eom' is in datetime format for consistency
+    wealth["eom"] = pd.to_datetime(wealth["eom"])
+    data["eom"] = pd.to_datetime(data["eom"])
+    w_opt["eom"] = pd.to_datetime(w_opt["eom"])
+
+    # Step 1: Map previous dates
     dates_prev = pd.DataFrame({"eom": dates, "eom_prev": pd.Series(dates).shift(1)})
 
-    # Initialize weights
-    w = data.copy()
-    w['w_start'] = np.nan
-    w = w.merge(w_opt, on=['id', 'eom'], how='left')
-    w = w.merge(dates_prev, on='eom', how='left')
+    # Step 2: Initialize weights (Equivalent to R's `initial_weights_new(w_type = "vw")`)
+    w = data[['id', 'eom']].drop_duplicates()  # Ensures no duplicate entries
+    w = w.merge(w_opt, on=['id', 'eom'], how='left')  # Merge optimal weights
+    w = w.merge(dates_prev, on='eom', how='left')  # Add previous month's reference
 
-    # Add transition return and wealth info to w_opt
+    # Step 3: Merge transition returns and wealth into w_opt
     w_opt = w_opt.merge(data[['id', 'eom', 'tr_ld1']], on=['id', 'eom'], how='left')
     w_opt = w_opt.merge(wealth[['eom', 'mu_ld1']], on='eom', how='left')
 
-    # Adjust weights based on transition returns and wealth
-    w_opt['w'] = w_opt['w'] * (1 + w_opt['tr_ld1']) / (1 + w_opt['mu_ld1'])
-    w_opt.rename(columns={'w': 'w_prev', 'eom': 'eom_prev'}, inplace=True)
+    # Step 4: Adjust weights based on transition returns and wealth
+    w_opt['w_prev'] = w_opt['w'] * (1 + w_opt['tr_ld1']) / (1 + w_opt['mu_ld1'])
+    w_opt = w_opt[['id', 'eom', 'w_prev']].rename(columns={'eom': 'eom_prev'})
 
-    # Merge adjusted weights back into w
+    # Step 5: Merge adjusted weights back into `w`
     w = w.merge(w_opt, on=['id', 'eom_prev'], how='left')
 
-    # Initialize starting weights
+    # Step 6: Initialize `w_start` weights
     min_eom = w['eom'].min()
-    w.loc[w['eom'] != min_eom, 'w_start'] = w['w_prev']
-    w['w_start'].fillna(0, inplace=True)
+    w['w_start'] = np.where(w['eom'] != min_eom, w['w_prev'],
+                            0)  # Aligns exactly with R's `w[eom != min(eom), w_start := w_prev]`
 
-    # Drop unnecessary columns
+    # Step 7: Handle missing values and drop unnecessary columns
+    w['w_start'].fillna(0, inplace=True)
     w.drop(columns=['eom_prev', 'w_prev'], inplace=True)
 
     return w
@@ -136,6 +146,7 @@ def tpf_implement(data, cov_list, wealth, dates, gam):
     tpf_opt = []
     for d in dates:
         print(d)
+
         data_sub = data_split.get(d, pd.DataFrame())
         if data_sub.empty:
             continue  # Skip if no data available
@@ -155,9 +166,7 @@ def tpf_implement(data, cov_list, wealth, dates, gam):
         pred_ld1 = data_sub.set_index("id")["pred_ld1"].dropna()  # Ensure pred_ld1 aligns with sigma
         sigma = pd.DataFrame(sigma)
         sigma.index = sigma.index.astype(str)
-        print(sigma)
         pred_ld1.index = pred_ld1.index.astype(str)
-        print(pred_ld1)
         pred_ld1 = pred_ld1.loc[sigma.index].to_numpy()  # Align shapes
 
         if pred_ld1 is None or pred_ld1.size == 0 or sigma.shape[0] != pred_ld1.shape[0]:
@@ -486,20 +495,19 @@ def mv_implement(data, cov_list, wealth, dates, gamma_rel):
     Minimum-variance portfolio implementation.
 
     Parameters:
-        data (pd.DataFrame): DataFrame containing portfolio data with columns such as `id`, `eom` (end of month),
-                             `me` (market equity), and `valid` column indicating valid rows.
+        data (pd.DataFrame): Portfolio data.
         cov_list (dict): Dictionary of covariance matrices indexed by dates.
-        wealth (pd.DataFrame or list): Wealth data required for weight adjustments.
-        dates (list): List of dates for which the portfolio is to be constructed.
+        wealth (pd.DataFrame or list): Wealth data.
+        dates (list): List of portfolio construction dates.
         gamma_rel (float): Risk-aversion parameter.
 
     Returns:
         dict: A dictionary containing:
-            - "w": DataFrame with the calculated portfolio weights.
-            - "pf": DataFrame with the portfolio performance metrics.
+            - "w": Portfolio weights DataFrame.
+            - "pf": Portfolio performance DataFrame.
     """
 
-    # Calculate minimum variance weights
+    # Split data by end-of-month (eom) dates
     data_split = {
         date: sub_df.copy() for date, sub_df in data[
             (data['valid'] == True) & (data['eom'].isin(dates))
@@ -508,38 +516,56 @@ def mv_implement(data, cov_list, wealth, dates, gamma_rel):
 
     mv_opt = []
     for d in dates:
+        if d not in data_split:
+            continue  # Skip if no data for the date
+
         data_sub = data_split[d]
-        ids = data_sub['id'].astype(str).values
+        ids = data_sub['id'].astype(str).values  # Convert to str
 
-        if str(d) not in cov_list:
-            continue  # Skip if covariance matrix is missing
+        # Ensure `d` is in the correct format for `cov_list`
+        sigma_data = cov_list.get(d, None)
+        if sigma_data is None or "fct_cov" not in sigma_data:
+            print(f"Warning: No valid covariance matrix found for {d}")
+            continue  # Skip if no valid covariance matrix
 
-        sigma = cov_list[str(d)].create_cov(ids=ids)
-        sigma_inv = np.linalg.inv(sigma)
+        sigma = sigma_data["fct_cov"]
+
+        # Ensure sigma is a DataFrame
+        if isinstance(sigma, pd.DataFrame):
+            sigma.index = sigma.index.astype(str)  # Ensure index is str
+            sigma.columns = sigma.columns.astype(str)  # Ensure columns are str
+            sigma = sigma.loc[sigma.index.intersection(ids), sigma.columns.intersection(ids)]  # Align with ids
+        elif isinstance(sigma, np.ndarray):
+            sigma = pd.DataFrame(sigma, index=ids, columns=ids)  # Convert ndarray to DataFrame
+
+        # Check if sigma is still valid
+        if sigma is None or sigma.shape[0] != sigma.shape[1] or sigma.shape[0] == 0:
+            print(f"Warning: Invalid covariance matrix for {d}")
+            continue  # Skip invalid covariance matrix
+
+        # Use pseudo-inverse for numerical stability
+        sigma_inv = np.linalg.pinv(sigma)
 
         # Compute minimum variance weights
         ones = np.ones((sigma_inv.shape[0], 1))
         weights = (sigma_inv @ ones) / (ones.T @ sigma_inv @ ones)
+
+        data_sub = data_sub[data_sub["id"].astype(str).isin(sigma.index)]  # Ensure valid IDs
         data_sub['w'] = weights.flatten()
 
         mv_opt.append(data_sub[['id', 'eom', 'w']])
 
-    if mv_opt:
-        mv_opt = pd.concat(mv_opt, ignore_index=True)
+    if not mv_opt:
+        return {"w": pd.DataFrame(), "pf": pd.DataFrame()}  # Return empty results safely
 
-        # Calculate actual weights using the helper function `w_fun`
-        mv_w = w_fun(data[data['eom'].isin(dates) & data['valid']], dates, mv_opt, wealth)
+    mv_opt = pd.concat(mv_opt, ignore_index=True)
 
-        # Calculate portfolio performance using the helper function `pf_ts_fun`
-        mv_pf = pf_ts_fun(mv_w, data, wealth, gamma_rel)
-        mv_pf['type'] = "Minimum Variance"
+    # Compute final portfolio weights and performance
+    mv_w = w_fun(data[data['eom'].isin(dates) & data['valid']], dates, mv_opt, wealth)
+    mv_pf = pf_ts_fun(mv_w, data, wealth, gamma_rel)
+    mv_pf['type'] = "Minimum Variance"
 
-        # Return weights and portfolio performance
-        return {"w": mv_w, "pf": mv_pf}
-    else:
-        return {"w": None, "pf": None}
-
-
+    return {"w": mv_w, "pf": mv_pf}
 
 
 def static_val_fun(data, dates, cov_list, lambda_list, wealth, cov_type, gamma_rel, k=None, g=None, u=None, hps=None):
@@ -578,10 +604,35 @@ def static_val_fun(data, dates, cov_list, lambda_list, wealth, cov_type, gamma_r
 
         # Extract required inputs for the current date
         wealth_t = static_weights.loc[static_weights['eom'] == d, 'wealth'].iloc[0]
-        ids = static_weights.loc[static_weights['eom'] == d, 'id'].values
-        sigma_gam = cov_list[str(d)].create_cov(ids=ids) * gamma_rel
+        ids = static_weights.loc[static_weights['eom'] == d, 'id'].astype(str).values
+
+        # Retrieve sigma_gam from cov_list
+        sigma_data = cov_list.get(d)
+        if sigma_data is None or "fct_cov" not in sigma_data:
+            print(f"Warning: Missing 'fct_cov' for {d}")
+            continue
+
+        # Convert fct_cov to DataFrame and filter by ids
+        sigma_gam = pd.DataFrame(sigma_data["fct_cov"])
+        sigma_gam.index = sigma_gam.index.astype(str)
+        sigma_gam.columns = sigma_gam.columns.astype(str)
+        sigma_gam = sigma_gam.loc[sigma_gam.index.intersection(ids), sigma_gam.columns.intersection(ids)] * gamma_rel
+
+        # Apply adjustments
         sigma_gam = sigma_gam_adj(sigma_gam, g=g, cov_type=cov_type)
-        lambda_matrix = lambda_list[str(d)].create_lambda(ids=ids) * k
+
+        # Retrieve lambda_matrix from lambda_list
+        lambda_data = lambda_list.get(d)
+        if lambda_data is None or "lambda" not in lambda_data:
+            print(f"Warning: Missing 'lambda' for {d}")
+            continue
+
+        # Convert lambda to DataFrame and filter by ids
+        lambda_matrix = pd.DataFrame(lambda_data["lambda"])
+        lambda_matrix.index = lambda_matrix.index.astype(str)
+        lambda_matrix.columns = lambda_matrix.columns.astype(str)
+        lambda_matrix = lambda_matrix.loc[
+                            lambda_matrix.index.intersection(ids), lambda_matrix.columns.intersection(ids)] * k
 
         # Calculate weights
         pred_ld1 = static_weights.loc[static_weights['eom'] == d, 'pred_ld1'].values
@@ -1716,6 +1767,7 @@ def mp_val_fun(data, dates, cov_list, lambda_list, wealth, risk_free, mu, gamma_
 
     # Return dictionary keyed by utility values otherwise
     return w_list
+
 
 def mp_implement(data_tc, cov_list, lambda_list, rf,
                  wealth, gamma_rel,

@@ -46,13 +46,14 @@ get_from_path_model = os.path.join(data_path, "Outputs")
 #     reverse=True
 # )
 # latest_folder = all_portfolios_dir[0]
-latest_folder = r"C:\Master\Data\Generated\Portfolios\20250219-1327_WEALTH10000000000.0_GAMMA10_SIZEperc_low50_high100_min40_INDTrue"
+latest_folder = r"C:\Master\Data\Generated\Portfolios\demo"
+output_path = r"C:\Master\Data\Generated\Portfolios\demo"
 
-# Create unique output folder in C:\Master\Data\Generated\Portfolios
-timestamp = datetime.now().strftime("%Y%m%d-%H%M")
-output_path = os.path.join(data_path, "Data", "Generated", "Portfolios",
-                           f"{timestamp}_WEALTH{pf_set['wealth']}_GAMMA{pf_set['gamma_rel']}_SIZE{config_params['size_screen']}_IND{config_params['industry_cov']}")
-os.makedirs(output_path, exist_ok=True)
+# # Create unique output folder in C:\Master\Data\Generated\Portfolios
+# timestamp = datetime.now().strftime("%Y%m%d-%H%M")
+# output_path = os.path.join(data_path, "Data", "Generated", "Portfolios",
+#                            f"{timestamp}_WEALTH{pf_set['wealth']}_GAMMA{pf_set['gamma_rel']}_SIZE{config_params['size_screen']}_IND{config_params['industry_cov']}")
+# os.makedirs(output_path, exist_ok=True)
 
 # Save config for reproducibility
 pd.to_pickle(settings, os.path.join(output_path, "settings.pkl"))
@@ -111,37 +112,14 @@ print(daily_returns.head())
 # -------------------- Step 2: Estimate Covariance Matrix --------------------
 print("Step 2: Estimating covariance matrix...")
 
-cov_results = prepare_cluster_data(
-    chars=chars,
-    cluster_labels=cluster_labels,
-    daily=daily_returns,
-    settings=settings,
-    features=features
-)
-
-
-# Extract components
-cluster_data_d = cov_results["cluster_data_d"]
-fct_ret = cov_results["fct_ret"]
-factor_cov = cov_results["factor_cov"]
-spec_risk = cov_results["spec_risk"]
-barra_cov = cov_results["barra_cov"]
-
-# Save covariance results
-pd.to_pickle(cov_results, os.path.join(output_path, "cov_results.pkl"))
-
-# # Load or compute covariance results
+# cov_results = prepare_cluster_data(
+#     chars=chars,
+#     cluster_labels=cluster_labels,
+#     daily=daily_returns,
+#     settings=settings,
+#     features=features
+# )
 #
-# # Use the latest folder
-# cov_results_path = os.path.join(latest_folder, "cov_results.pkl")
-#
-# # Check if file exists
-# if not os.path.exists(cov_results_path):
-#     raise FileNotFoundError(f"Covariance results file not found in latest folder: {cov_results_path}")
-#
-# # Load covariance results
-# cov_results = pd.read_pickle(cov_results_path)
-# print(f"Loaded covariance results from: {cov_results_path}")
 #
 # # Extract components
 # cluster_data_d = cov_results["cluster_data_d"]
@@ -149,6 +127,29 @@ pd.to_pickle(cov_results, os.path.join(output_path, "cov_results.pkl"))
 # factor_cov = cov_results["factor_cov"]
 # spec_risk = cov_results["spec_risk"]
 # barra_cov = cov_results["barra_cov"]
+#
+# # Save covariance results
+# pd.to_pickle(cov_results, os.path.join(output_path, "cov_results.pkl"))
+
+# # Load or compute covariance results
+
+# Use the latest folder
+cov_results_path = os.path.join(latest_folder, "cov_results.pkl")
+
+# Check if file exists
+if not os.path.exists(cov_results_path):
+    raise FileNotFoundError(f"Covariance results file not found in latest folder: {cov_results_path}")
+
+# Load covariance results
+cov_results = pd.read_pickle(cov_results_path)
+print(f"Loaded covariance results from: {cov_results_path}")
+
+# Extract components
+cluster_data_d = cov_results["cluster_data_d"]
+fct_ret = cov_results["fct_ret"]
+factor_cov = cov_results["factor_cov"]
+spec_risk = cov_results["spec_risk"]
+barra_cov = cov_results["barra_cov"]
 
 # -------------------- Step 3: Prepare Portfolio Data --------------------
 print("Step 3: Preparing portfolio data...")
@@ -200,8 +201,8 @@ dates_m1, dates_m2, dates_oos, dates_hp, hp_years = (
 #     portfolio_data["dates"]["dates_hp"],
 #     portfolio_data["dates"]["hp_years"]
 # )
-
-print("Loaded portfolio data from latest folder.")
+#
+# print("Loaded portfolio data from latest folder.")
 
 # -------------------- Step 4: Run Base Case and Feature Importance --------------------
 if config_params["update_base"]:
