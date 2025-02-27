@@ -89,7 +89,7 @@ settings = {
     },
     "pf": {
         "dates": {
-            "start_year": 2015,
+            "start_year": 2016,
             "end_yr": 2020,
             "split_years": 4
         },

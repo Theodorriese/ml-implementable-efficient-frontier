@@ -590,11 +590,30 @@ def static_val_fun(data, dates, cov_list, lambda_list, wealth, cov_type, gamma_r
     """
     # Initialize weights with value-weighted (VW) as default
     static_weights = initial_weights_new(data, w_type="vw")
-    static_weights = static_weights.merge(data[['id', 'eom', 'tr_ld1', 'pred_ld1']], on=['id', 'eom'], how='left')
-    static_weights = static_weights.merge(wealth[['eom', 'mu_ld1', 'wealth']], on='eom', how='left')
+
+    # Merge only new columns to avoid duplicate column names
+    static_weights = static_weights.merge(
+        data[['id', 'eom', 'tr_ld1', 'pred_ld1']],
+        on=['id', 'eom'],
+        how='left'
+    )
+
+    static_weights = static_weights.merge(
+        wealth[['eom', 'mu_ld1', 'wealth']],
+        on='eom',
+        how='left'
+    )
+
+    # Resolve duplicate column issue by choosing the correct version
+    static_weights["tr_ld1"] = static_weights[["tr_ld1_x", "tr_ld1_y"]].bfill(axis=1).iloc[:, 0]
+    static_weights["pred_ld1"] = static_weights[["pred_ld1_x", "pred_ld1_y"]].bfill(axis=1).iloc[:, 0]
+
+    # Drop the unnecessary '_x' and '_y' columns
+    static_weights.drop(columns=["tr_ld1_x", "tr_ld1_y", "pred_ld1_x", "pred_ld1_y"], inplace=True)
 
     # Iterate over each date
     for d in dates:
+        print(d)
         # If hyperparameters are provided, use them
         if hps is not None:
             recent_hps = hps[(hps['eom_ret'] < d) & (hps['eom_ret'] == hps[hps['eom_ret'] < d]['eom_ret'].max())]
@@ -602,49 +621,55 @@ def static_val_fun(data, dates, cov_list, lambda_list, wealth, cov_type, gamma_r
             u = recent_hps['u'].iloc[0]
             k = recent_hps['k'].iloc[0]
 
-        # Extract required inputs for the current date
+        # Extract inputs
         wealth_t = static_weights.loc[static_weights['eom'] == d, 'wealth'].iloc[0]
         ids = static_weights.loc[static_weights['eom'] == d, 'id'].astype(str).values
 
-        # Retrieve sigma_gam from cov_list
+        # Retrieve and process sigma_gam
         sigma_data = cov_list.get(d)
         if sigma_data is None or "fct_cov" not in sigma_data:
             print(f"Warning: Missing 'fct_cov' for {d}")
             continue
 
-        # Convert fct_cov to DataFrame and filter by ids
         sigma_gam = pd.DataFrame(sigma_data["fct_cov"])
         sigma_gam.index = sigma_gam.index.astype(str)
         sigma_gam.columns = sigma_gam.columns.astype(str)
-        sigma_gam = sigma_gam.loc[sigma_gam.index.intersection(ids), sigma_gam.columns.intersection(ids)] * gamma_rel
-
-        # Apply adjustments
+        sigma_gam = sigma_gam.loc[sigma_gam.index.intersection(ids), sigma_gam.columns.intersection(ids)].copy()
+        sigma_gam *= gamma_rel
         sigma_gam = sigma_gam_adj(sigma_gam, g=g, cov_type=cov_type)
 
-        # Retrieve lambda_matrix from lambda_list
+        # Retrieve and process lambda_matrix
         lambda_data = lambda_list.get(d)
-        if lambda_data is None or "lambda" not in lambda_data:
-            print(f"Warning: Missing 'lambda' for {d}")
+        if not lambda_data:
+            print(f"Warning: No lambda values found for {d}")
             continue
 
-        # Convert lambda to DataFrame and filter by ids
-        lambda_matrix = pd.DataFrame(lambda_data["lambda"])
+        lambda_matrix = pd.DataFrame.from_dict(lambda_data, orient="index", columns=["lambda"])
         lambda_matrix.index = lambda_matrix.index.astype(str)
-        lambda_matrix.columns = lambda_matrix.columns.astype(str)
-        lambda_matrix = lambda_matrix.loc[
-                            lambda_matrix.index.intersection(ids), lambda_matrix.columns.intersection(ids)] * k
+        lambda_matrix = lambda_matrix.loc[lambda_matrix.index.intersection(ids)].copy()
+        lambda_matrix *= k
 
-        # Calculate weights
-        pred_ld1 = static_weights.loc[static_weights['eom'] == d, 'pred_ld1'].values
-        w_start = static_weights.loc[static_weights['eom'] == d, 'w_start'].values
+        # Extract weights
+        pred_ld1 = static_weights.loc[static_weights['eom'] == d, 'pred_ld1'].values.reshape(-1, 1)
+        w_start = static_weights.loc[static_weights['eom'] == d, 'w_start'].values.reshape(-1, 1)
+
+        # Ensure lambda_matrix is correctly shaped
+        lambda_matrix = lambda_matrix.values.reshape(-1, 1)
+
+        # Fix shape mismatch for matrix multiplication
+        lambda_w_product = lambda_matrix * w_start
+
+        # Solve for optimal weights
         weights = np.linalg.solve(
             sigma_gam + wealth_t * lambda_matrix,
-            pred_ld1 * u + wealth_t * lambda_matrix @ w_start
+            pred_ld1 * u + wealth_t * lambda_w_product
         )
-        static_weights.loc[static_weights['eom'] == d, 'w'] = weights
+
+        # Assign weights back to static_weights
+        static_weights.loc[static_weights['eom'] == d, 'w'] = weights.flatten()
 
         # Update weights for the next month
-        next_month_idx = dates.index(d) + 1
+        next_month_idx = list(dates).index(d) + 1
         if next_month_idx < len(dates):
             next_month = dates[next_month_idx]
             transition_weights = static_weights.loc[static_weights['eom'] == d].copy()
