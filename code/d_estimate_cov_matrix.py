@@ -163,7 +163,10 @@ def prepare_cluster_data(chars, cluster_labels, daily, settings, features):
 
 
     # 14) Stock-level data for each calc_date
+
+    # Initialize dictionary for stock-level covariance results
     barra_cov = {}
+
     for d in tqdm(calc_dates, desc="Stock-level covariances"):
         # Step 1: Extract stock-level characteristics
         char_data = cluster_data_m[cluster_data_m["eom"] == d].copy()
@@ -189,7 +192,7 @@ def prepare_cluster_data(chars, cluster_labels, daily, settings, features):
 
         # Step 5: Extract factor loadings, ensuring alignment with factor covariance
         char_data = char_data.sort_values("id")  # Sort by asset ID
-        asset_ids = char_data["id"].values
+        asset_ids = char_data["id"].values  # Asset IDs as row index
 
         factor_names = fct_cov_annual.columns.tolist()  # Extract factor names from covariance matrix
         if not all(f in char_data.columns for f in factor_names):
@@ -198,17 +201,20 @@ def prepare_cluster_data(chars, cluster_labels, daily, settings, features):
 
         X = char_data[factor_names].fillna(0).values  # Extract factor exposures, fill NaNs with 0
 
+        # Convert fct_load to a DataFrame with asset IDs as index
+        fct_load_df = pd.DataFrame(X, index=asset_ids, columns=factor_names)
+
         # Step 6.1: Compute stock covariance matrix (asset-level covariance)
         asset_cov = X @ fct_cov_annual @ X.T + np.diag((char_data["res_vol"] ** 2 * 21).values)
 
-        # Step 6.2: Convert `asset_cov` into a DataFrame before storing it
-        asset_cov_df = pd.DataFrame(asset_cov)  # First, create DataFrame
-        asset_cov_df.index = asset_ids  # Assign asset IDs as index
-        asset_cov_df.columns = asset_ids  # Assign asset IDs as columns
+        # Convert `asset_cov` to a DataFrame before storing it
+        asset_cov_df = pd.DataFrame(asset_cov)
+        asset_cov_df.index = asset_ids
+        asset_cov_df.columns = asset_ids
 
         # Step 7: Store results in dictionary (barra_cov)
         barra_cov[d] = {
-            "fct_load": X,  # Factor exposures
+            "fct_load": fct_load_df,  # Factor exposures (now a DataFrame with asset IDs)
             "fct_cov": asset_cov_df,  # Asset covariance matrix
             "ivol_vec": pd.Series((char_data["res_vol"] ** 2 * 21).values, index=asset_ids)  # Idiosyncratic risk
         }

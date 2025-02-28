@@ -631,10 +631,8 @@ def static_val_fun(data, dates, cov_list, lambda_list, wealth, cov_type, gamma_r
             print(f"Warning: Missing 'fct_cov' for {d}")
             continue
 
-        sigma_gam = pd.DataFrame(sigma_data["fct_cov"])
-        sigma_gam.index = sigma_gam.index.astype(str)
-        sigma_gam.columns = sigma_gam.columns.astype(str)
-        sigma_gam = sigma_gam.loc[sigma_gam.index.intersection(ids), sigma_gam.columns.intersection(ids)].copy()
+        # Call the updated create_cov function to compute the covariance matrix
+        sigma_gam = create_cov(sigma_data, ids)
         sigma_gam *= gamma_rel
         sigma_gam = sigma_gam_adj(sigma_gam, g=g, cov_type=cov_type)
 
@@ -651,6 +649,8 @@ def static_val_fun(data, dates, cov_list, lambda_list, wealth, cov_type, gamma_r
 
         # Extract weights
         pred_ld1 = static_weights.loc[static_weights['eom'] == d, 'pred_ld1'].values.reshape(-1, 1)
+        static_weights.loc[static_weights['eom'] == d, 'w_start'] = static_weights.loc[
+            static_weights['eom'] == d, 'w_start'].fillna(0)
         w_start = static_weights.loc[static_weights['eom'] == d, 'w_start'].values.reshape(-1, 1)
 
         # Ensure lambda_matrix is correctly shaped
@@ -672,18 +672,34 @@ def static_val_fun(data, dates, cov_list, lambda_list, wealth, cov_type, gamma_r
         next_month_idx = list(dates).index(d) + 1
         if next_month_idx < len(dates):
             next_month = dates[next_month_idx]
+
+            # 1) Create transition_weights from static_weights (rows for the date d),
+            #    then shift 'eom' to the next_month and compute w_start:
             transition_weights = static_weights.loc[static_weights['eom'] == d].copy()
             transition_weights['eom'] = next_month
             transition_weights['w_start'] = (
-                transition_weights['w'] * (1 + transition_weights['tr_ld1']) /
-                (1 + transition_weights['mu_ld1'])
+                    transition_weights['w'] * (1 + transition_weights['tr_ld1']) /
+                    (1 + transition_weights['mu_ld1'])
             )
+
+            # 2) Merge, but keep BOTH w_start columns by giving the incoming one a suffix:
+            #    - The current static_weights['w_start'] remains 'w_start'
+            #    - The newly merged transition_weights['w_start'] becomes 'w_start_new'
             static_weights = static_weights.merge(
                 transition_weights[['id', 'eom', 'w_start']],
                 on=['id', 'eom'],
-                how='left'
+                how='left',
+                suffixes=('', '_new')
             )
-            static_weights['w_start'].fillna(0, inplace=True)
+
+            # 3) Fill old w_start from the new w_start_new, only where it's NaN:
+            static_weights['w_start'] = static_weights['w_start'].fillna(static_weights['w_start_new'])
+
+            # 4) Drop the extra w_start_new column if you no longer need it:
+            static_weights.drop(columns='w_start_new', inplace=True)
+
+    # 5) **Now fill any remaining NaNs with zero at the very end of the entire loop**
+    static_weights['w_start'] = static_weights['w_start'].fillna(0)
 
     return static_weights
 
