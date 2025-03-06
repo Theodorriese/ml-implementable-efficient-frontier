@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import matplotlib.dates as mdates
 import matplotlib.lines as mlines  # For custom legend handles
+import statsmodels.formula.api as smf
+
 
 
 # Random pip below for specific pip install
@@ -195,106 +197,137 @@ def short_fees_2(short_fees_linked):
 
 
 #%% 
-def analyze_short_fees(short_fees, chars):
+if True: 
+    def analyze_short_fees(short_fees, chars):
+        """
+        Merge short fees with stock characteristics and perform analysis.
+        
+        Steps:
+        1. Merge short fees data with characteristics on 'permno' and 'eom'.
+        2. Compute summary statistics (proportion non-missing sfee by eom, dcbs frequencies).
+        3. Run regressions to examine the predictive power of characteristics on sfee.
+        4. Plot selected relationships.
+        
+        Parameters:
+            short_fees (pd.DataFrame): Processed short fees data with columns 'permno', 'eom', 'sfee', 'dcbs'.
+            chars (pd.DataFrame): Stock characteristics data; must include 'permno', 'eom', 'market_equity', 
+                                'rvol_252d', and 'dolvol_126d'.
+        
+        Returns:
+            pd.DataFrame: The merged DataFrame used for analysis.
+        """
+
+        # Part 1: Fix data set and show stats on sfee missing and frequency per dcbs group
+
+        # Ensure that 'permno' in chars is a string and 'eom' is datetime
+        chars['permno'] = chars['permno'].astype(str)
+        chars['eom'] = pd.to_datetime(chars['eom'])
+        
+        # Merge on 'permno' and 'eom'
+        merged = pd.merge(short_fees, chars[['permno', 'eom', 'market_equity', 'rvol_252d', 'dolvol_126d']],
+                        on=['permno', 'eom'], how='left')
+        
+        # Summary Statistics: Proportion of non-missing sfee by eom
+        # "# How many are non-missing? Very few"
+        prop_non_missing = merged.groupby('eom')['sfee'].apply(lambda x: x.notna().mean()).reset_index(name='non_miss')
+        print("Proportion of non-missing sfee by eom (non-zero only):")
+        print(prop_non_missing[prop_non_missing['non_miss'] != 0])
+        
+        total_rows = merged.shape[0]
+        missing_count = merged['sfee'].isna().sum()
+        prop_missing = missing_count / total_rows
+        print(f"Out of {total_rows} total observations, {missing_count} ({prop_missing:.2%}) are missing sfee.")
+
+        sns.scatterplot(data=prop_non_missing, x='eom', y='non_miss')
+        plt.xticks(rotation=45)
+        plt.title("Proportion of non-missing sfee by eom")
+        plt.show()
+        
+        # Frequency of dcbs groups
+        # "# What is the typical dcbs group?" 
+        # Prior study had 96% of sample in DCBS=1 group - we have 68% on US stocks
+        freq_dcbs = merged.loc[merged['dcbs'].notna(), 'dcbs'].value_counts(normalize=True)
+        print("Frequency of dcbs groups:")
+        print(freq_dcbs)
+        
+        # Part 2: Regression Analysis: Full data
+
+        print("Regression: sfee ~ market_equity")
+        mod1 = smf.ols('sfee ~ market_equity', data=merged).fit()
+        print(mod1.summary())
+        # The output here shows how much variance in sfee is explained by market_equity
+        
+        print("Regression: sfee ~ market_equity + rvol_252d")
+        mod2 = smf.ols('sfee ~ market_equity + rvol_252d', data=merged).fit()
+        print(mod2.summary())
+        
+        print("Regression: sfee ~ market_equity + rvol_252d + dolvol_126d")
+        mod3 = smf.ols('sfee ~ market_equity + rvol_252d + dolvol_126d', data=merged).fit()
+        print(mod3.summary())
+        
+        # Part 3: Regression Analysis: Outlier data
+
+        # Outlier Analysis: Plot sfee vs. market_equity for ALL EOM
+        # Change plot and filters according to analysis
+        # the plot shows some linearity between shorting costs and stock market values
+        subset = merged[
+            (merged['sfee'].notna()) & # Only use non-missing shorting fees
+            (merged['market_equity'].notna()) & # Only use non-missing market_equity rows
+            (merged['sfee'] < 0.05) & # Filter on shorting fee - there are fees of up to 900%
+            (merged['market_equity'] < 500000) # Filter on market_equity - largest US value is Apple 3e10^12
+        ]
+        sns.scatterplot(data=subset, x='market_equity', y='sfee')
+        plt.title("market_equity vs sfee (All EOM)")
+        plt.show()
+        print("subset shape:", subset.shape)
+        print(subset.head())
+        
+        # Regressions on subset excluding top 1% of sfee
+        sfee_99 = merged['sfee'].quantile(0.99)
+        subset99 = merged[merged['sfee'] <= sfee_99]
+        print("Regression on subset (sfee <= 99th percentile): sfee ~ market_equity")
+        mod1_99 = smf.ols('sfee ~ market_equity', data=subset99).fit()
+        print(mod1_99.summary())
+        
+        print("Regression on subset: sfee ~ market_equity + rvol_252d")
+        mod2_99 = smf.ols('sfee ~ market_equity + rvol_252d', data=subset99).fit()
+        print(mod2_99.summary())
+        
+        print("Regression on subset: sfee ~ market_equity + rvol_252d + dolvol_126d")
+        mod3_99 = smf.ols('sfee ~ market_equity + rvol_252d + dolvol_126d', data=subset99).fit()
+        print(mod3_99.summary())
+        
+        # Part 4: Summary statistics for each dcbs group + pickle generation + 
+
+        # Summary statistics by dcbs
+        summary_dcbs = merged.loc[merged['sfee'].notna()].groupby('dcbs')['sfee'].agg(['count', 'mean', 'median'])
+        total_n = summary_dcbs['count'].sum()
+        summary_dcbs['frequency'] = summary_dcbs['count'] / total_n
+        print("Summary statistics by dcbs:")
+        print(summary_dcbs.sort_values('dcbs'))
+        
+        # Generate pickle file    
+        out_path = os.path.join(Output_Dir, "merged_analysis.pkl")
+        merged.to_pickle(out_path)
+        print(f"Saved merged analysis data to {out_path}")
+
+        return merged
+
+def impute_sfee_outside_sample():
     """
-    Merge short fees with stock characteristics and perform analysis.
-    
-    Steps:
-      1. Merge short fees data with characteristics on 'permno' and 'eom'.
-      2. Compute summary statistics (proportion non-missing sfee by eom, dcbs frequencies).
-      3. Run regressions to examine the predictive power of characteristics on sfee.
-      4. Plot selected relationships.
+    Merge chars and sfee data
+    Impute missing short-fees based on medians from similar DCBS group
     
     Parameters:
-        short_fees (pd.DataFrame): Processed short fees data with columns 'permno', 'eom', 'sfee', 'dcbs'.
-        chars (pd.DataFrame): Stock characteristics data; must include 'permno', 'eom', 'market_equity', 
-                              'rvol_252d', and 'dolvol_126d'.
-    
+
+
+
     Returns:
-        pd.DataFrame: The merged DataFrame used for analysis.
+        pd.DataFrame: Merged DataFrame with imputed sfee based on medians
+
     """
-    import pandas as pd
-    import statsmodels.formula.api as smf
-    import matplotlib.pyplot as plt
-    import seaborn as sns
 
-    # Ensure that 'permno' in chars is a string and 'eom' is datetime
-    chars['permno'] = chars['permno'].astype(str)
-    chars['eom'] = pd.to_datetime(chars['eom'])
-    
-    # Merge on 'permno' and 'eom'
-    merged = pd.merge(short_fees, chars[['permno', 'eom', 'market_equity', 'rvol_252d', 'dolvol_126d']],
-                      on=['permno', 'eom'], how='left')
-    
-    # Summary Statistics: Proportion of non-missing sfee by eom
-    # "# How many are non-missing? Very few"
-    prop_non_missing = merged.groupby('eom')['sfee'].apply(lambda x: x.notna().mean()).reset_index(name='non_miss')
-    print("Proportion of non-missing sfee by eom (non-zero only):")
-    print(prop_non_missing[prop_non_missing['non_miss'] != 0])
-    
-    sns.scatterplot(data=prop_non_missing, x='eom', y='non_miss')
-    plt.xticks(rotation=45)
-    plt.title("Proportion of non-missing sfee by eom")
-    plt.show()
-    
-    # Frequency of dcbs groups
-    # "# What is the typical dcbs group? 96% of the sample are in the "easiest to borrow" group"
-    freq_dcbs = merged.loc[merged['dcbs'].notna(), 'dcbs'].value_counts(normalize=True)
-    print("Frequency of dcbs groups:")
-    print(freq_dcbs)
-    
-    # Regression Analysis
-    print("Regression: sfee ~ market_equity")
-    mod1 = smf.ols('sfee ~ market_equity', data=merged).fit()
-    print(mod1.summary())
-    # The output here shows how much variance in sfee is explained by market_equity
-    
-    print("Regression: sfee ~ market_equity + rvol_252d")
-    mod2 = smf.ols('sfee ~ market_equity + rvol_252d', data=merged).fit()
-    print(mod2.summary())
-    
-    print("Regression: sfee ~ market_equity + rvol_252d + dolvol_126d")
-    mod3 = smf.ols('sfee ~ market_equity + rvol_252d + dolvol_126d', data=merged).fit()
-    print(mod3.summary())
-    
-    # Outlier Analysis: Plot sfee vs. market_equity for maximum eom
-    max_eom = merged['eom'].max()
-    subset = merged[(merged['sfee'].notna()) & (merged['eom'] == max_eom)]
-    sns.scatterplot(data=subset, x='market_equity', y='sfee')
-    plt.title("market_equity vs sfee at max(eom)")
-    plt.show()
-    print("max_eom:", max_eom)
-    print("subset shape:", subset.shape)
-    print(subset.head())
-    
-    # # Regressions on subset excluding top 1% of sfee
-    # sfee_99 = merged['sfee'].quantile(0.99)
-    # subset99 = merged[merged['sfee'] <= sfee_99]
-    # print("Regression on subset (sfee <= 99th percentile): sfee ~ market_equity")
-    # mod1_99 = smf.ols('sfee ~ market_equity', data=subset99).fit()
-    # print(mod1_99.summary())
-    
-    # print("Regression on subset: sfee ~ market_equity + rvol_252d")
-    # mod2_99 = smf.ols('sfee ~ market_equity + rvol_252d', data=subset99).fit()
-    # print(mod2_99.summary())
-    
-    # print("Regression on subset: sfee ~ market_equity + rvol_252d + dolvol_126d")
-    # mod3_99 = smf.ols('sfee ~ market_equity + rvol_252d + dolvol_126d', data=subset99).fit()
-    # print(mod3_99.summary())
-    
-    # # Summary statistics by dcbs
-    # summary_dcbs = merged.loc[merged['sfee'].notna()].groupby('dcbs')['sfee'].agg(['count', 'mean', 'median'])
-    # total_n = summary_dcbs['count'].sum()
-    # summary_dcbs['prop'] = summary_dcbs['count'] / total_n
-    # print("Summary statistics by dcbs:")
-    # print(summary_dcbs.sort_values('dcbs'))
-    
-    # # Generate pickle file    
-    # out_path = os.path.join(Output_Dir, "merged_analysis.pkl")
-    # merged.to_pickle(out_path)
-    # print(f"Saved merged analysis data to {out_path}")
-
-    return merged
+    #
 
 
 #%% 
@@ -318,8 +351,9 @@ def get_shorting_fees():
     else:
         short_fees_filtered = short_fees_filters(short_fees_df)
     
-    print("After filtering:")
-    print(short_fees_filtered.head())
+    # Print filtered df
+    # print("After filtering:")
+    # print(short_fees_filtered.head())
     
     # 3. Link short fees to CRSP permno via CUSIP
     linked_path = os.path.join(Output_Dir, Linked_PKL)
@@ -369,51 +403,84 @@ get_shorting_fees()
 
 
 
-#%%
-def get_merged_test(merged):
-    data_path = r"C:\Master"
-    file_name = "merged_analysis.pkl"
-    merged_test_print = os.path.join(data_path, file_name)
-
-    return merged_test_print
-#%%
-path = get_merged_test(merged)
-print("Merged analysis pickle path:", path)
-#%%
-import pandas as pd
-df = pd.read_pickle(path)
-print("DataFrame shape:", df.shape)
-print(df.head())
-#%%
 
 
 
 
-
-
-
-
-
-
-
-
+# DIVERSE PRINTS ----------------------------------------------------
 #%%
 import os
 import pandas as pd
 
-Output_Dir = r"C:\Master"
-file_name = "merged_analysis.pkl"
-file_path = os.path.join(Output_Dir, file_name)
-csv_file = "merged_analysis.csv"
+output_dir = r"C:\Master"
+pkl_file = "sf_last.pkl"
+pkl_path = os.path.join(output_dir, pkl_file)
 
 # Load the pickle file into a DataFrame
-merged_analysis = pd.read_pickle(file_path)
-csv_path = os.path.join(Output_Dir, csv_file)
-merged_analysis.to_csv(csv_path, index=False)
-print(f"Exported merged_analysis to CSV: {csv_path}")
-# View the first few rows of the DataFrame
-print(merged_analysis.head())
+sf_last_df = pd.read_pickle(pkl_path)
+
+# Print basic info about the DataFrame
+print("DataFrame shape:", sf_last_df.shape)
+print("Columns:", sf_last_df.columns.tolist())
+print("First few rows:")
+print(sf_last_df.head())
+
+# Save the DataFrame to a CSV file
+csv_file = "sf_last.csv"  # using a CSV file extension
+csv_path = os.path.join(output_dir, csv_file)
+sf_last_df.to_csv(csv_path, index=False)
+
+print(f"DataFrame has been saved to {csv_path}")
+
+
+    
+
+
+
 #%%
+if False:
+    def get_merged_test(merged):
+        data_path = r"C:\Master"
+        file_name = "merged_analysis.pkl"
+        merged_test_print = os.path.join(data_path, file_name)
+
+        return merged_test_print
+    #%%
+    path = get_merged_test(merged)
+    print("Merged analysis pickle path:", path)
+    #%%
+    import pandas as pd
+    df = pd.read_pickle(path)
+    print("DataFrame shape:", df.shape)
+    print(df.head())
+    #%%
+
+
+
+
+
+#%%
+if False:
+    import os
+    import pandas as pd
+
+    Output_Dir = r"C:\Master"
+    file_name = "merged_analysis.pkl"
+    file_path = os.path.join(Output_Dir, file_name)
+    csv_file = "merged_analysis.csv"
+
+    # Load the pickle file into a DataFrame
+    merged_analysis = pd.read_pickle(file_path)
+    csv_path = os.path.join(Output_Dir, csv_file)
+    merged_analysis.to_csv(csv_path, index=False)
+    print(f"Exported merged_analysis to CSV: {csv_path}")
+    # View the first few rows of the DataFrame
+    print(merged_analysis.head())
+    #%%
+
+
+
+
 
 
 
