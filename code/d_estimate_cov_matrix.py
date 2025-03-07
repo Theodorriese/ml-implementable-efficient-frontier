@@ -118,9 +118,38 @@ def prepare_cluster_data(chars, cluster_labels, daily, settings, features):
         var_est = (wv_cur * centered_v.T) @ centered_v / wv_cur.sum()
         sd_diag = np.diag(np.sqrt(np.diag(var_est)))
         cov_out = sd_diag @ cor_est @ sd_diag
+        print(cov_out)
+
+
+        # VERSION 2.1
+        weights = w_cur / np.sum(w_cur)
+        weighted_mean_2 = np.average(cov_data, axis=0, weights=weights)
+        centered_data_2 = cov_data - weighted_mean_2
+        weighted_cov2 = (centered_data_2 * weights[:, None]).T @ centered_data_2
+
+        weight_sum_sq = np.sum(weights ** 2)
+        factor = 1 / (1 - weight_sum_sq)
+        weighted_cov_unbiased = weighted_cov2 * factor
+        print(weighted_cov_unbiased)
+
+        # VERSION 2.2
+        cov_matrix_numpy_bias = np.cov(centered_data_2.T, aweights=weights, bias=True)
+        print(cov_matrix_numpy_bias)
+
+        # Version 2.3
+        cov_matrix_biased = np.cov(centered_data_2.T, aweights=weights, bias=True)
+        weight_sum_sq2 = np.sum(weights ** 2)
+        factor = 1 / (1 - weight_sum_sq2)
+        cov_matrix_unbiased = cov_matrix_biased * factor
+        print(cov_matrix_unbiased)
+
+        # VERSION 2.4
+        cov_matrix_numpy_unbias = np.cov(centered_data_2.T, aweights=weights, bias=False)
+        print(cov_matrix_numpy_unbias)
+
 
         factor_names = list(fct_ret.columns[1:])
-        factor_cov_est[d] = pd.DataFrame(cov_out)
+        factor_cov_est[d] = pd.DataFrame(cov_matrix_numpy_unbias)
         factor_cov_est[d].index = factor_names
         factor_cov_est[d].columns = factor_names
 
@@ -199,23 +228,24 @@ def prepare_cluster_data(chars, cluster_labels, daily, settings, features):
             print(f"Warning: Missing factor names in char_data for {d}")
             continue  # Skip if factor exposures are not properly available
 
-        X = char_data[factor_names].fillna(0).values  # Extract factor exposures, fill NaNs with 0
+        X = char_data[factor_names].fillna(0)
+        X.index = char_data["id"].astype(str)
 
-        # Convert fct_load to a DataFrame with asset IDs as index
-        fct_load_df = pd.DataFrame(X, index=asset_ids, columns=factor_names)
-
-        # Step 6.1: Compute stock covariance matrix (asset-level covariance)
-        asset_cov = X @ fct_cov_annual @ X.T + np.diag((char_data["res_vol"] ** 2 * 21).values)
-
-        # Convert `asset_cov` to a DataFrame before storing it
-        asset_cov_df = pd.DataFrame(asset_cov)
-        asset_cov_df.index = asset_ids
-        asset_cov_df.columns = asset_ids
+        # # Convert fct_load to a DataFrame with asset IDs as index
+        # fct_load_df = pd.DataFrame(X, index=asset_ids, columns=factor_names)
+        #
+        # # Step 6.1: Compute stock covariance matrix (asset-level covariance)
+        # asset_cov = X @ fct_cov_annual @ X.T + np.diag((char_data["res_vol"] ** 2 * 21).values)
+        #
+        # # Convert `asset_cov` to a DataFrame before storing it
+        # asset_cov_df = pd.DataFrame(asset_cov)
+        # asset_cov_df.index = asset_ids
+        # asset_cov_df.columns = asset_ids
 
         # Step 7: Store results in dictionary (barra_cov)
         barra_cov[d] = {
-            "fct_load": fct_load_df,  # Factor exposures (now a DataFrame with asset IDs)
-            "fct_cov": asset_cov_df,  # Asset covariance matrix
+            "fct_load": X,
+            "fct_cov": fct_cov_annual,
             "ivol_vec": pd.Series((char_data["res_vol"] ** 2 * 21).values, index=asset_ids)  # Idiosyncratic risk
         }
 

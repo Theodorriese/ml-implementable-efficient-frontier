@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+from pandas.tseries.offsets import MonthEnd
 # from scipy.stats import rankdata
 # from functools import reduce
 import re
@@ -41,6 +42,9 @@ def create_cov(x, ids=None):
     Returns:
         np.ndarray: The computed covariance matrix.
     """
+    x["fct_load"].index = x["fct_load"].index.astype(str)
+    x["ivol_vec"].index = x["ivol_vec"].index.astype(str)
+
     if ids is None:
         load = x["fct_load"]
         ivol = x["ivol_vec"]
@@ -62,7 +66,11 @@ def create_lambda(x, ids):
     Returns:
         np.ndarray: A diagonal matrix of lambda values for the given IDs.
     """
-    return np.diag([x[i] for i in ids])
+    x = {str(k): v for k, v in x.items()}  # Convert keys to strings
+    ids = [str(i) for i in ids]  # Ensure IDs are also strings
+
+    return np.diag([x[i] for i in ids])  # Now lookup works
+
 
 
 # Compute expected risk
@@ -242,47 +250,106 @@ def initial_weights_new(data, w_type, udf_weights=None):
 
 
 # Portfolio function
-def pf_ts_fun(weights, data, wealth, gam):
+def agg_func(df):
     """
-    Computes portfolio time-series performance based on weights and returns.
+    Aggregates portfolio statistics for a given end-of-month (eom) group.
+
+    This function computes key portfolio metrics, including:
+    - Total invested capital (`inv`)
+    - Total short positions (`shorting`)
+    - Portfolio turnover (`turnover`)
+    - Portfolio returns (`r`)
+    - Transaction costs (`tc`)
 
     Parameters:
-        weights (pd.DataFrame): Portfolio weights for each 'id' and 'eom'.
-                                Expected columns: ['id', 'eom', 'w', 'w_start'].
-        data (pd.DataFrame): Stock return data with 'id', 'eom', and 'ret_ld1', 'lambda'.
-        wealth (pd.DataFrame): Wealth data with 'eom' and 'wealth'.
-        gam (float): Risk-aversion parameter.
+        df (pd.DataFrame): DataFrame containing portfolio data for a single `eom` period.
+                           Expected columns: ['w', 'w_start', 'ret_ld1', 'lambda', 'wealth'].
 
     Returns:
-        pd.DataFrame: Time-series portfolio performance metrics including:
-                      - 'inv': Total invested (absolute weight sum).
-                      - 'shorting': Total short positions (absolute sum of negative weights).
-                      - 'turnover': Total portfolio turnover.
-                      - 'r': Portfolio return.
-                      - 'tc': Transaction costs.
-                      - 'eom_ret': End-of-month return date.
+        pd.Series: A Series containing aggregated portfolio statistics:
+            - 'inv': Sum of absolute weights (total invested capital).
+            - 'shorting': Sum of absolute values of negative weights (total short positions).
+            - 'turnover': Sum of absolute changes in weights (`|w - w_start|`).
+            - 'r': Portfolio returns computed as `sum(w * ret_ld1)`.
+            - 'tc': Transaction costs calculated as `(wealth / 2) * sum(lambda * (w - w_start)^2)`.
     """
-    # Merge weights with data and wealth
-    comb = data[['id', 'eom', 'ret_ld1', 'lambda']].merge(weights, on=["id", "eom"], how="left")
-    comb = comb.merge(wealth[['eom', 'wealth']], on="eom", how="left")
+    inv = df['w'].abs().sum(skipna=True)
+    shorting = df.loc[df['w'] < 0, 'w'].abs().sum(skipna=True)
+    turnover = np.nansum(np.abs(df['w'] - df['w_start']))
+    r = np.nansum(df['w'] * df['ret_ld1'])
 
-    # Ensure 'w' is properly handled for calculations
-    comb['w'] = comb['w'].fillna(0)
+    # Get unique wealth value
+    wealth_val = df['wealth'].dropna().unique()
+    wealth_val = wealth_val[0] if len(wealth_val) > 0 else 0
 
-    # Compute portfolio metrics
-    summary = comb.groupby("eom").agg(
-        inv=("w", lambda x: x.abs().sum()),  # Total invested (sum of absolute weights)
-        shorting=("w", lambda x: x[x < 0].abs().sum()),  # Total short positions
-        turnover=("w", lambda x: np.sum(np.abs(x - comb.loc[x.index, "w_start"]))),  # Portfolio turnover
-        r=("w", lambda x: np.sum(x * comb.loc[x.index, "ret_ld1"])),  # Portfolio return
-        tc=("w", lambda x: (comb["wealth"].iloc[0] / 2) * np.sum(comb.loc[x.index, "lambda"] * (x - comb.loc[x.index, "w_start"]) ** 2))  # Transaction costs
-    ).reset_index()
+    # Transaction cost
+    tc = wealth_val / 2 * np.nansum(df['lambda'] * (df['w'] - df['w_start']) ** 2)
 
-    # Adjust end-of-month return date
-    summary["eom_ret"] = summary["eom"] + pd.DateOffset(months=1) - pd.DateOffset(days=1)
+    return pd.Series({
+        'inv': inv,
+        'shorting': shorting,
+        'turnover': turnover,
+        'r': r,
+        'tc': tc
+    })
 
-    return summary
 
+def pf_ts_fun(weights, data, wealth):
+    """
+    Computes time-series portfolio performance based on given weights and stock return data.
+
+    This function calculates **monthly portfolio metrics** such as:
+    - Total capital invested (`inv`).
+    - Short positions (`shorting`).
+    - Portfolio turnover (`turnover`).
+    - Monthly returns (`r`).
+    - Transaction costs (`tc`).
+
+    Parameters:
+        weights (pd.DataFrame): DataFrame containing portfolio weights for each stock per month.
+                                Expected columns: ['id', 'eom', 'w', 'w_start'].
+        data (pd.DataFrame): Stock return data with necessary financial metrics.
+                             Expected columns: ['id', 'eom', 'ret_ld1', 'pred_ld1', 'lambda'].
+        wealth (pd.DataFrame): Portfolio wealth per `eom`. Expected columns: ['eom', 'wealth'].
+        gam (float): Unused parameter (can be removed or used for additional calculations).
+
+    Returns:
+        pd.DataFrame: Aggregated portfolio statistics with the following columns:
+            - 'inv': Total capital invested.
+            - 'shorting': Total short positions.
+            - 'turnover': Portfolio turnover.
+            - 'r': Portfolio returns.
+            - 'tc': Transaction costs.
+            - 'eom_ret': End-of-month return date.
+    """
+
+    # Step 1: Merge weights with relevant columns from data
+    comb = pd.merge(
+        weights,
+        data[['id', 'eom', 'ret_ld1', 'pred_ld1', 'lambda']],
+        on=['id', 'eom'],
+        how='left'
+    )
+
+    # Step 2: Merge with wealth data only if needed
+    if 'wealth' not in comb.columns:
+        comb = pd.merge(
+            comb,
+            wealth[['eom', 'wealth']],
+            on='eom',
+            how='left'
+        )
+
+    # Step 3: Ensure w_start is not NaN
+    comb['w_start'] = comb['w_start'].fillna(0)
+
+    # Step 4: Apply the aggregation function
+    grouped = comb.groupby('eom').apply(agg_func).reset_index()
+
+    # Step 5: Compute end-of-month return date using MonthEnd
+    grouped['eom_ret'] = grouped['eom'] + MonthEnd(1)
+
+    return grouped
 
 
 # Size-based screen

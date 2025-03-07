@@ -1,5 +1,7 @@
 import numpy as np
 import pandas as pd
+import os
+from tqdm import tqdm
 from scipy.linalg import sqrtm, solve
 from itertools import product
 from collections import defaultdict
@@ -186,7 +188,7 @@ def tpf_implement(data, cov_list, wealth, dates, gam):
 
     tpf_opt = pd.concat(tpf_opt, ignore_index=True)
     tpf_w = w_fun(data, dates, tpf_opt, wealth)
-    tpf_pf = pf_ts_fun(tpf_w, data, wealth, gam)
+    tpf_pf = pf_ts_fun(tpf_w, data, wealth)
     tpf_pf['type'] = "Markowitz-ML"
 
     return {"w": tpf_w, "pf": tpf_pf}
@@ -296,7 +298,7 @@ def mv_risky_fun(data, cov_list, wealth, dates, gam, u_vec):
     # Compute portfolios for each utility value
     def portfolio_performance(u_sel):
         w = mv_opt_all[mv_opt_all['u'] == u_sel].drop(columns='u')
-        portfolio = pf_ts_fun(w, data, wealth, gam)
+        portfolio = pf_ts_fun(w, data, wealth)
         portfolio['u'] = u_sel
         return portfolio
 
@@ -360,7 +362,7 @@ def factor_ml_implement(data, wealth, dates, n_pfs, gam):
     hml_w = w_fun(data[data["eom"].isin(dates) & data["valid"]], dates, hml_opt, wealth)
 
     # Compute portfolio performance
-    hml_pf = pf_ts_fun(hml_w, data, wealth, gam)
+    hml_pf = pf_ts_fun(hml_w, data, wealth)
     hml_pf["type"] = "Factor-ML"
 
     # Output dictionary
@@ -396,7 +398,7 @@ def ew_implement(data, wealth, dates, gamma_rel):
     ew_w = w_fun(data_valid, dates, ew_opt[['id', 'eom', 'w']], wealth)
 
     # Compute portfolio performance
-    ew_pf = pf_ts_fun(ew_w, data, wealth, gamma_rel)
+    ew_pf = pf_ts_fun(ew_w, data, wealth)
     ew_pf['type'] = "1/N"
 
     # Return weights and portfolio performance
@@ -437,7 +439,7 @@ def mkt_implement(data, wealth, dates, gamma_rel):
     mkt_w = w_fun(data_valid, dates, mkt_opt[['id', 'eom', 'w']], wealth)
 
     # Compute portfolio performance
-    mkt_pf = pf_ts_fun(mkt_w, data, wealth, gamma_rel)
+    mkt_pf = pf_ts_fun(mkt_w, data, wealth)
     mkt_pf['type'] = "Market"
 
     # Return weights and portfolio performance
@@ -483,7 +485,7 @@ def rw_implement(data, wealth, dates, gamma_rel):
     rw_w = w_fun(data_valid, dates, rw_opt, wealth)
 
     # Compute portfolio performance
-    rw_pf = pf_ts_fun(rw_w, data, wealth, gamma_rel)
+    rw_pf = pf_ts_fun(rw_w, data, wealth)
     rw_pf['type'] = "Rank-ML"
 
     # Return weights and portfolio performance
@@ -562,7 +564,7 @@ def mv_implement(data, cov_list, wealth, dates, gamma_rel):
 
     # Compute final portfolio weights and performance
     mv_w = w_fun(data[data['eom'].isin(dates) & data['valid']], dates, mv_opt, wealth)
-    mv_pf = pf_ts_fun(mv_w, data, wealth, gamma_rel)
+    mv_pf = pf_ts_fun(mv_w, data, wealth)
     mv_pf['type'] = "Minimum Variance"
 
     return {"w": mv_w, "pf": mv_pf}
@@ -642,10 +644,8 @@ def static_val_fun(data, dates, cov_list, lambda_list, wealth, cov_type, gamma_r
             print(f"Warning: No lambda values found for {d}")
             continue
 
-        lambda_matrix = pd.DataFrame.from_dict(lambda_data, orient="index", columns=["lambda"])
-        lambda_matrix.index = lambda_matrix.index.astype(str)
-        lambda_matrix = lambda_matrix.loc[lambda_matrix.index.intersection(ids)].copy()
-        lambda_matrix *= k
+        lambda_mat = create_lambda(lambda_data, ids)
+        lambda_mat *= k
 
         # Extract weights
         pred_ld1 = static_weights.loc[static_weights['eom'] == d, 'pred_ld1'].values.reshape(-1, 1)
@@ -653,20 +653,13 @@ def static_val_fun(data, dates, cov_list, lambda_list, wealth, cov_type, gamma_r
             static_weights['eom'] == d, 'w_start'].fillna(0)
         w_start = static_weights.loc[static_weights['eom'] == d, 'w_start'].values.reshape(-1, 1)
 
-        # Ensure lambda_matrix is correctly shaped
-        lambda_matrix = lambda_matrix.values.reshape(-1, 1)
-
-        # Fix shape mismatch for matrix multiplication
-        lambda_w_product = lambda_matrix * w_start
-
-        # Solve for optimal weights
-        weights = np.linalg.solve(
-            sigma_gam + wealth_t * lambda_matrix,
-            pred_ld1 * u + wealth_t * lambda_w_product
-        )
+        ## VERSION 2
+        rhs = (pred_ld1 * u) + wealth_t * (lambda_mat @ w_start)
+        A = sigma_gam + wealth_t * lambda_mat
+        w_solution = np.linalg.solve(A, rhs)
 
         # Assign weights back to static_weights
-        static_weights.loc[static_weights['eom'] == d, 'w'] = weights.flatten()
+        static_weights.loc[static_weights['eom'] == d, 'w'] = w_solution.flatten()
 
         # Update weights for the next month
         next_month_idx = list(dates).index(d) + 1
@@ -751,7 +744,7 @@ def static_implement(data_tc, cov_list, lambda_list,
     if validation is None:
         validation_list = []
         # Enumerate over rows so 'i' is a proper integer
-        for i, hprow in static_hps.iterrows():
+        for i, hprow in tqdm(static_hps.iterrows(), total=len(static_hps), desc="Processing Hyperparameters"):
             k, u, g = float(hprow['k']), float(hprow['u']), float(hprow['g'])
 
             # Calculate weights for each combination
@@ -765,8 +758,9 @@ def static_implement(data_tc, cov_list, lambda_list,
                 gamma_rel=gamma_rel,
                 k=k, g=g, u=u
             )
+
             # Evaluate portfolio performance
-            pf_results = pf_ts_fun(static_w, data_tc, wealth, gamma_rel)
+            pf_results = pf_ts_fun(static_w, data_tc, wealth)
             pf_results['hp_no'] = i
             pf_results['k'] = k
             pf_results['u'] = u
@@ -797,9 +791,9 @@ def static_implement(data_tc, cov_list, lambda_list,
         wealth=wealth,
         cov_type=cov_type,
         gamma_rel=gamma_rel,
-        hps=optimal_hps  # your static_val_fun presumably supports passing a DataFrame of best HPs
+        hps=optimal_hps
     )
-    pf = pf_ts_fun(w, data_tc, wealth, gamma_rel)
+    pf = pf_ts_fun(w, data_tc, wealth)
     pf['type'] = "Static-ML*"
 
     return {

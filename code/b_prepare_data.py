@@ -59,7 +59,7 @@ def load_risk_free(data_path):
 def load_market_data(data_path):
     market = pd.read_csv(os.path.join(data_path, "market_returns.csv"))
     market["eom"] = pd.to_datetime(market["eom"])
-    return market[market["excntry"] == "USA"][["eom", "mkt_vw_exc"]] # Return USA data
+    return market[market["excntry"] == "USA"][["eom", "mkt_vw_exc"]]
 
 
 # Wealth function

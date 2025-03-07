@@ -120,7 +120,6 @@ print("Step 2: Estimating covariance matrix...")
 #     features=features
 # )
 #
-#
 # # Extract components
 # cluster_data_d = cov_results["cluster_data_d"]
 # fct_ret = cov_results["fct_ret"]
