@@ -188,7 +188,7 @@ def load_monthly_data(data_path, settings, risk_free):
 def preprocess_chars(data_path, features, settings, data_ret_ld1, wealth):
     cols_to_use = ["id", "eom", "sic", "ff49", "size_grp", "me", "crsp_exchcd", "rvol_252d", "dolvol_126d"] + features
     chars = pd.read_csv(os.path.join(data_path, "usa.csv"), usecols=cols_to_use)
-    chars = chars[chars["id"] <= 99999]  # Filter only CRSP observations
+    chars = chars[chars["id"] <= 99999] # Filter only CRSP observations
 
     # Add useful columns
     chars["dolvol"] = chars["dolvol_126d"]
@@ -198,22 +198,25 @@ def preprocess_chars(data_path, features, settings, data_ret_ld1, wealth):
     chars["eom"] = pd.to_datetime(chars["eom"])
 
     # Convert columns to datetime for proper merging
+    chars["eom"] = pd.to_datetime(chars["eom"])
+
     chars.rename(columns={"eom": "eom_m"}, inplace=True)
     chars = chars.merge(data_ret_ld1, on=["id", "eom_m"], how="left")
     chars.drop(columns=["eom"], inplace=True)
     chars.rename(columns={"eom_m": "eom_ret"}, inplace=True)
-
-    # Merge 'mu_ld1' from wealth
     chars = chars.merge(wealth[["eom_ret", "mu_ld1"]], on="eom_ret", how="left")
     chars.rename(columns={"eom_ret": "eom"}, inplace=True)
 
-    # **Add mu_ld0 (equivalent to R shift)**
+    # Shift `eom` forward by 1 month before merging with `chars`
     wealth_temp = wealth.copy()
-    wealth_temp["eom_ret"] = wealth_temp["eom_ret"] + pd.DateOffset(months=1) - pd.Timedelta(days=1)
-    wealth_temp = wealth_temp.rename(columns={"mu_ld1": "mu_ld0"})
-    chars = chars.merge(wealth_temp[["eom_ret", "mu_ld0"]], on="eom_ret", how="left")
+    wealth_temp["eom"] = (wealth_temp["eom"] + pd.DateOffset(months=1)).apply(lambda x: x + pd.offsets.MonthEnd(0))
+
+    # Merge mu_ld1 as mu_ld0 into chars
+    chars = chars.merge(wealth_temp[["eom", "mu_ld1"]].rename(columns={"mu_ld1": "mu_ld0"}), on="eom", how="left")
 
     return chars
+
+
 
 
 # Date screen
