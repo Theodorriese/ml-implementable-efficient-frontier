@@ -57,7 +57,6 @@ def create_lambda_list(chars):
     }
 
 
-
 def calculate_dates(settings, pf_set, barra_cov):
     """
     Calculate important date ranges for the portfolio.

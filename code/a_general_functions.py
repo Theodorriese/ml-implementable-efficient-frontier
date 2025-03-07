@@ -331,6 +331,13 @@ def pf_ts_fun(weights, data, wealth):
         how='left'
     )
 
+    # Resolve duplicate column issue dynamically
+    for col in ["ret_ld1", "pred_ld1", "lambda"]:
+        x_col, y_col = f"{col}_x", f"{col}_y"
+        if x_col in comb.columns and y_col in comb.columns:
+            comb[col] = comb[[x_col, y_col]].bfill(axis=1).iloc[:, 0]
+            comb.drop(columns=[x_col, y_col], inplace=True)
+
     # Step 2: Merge with wealth data only if needed
     if 'wealth' not in comb.columns:
         comb = pd.merge(

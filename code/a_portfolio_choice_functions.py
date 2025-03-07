@@ -607,11 +607,11 @@ def static_val_fun(data, dates, cov_list, lambda_list, wealth, cov_type, gamma_r
     )
 
     # Resolve duplicate column issue by choosing the correct version
-    static_weights["tr_ld1"] = static_weights[["tr_ld1_x", "tr_ld1_y"]].bfill(axis=1).iloc[:, 0]
-    static_weights["pred_ld1"] = static_weights[["pred_ld1_x", "pred_ld1_y"]].bfill(axis=1).iloc[:, 0]
-
-    # Drop the unnecessary '_x' and '_y' columns
-    static_weights.drop(columns=["tr_ld1_x", "tr_ld1_y", "pred_ld1_x", "pred_ld1_y"], inplace=True)
+    for col in ["tr_ld1", "pred_ld1", "mu_ld1"]:
+        x_col, y_col = f"{col}_x", f"{col}_y"
+        if x_col in static_weights.columns and y_col in static_weights.columns:
+            static_weights[col] = static_weights[[x_col, y_col]].bfill(axis=1).iloc[:, 0]
+            static_weights.drop(columns=[x_col, y_col], inplace=True)
 
     # Iterate over each date
     for d in dates:
@@ -847,14 +847,20 @@ def pfml_input_fun(data_tc, cov_list, lambda_list, gamma_rel, wealth, mu, dates,
 
     # Create random Fourier features if required
     if rff_feat:
-        np.random.seed(seed)
-        rff_x = np.random.randn(len(features), p_max)
-        rff_cos = np.cos(np.dot(data_tc[features], rff_x) / g)
-        rff_sin = np.sin(np.dot(data_tc[features], rff_x) / g)
+        # Generate Random Fourier Features using the corrected function
+        rff_output = rff(data_tc[features].values, p=p_max, g=g)
 
+        # Extract components
+        rff_x = rff_output["W"]  # Store weights separately
+        rff_cos = rff_output["X_cos"]
+        rff_sin = rff_output["X_sin"]
+
+        # Stack cosine and sine features
         rff_features = np.hstack([rff_cos, rff_sin])
         rff_columns = [f"rff{i}_cos" for i in range(1, p_max // 2 + 1)] + \
                       [f"rff{i}_sin" for i in range(1, p_max // 2 + 1)]
+
+        # Convert to DataFrame
         rff_df = pd.DataFrame(rff_features, columns=rff_columns)
 
         data = pd.concat(
@@ -870,7 +876,7 @@ def pfml_input_fun(data_tc, cov_list, lambda_list, gamma_rel, wealth, mu, dates,
         data = data_tc[['id', 'eom', 'valid', 'ret_ld1', 'tr_ld0', 'mu_ld0'] + features]
         feat_new = features
 
-    # We'll add 'constant' so we can do a group-based transformation
+    # We will add 'constant' so we can do a group-based transformation
     feat_cons = feat_new + ['constant']
 
     # Scale features if requested
@@ -913,7 +919,7 @@ def pfml_input_fun(data_tc, cov_list, lambda_list, gamma_rel, wealth, mu, dates,
         w = wealth.loc[wealth['eom'] == d, 'wealth'].iloc[0]
         rf = risk_free.loc[risk_free['eom'] == d, 'rf'].iloc[0]
 
-        # Some function m_func used for weighting, presumably defined elsewhere
+        # m_func used for weighting
         m = m_func(
             w=w, mu=mu, rf=rf,
             sigma_gam=sigma * gamma_rel,
@@ -979,7 +985,6 @@ def pfml_input_fun(data_tc, cov_list, lambda_list, gamma_rel, wealth, mu, dates,
         # rff_x is guaranteed to be defined here (either None or the RFF array)
         'rff_w': rff_x if rff_feat else None
     }
-
 
 
 def pfml_feat_fun(p, orig_feat, features):
@@ -1352,7 +1357,6 @@ def pfml_w(
     return fa_weights
 
 
-
 def pfml_implement(
     data_tc,
     cov_list,
@@ -1414,7 +1418,7 @@ def pfml_implement(
     """
 
     # 1. Hyperparameter search if none provided
-    if hps is None:
+    if not hps:
         hps = {}
         for g in g_vec:
             print(f"Processing g: {g}")
@@ -1512,7 +1516,7 @@ def pfml_implement(
         aims=aims
     )
 
-    pf = pf_ts_fun(w, data_tc, wealth, gamma_rel)
+    pf = pf_ts_fun(w, data_tc, wealth)
     pf["type"] = "Portfolio-ML"
 
     # 5. RFF weight list
@@ -1623,7 +1627,7 @@ def pfml_cf_fun(data, cf_cluster, pfml_base, dates, cov_list, lambda_list, scale
 
     # Step 4: Compute counterfactual portfolio weights
     w_cf = pfml_w(data, dates, cov_list, lambda_list, gamma_rel, iter, risk_free, wealth, mu, aim_cf)
-    pf_cf = pf_ts_fun(w_cf, data, wealth, gamma_rel)
+    pf_cf = pf_ts_fun(w_cf, data, wealth)
     pf_cf['type'] = "Portfolio-ML"
     pf_cf['cluster'] = cf_cluster
 

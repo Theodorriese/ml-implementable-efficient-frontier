@@ -182,7 +182,7 @@ def run_f_base_case(chars, barra_cov, wealth, dates_oos, pf_set, settings, confi
     # benchmark_portfolios(chars, barra_cov, wealth, dates_oos, pf_set, settings, output_path)
 
     # Run Static-ML
-    static_ml(chars, barra_cov, lambda_list, wealth, pf_set, settings, dates_oos, dates_hp, output_path)
+    # static_ml(chars, barra_cov, lambda_list, wealth, pf_set, settings, dates_oos, dates_hp, output_path)
 
     # Run Portfolio-ML
     portfolio_ml(chars, barra_cov, lambda_list, features, risk_free, wealth, pf_set, settings, dates_m2, dates_oos, hp_years, output_path)

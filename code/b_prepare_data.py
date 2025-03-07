@@ -188,7 +188,7 @@ def load_monthly_data(data_path, settings, risk_free):
 def preprocess_chars(data_path, features, settings, data_ret_ld1, wealth):
     cols_to_use = ["id", "eom", "sic", "ff49", "size_grp", "me", "crsp_exchcd", "rvol_252d", "dolvol_126d"] + features
     chars = pd.read_csv(os.path.join(data_path, "usa.csv"), usecols=cols_to_use)
-    chars = chars[chars["id"] <= 99999] # Filter only CRSP observations
+    chars = chars[chars["id"] <= 99999]  # Filter only CRSP observations
 
     # Add useful columns
     chars["dolvol"] = chars["dolvol_126d"]
@@ -196,29 +196,22 @@ def preprocess_chars(data_path, features, settings, data_ret_ld1, wealth):
     chars["rvol_m"] = chars["rvol_252d"] * np.sqrt(21)
 
     chars["eom"] = pd.to_datetime(chars["eom"])
-    # data_ret_ld1["eom_m"] = pd.to_datetime(data_ret_ld1["eom"])
 
-    ### TEMP MERGE - FIX ALL THE EOM NAMES
     # Convert columns to datetime for proper merging
-    chars["eom"] = pd.to_datetime(chars["eom"])
-    # data_ret_ld1["eom_m"] = pd.to_datetime(data_ret_ld1["eom_m"])
-    # wealth["eom_ret"] = pd.to_datetime(wealth["eom_ret"])
-
     chars.rename(columns={"eom": "eom_m"}, inplace=True)
     chars = chars.merge(data_ret_ld1, on=["id", "eom_m"], how="left")
     chars.drop(columns=["eom"], inplace=True)
     chars.rename(columns={"eom_m": "eom_ret"}, inplace=True)
+
+    # Merge 'mu_ld1' from wealth
     chars = chars.merge(wealth[["eom_ret", "mu_ld1"]], on="eom_ret", how="left")
     chars.rename(columns={"eom_ret": "eom"}, inplace=True)
 
-    # # Exchange code screen - OBS this screens for only NYSE stocks - change if needed
-    # if settings["screens"]["nyse_stocks"]:
-    #     # Ensure 'crsp_exchcd' exists and calculate exclusion percentage
-    #     exclude_pct = round(((chars["crsp_exchcd"] != 1).astype(int).mean()) * 100, 2)
-    #     print(f"NYSE stock screen excludes {exclude_pct}% of the observations")
-    #     chars = chars[chars["crsp_exchcd"] == 1]
-    #
-    # print(chars["crsp_exchcd"].head())  # Preview the first few rows
+    # **Add mu_ld0 (equivalent to R shift)**
+    wealth_temp = wealth.copy()
+    wealth_temp["eom_ret"] = wealth_temp["eom_ret"] + pd.DateOffset(months=1) - pd.Timedelta(days=1)
+    wealth_temp = wealth_temp.rename(columns={"mu_ld1": "mu_ld0"})
+    chars = chars.merge(wealth_temp[["eom_ret", "mu_ld0"]], on="eom_ret", how="left")
 
     return chars
 

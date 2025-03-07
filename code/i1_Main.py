@@ -64,7 +64,7 @@ settings = {
     "months": False,
     "split": {
         "train_end": pd.Timestamp("2015-12-31"), # obs
-        "test_end": pd.Timestamp("2019-12-31"), # just changed
+        "test_end": pd.Timestamp("2019-12-31"), # obs
         "val_years": 2,
         "model_update_freq": "yearly",  # Options: "once", "yearly", "decade"
         "train_lookback": 1,
@@ -77,7 +77,7 @@ settings = {
     "deletion_n": 12,  # Exclude from universe after N periods where the stock is non-valid
     "screens": {
         "start": pd.Timestamp("2010-01-01"),
-        "end": pd.Timestamp("2020-12-31"),
+        "end": pd.Timestamp("2019-12-31"),
         "feat_pct": 0.5,
         "nyse_stocks": True
     },
@@ -90,8 +90,8 @@ settings = {
     "pf": {
         "dates": {
             "start_year": 2016,
-            "end_yr": 2020,
-            "split_years": 4
+            "end_yr": 2019,
+            "split_years": 3 # changed from 4
         },
         "hps": {
             "cov_type": "cov_add",

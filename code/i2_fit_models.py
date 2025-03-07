@@ -138,6 +138,8 @@ def prepare_and_fit_models(settings, pf_set, features, output_path):
 
     # -------------------- Step 2: Model Fitting --------------------
 
+    # # To just load them
+
     # print("Loading monthly return data...")
     # data_ret = pd.read_csv(os.path.join(settings["data_path"], "data_ret_processed.csv"))
     #
@@ -163,11 +165,6 @@ def prepare_and_fit_models(settings, pf_set, features, output_path):
 
     print("Data preparation and model fitting complete.")
     return chars, models
-
-    # create as temp csv file to store. and then proceed
-
-    # -------------------- Step 3: Estimate covariance matrix --------------------
-    # To come...
 
 
 # Main Runner
