@@ -9,11 +9,43 @@ from functools import reduce
 from a_general_functions import create_cov, create_lambda, sigma_gam_adj, initial_weights_new, pf_ts_fun
 from a_return_prediction_functions import rff
 from b_prepare_data import load_cluster_labels
+import ctypes
+
+# Load the compiled C++ shared library
+try:
+    lib = ctypes.CDLL("sqrtm_cpp.dll")
+except OSError:
+    raise RuntimeError("Failed to load sqrtm_cpp shared library. Ensure it is compiled correctly.")
+
+# Define the function signature in ctypes
+lib.sqrtm_cpp.argtypes = [np.ctypeslib.ndpointer(dtype=np.float64, ndim=2, flags="C_CONTIGUOUS")]
+lib.sqrtm_cpp.restype = ctypes.POINTER(ctypes.c_double)
+
+def sqrtm_cpp(A):
+    """
+    Calls the C++ sqrtm function to compute the matrix square root.
+
+    Parameters:
+        A (ndarray): Input square matrix.
+
+    Returns:
+        ndarray: Square root of matrix A.
+    """
+    n = A.shape[0]
+    A_ctypes = np.ascontiguousarray(A, dtype=np.float64)  # Ensure correct dtype and memory layout
+
+    # Call the C++ function
+    A_sqrt_ptr = lib.sqrtm_cpp(A_ctypes)
+
+    # Convert the output back to a NumPy array
+    A_sqrt = np.ctypeslib.as_array(A_sqrt_ptr, shape=(n, n))
+
+    return np.real(A_sqrt)  # Ensure output is real
 
 
 def m_func(w, mu, rf, sigma_gam, gam, lambda_mat, iterations):
     """
-    Computes the m matrix using the iterative process described in the R function.
+    Computes the m matrix exactly as in the R function, using C++ for sqrtm.
 
     Parameters:
         w (float): Weight scalar.
@@ -41,16 +73,16 @@ def m_func(w, mu, rf, sigma_gam, gam, lambda_mat, iterations):
     x = (1 / w) * lamb_neg05 @ sigma_gam @ lamb_neg05
     y = np.diag(1 + np.diag(sigma_gr))
 
-    # Initial sigma_hat and m_tilde
+    # Initial sigma_hat and m_tilde using C++ sqrtm function
     sigma_hat = x + np.diag(1 + g_bar)
     sigma_hat_squared = sigma_hat @ sigma_hat
-    m_tilde = 0.5 * (sigma_hat - sqrtm(sigma_hat_squared - 4 * np.eye(n)))
+    m_tilde = 0.5 * (sigma_hat - sqrtm_cpp(sigma_hat_squared - 4 * np.eye(n)))
 
-    # Iterative process
+    # Iterative process (EXACT match to R: `m_tilde <- solve(x + y - m_tilde * sigma_gr)`)
     for _ in range(iterations):
         m_tilde = solve(x + y - m_tilde @ sigma_gr, np.eye(n))
 
-    # Output
+    # Final Output (matches `lamb_neg05 %*% m_tilde %*% sqrt(lambda)` in R)
     return lamb_neg05 @ m_tilde @ np.sqrt(lambda_mat)
 
 
@@ -333,7 +365,7 @@ def mv_risky_fun(data, cov_list, wealth, dates, gam, u_vec):
     return portfolio_results
 
 
-def factor_ml_implement(data, wealth, dates, n_pfs, gam):
+def factor_ml_implement(data, wealth, dates, n_pfs):
     """
     Implements a High Minus Low (HML) portfolio strategy using predicted returns.
 
@@ -395,7 +427,7 @@ def factor_ml_implement(data, wealth, dates, n_pfs, gam):
     return {"w": hml_w, "pf": hml_pf}
 
 
-def ew_implement(data, wealth, dates, gamma_rel):
+def ew_implement(data, wealth, dates):
     """
     Equal-weighted (1/N) portfolio implementation.
 
@@ -404,7 +436,6 @@ def ew_implement(data, wealth, dates, gamma_rel):
                              and `valid` column indicating valid rows.
         wealth (pd.DataFrame or list): Wealth data required for weight adjustments.
         dates (list): List of dates for which the portfolio is to be constructed.
-        gamma_rel (float): Risk-aversion parameter.
 
     Returns:
         dict: A dictionary containing:
@@ -472,7 +503,7 @@ def mkt_implement(data, wealth, dates, gamma_rel):
     return {"w": mkt_w, "pf": mkt_pf}
 
 
-def rw_implement(data, wealth, dates, gamma_rel):
+def rw_implement(data, wealth, dates):
     """
     Rank-weighted portfolio implementation.
 
@@ -518,16 +549,15 @@ def rw_implement(data, wealth, dates, gamma_rel):
     return {"w": rw_w, "pf": rw_pf}
 
 
-def mv_implement(data, cov_list, wealth, dates, gamma_rel):
+def mv_implement(data, cov_list, wealth, dates):
     """
-    Minimum-variance portfolio implementation.
+    Minimum-variance portfolio implementation using `create_cov`.
 
     Parameters:
         data (pd.DataFrame): Portfolio data.
         cov_list (dict): Dictionary of covariance matrices indexed by dates.
         wealth (pd.DataFrame or list): Wealth data.
         dates (list): List of portfolio construction dates.
-        gamma_rel (float): Risk-aversion parameter.
 
     Returns:
         dict: A dictionary containing:
@@ -550,24 +580,19 @@ def mv_implement(data, cov_list, wealth, dates, gamma_rel):
         data_sub = data_split[d]
         ids = data_sub['id'].astype(str).values  # Convert to str
 
-        # Ensure `d` is in the correct format for `cov_list`
+        # Retrieve covariance data and construct sigma using create_cov
         sigma_data = cov_list.get(d, None)
-        if sigma_data is None or "fct_cov" not in sigma_data:
-            print(f"Warning: No valid covariance matrix found for {d}")
-            continue  # Skip if no valid covariance matrix
+        if sigma_data is None:
+            print(f"Warning: No covariance data found for {d}")
+            continue  # Skip if no valid covariance data
 
-        sigma = sigma_data["fct_cov"]
+        sigma = create_cov(sigma_data, ids)  # Use new covariance function
 
-        # Ensure sigma is a DataFrame
-        if isinstance(sigma, pd.DataFrame):
-            sigma.index = sigma.index.astype(str)  # Ensure index is str
-            sigma.columns = sigma.columns.astype(str)  # Ensure columns are str
-            sigma = sigma.loc[sigma.index.intersection(ids), sigma.columns.intersection(ids)]  # Align with ids
-        elif isinstance(sigma, np.ndarray):
-            sigma = pd.DataFrame(sigma, index=ids, columns=ids)  # Convert ndarray to DataFrame
+        # Ensure sigma is a DataFrame and aligned with valid IDs
+        sigma = pd.DataFrame(sigma, index=ids, columns=ids)
 
-        # Check if sigma is still valid
-        if sigma is None or sigma.shape[0] != sigma.shape[1] or sigma.shape[0] == 0:
+        # Check if sigma is valid
+        if sigma.shape[0] != sigma.shape[1] or sigma.shape[0] == 0:
             print(f"Warning: Invalid covariance matrix for {d}")
             continue  # Skip invalid covariance matrix
 
@@ -905,21 +930,28 @@ def pfml_input_fun(data_tc, cov_list, lambda_list, gamma_rel, wealth, mu, dates,
     # We will add 'constant' so we can do a group-based transformation
     feat_cons = feat_new + ['constant']
 
-    # Scale features if requested
+    # Scale features
     if scale:
         scales = []
         # Build a monthly DataFrame of vol scaling
         for d in dates_lb:
-            sigma = cov_list.get(str(d), None)
-            if sigma is not None:
-                diag_vol = np.sqrt(np.diag(sigma))
-                scales.append(
-                    pd.DataFrame({'id': np.arange(len(diag_vol)), 'eom': d, 'vol_scale': diag_vol})
-                )
-        scales_df = pd.concat(scales, ignore_index=True) if len(scales) > 0 else pd.DataFrame()
+            sigma_data = cov_list.get(d, None)
+            if sigma_data is not None:
+                sigma = create_cov(sigma_data)
+                if sigma is not None and isinstance(sigma, pd.DataFrame) and sigma.shape[0] > 0:
+                    diag_vol = np.sqrt(np.diag(sigma))
+                    scales.append(
+                        pd.DataFrame({'id': sigma.index, 'eom': d, 'vol_scale': diag_vol})
+                    )
+
+        # Ensure scales_df is properly created
+        scales_df = pd.concat(scales, ignore_index=True) if scales else pd.DataFrame()
+        data['id'] = data['id'].astype(str)
+        scales_df['id'] = scales_df['id'].astype(str)
         data = data.merge(scales_df, on=['id', 'eom'], how='left')
+
         # Fill missing scales with the median for that eom group
-        data['vol_scale'] = data.groupby('eom')['vol_scale'].apply(lambda x: x.fillna(x.median()))
+        data['vol_scale'] = data.groupby('eom')['vol_scale'].transform(lambda x: x.fillna(x.median()))
 
     # If balanced, we want to demean within each date and then scale so norm=1
     if balanced:
@@ -940,10 +972,14 @@ def pfml_input_fun(data_tc, cov_list, lambda_list, gamma_rel, wealth, mu, dates,
         ids = data_ret['id'].values
         r = data_ret['ret_ld1'].values
 
-        sigma = cov_list[str(d)]
-        lambda_mat = lambda_list[str(d)]
-        w = wealth.loc[wealth['eom'] == d, 'wealth'].iloc[0]
-        rf = risk_free.loc[risk_free['eom'] == d, 'rf'].iloc[0]
+        sigma_data = cov_list.get(d, None)
+        sigma = create_cov(sigma_data, ids) if sigma_data is not None else None
+
+        lambda_data = lambda_list.get(d, None)
+        lambda_mat = create_lambda(lambda_data, ids) if lambda_data is not None else None
+
+        w = wealth.loc[wealth['eom'] == pd.Timestamp(d), 'wealth'].iloc[0]
+        rf = risk_free.loc[risk_free['eom'] == pd.Timestamp(d), 'rf'].iloc[0]
 
         # m_func used for weighting
         m = m_func(
@@ -1891,7 +1927,7 @@ def mp_implement(data_tc, cov_list, lambda_list, rf,
                 cov_type, iter_, K, k=k, g=g, u_vec=u_vec, verbose=True
             )
             for u in u_vec:
-                pf_ts = pf_ts_fun(mp_w_list[str(u)], data_tc, wealth, gamma_rel)
+                pf_ts = pf_ts_fun(mp_w_list[str(u)], data_tc, wealth)
                 pf_ts['k'] = k
                 pf_ts['g'] = g
                 pf_ts['u'] = u
@@ -1922,7 +1958,7 @@ def mp_implement(data_tc, cov_list, lambda_list, rf,
         data_rel_oos, dates_oos, cov_list, lambda_list, wealth, rf, gamma_rel,
         cov_type, iter_, K, hps=optimal_hps
     )
-    portfolio_performance = pf_ts_fun(final_weights, data_tc, wealth, gamma_rel)
+    portfolio_performance = pf_ts_fun(final_weights, data_tc, wealth)
     portfolio_performance['type'] = "Multiperiod-ML*"
 
     # Return results

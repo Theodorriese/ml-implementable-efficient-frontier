@@ -74,7 +74,7 @@ def prepare_cluster_data(chars, cluster_labels, daily, settings, features):
     fct_ret = pd.DataFrame(factor_returns).sort_values("date").reset_index(drop=True)
 
     # 8) EWMA weights for factor-cov
-    w_cor = (0.5 ** (1 / settings["cov_set"]["hl_cor"])) ** np.arange(settings["cov_set"]["obs"], 0, -1)
+    w_cor = (0.5 ** (1 / settings["cov_set"]["hl_cor"])) ** np.arange(settings["cov_set"]["obs"], 0, -1) # delete?
     w_var = (0.5 ** (1 / settings["cov_set"]["hl_var"])) ** np.arange(settings["cov_set"]["obs"], 0, -1)
 
     # 9) Factor covariance dates
