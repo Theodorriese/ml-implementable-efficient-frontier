@@ -105,48 +105,12 @@ def prepare_cluster_data(chars, cluster_labels, daily, settings, features):
         cov_data = fct_ret[fct_ret["date"].isin(sub_dates)].drop(columns="date")
         t = len(cov_data)
 
-        # Weighted correlation
-        w_cur = w_cor[-t:]
-        mean_c = np.average(cov_data, axis=0, weights=w_cur)
-        centered_c = cov_data - mean_c
-        cor_est = (w_cur * centered_c.T) @ centered_c / (w_cur @ w_cur)
-
-        # Weighted variance
-        wv_cur = w_var[-t:]
-        mean_v = np.average(cov_data, axis=0, weights=wv_cur)
-        centered_v = cov_data - mean_v
-        var_est = (wv_cur * centered_v.T) @ centered_v / wv_cur.sum()
-        sd_diag = np.diag(np.sqrt(np.diag(var_est)))
-        cov_out = sd_diag @ cor_est @ sd_diag
-        print(cov_out)
-
-
-        # VERSION 2.1
+        # Weighted covariance - VERSION 2.4
+        w_cur = w_var[-t:]
         weights = w_cur / np.sum(w_cur)
-        weighted_mean_2 = np.average(cov_data, axis=0, weights=weights)
-        centered_data_2 = cov_data - weighted_mean_2
-        weighted_cov2 = (centered_data_2 * weights[:, None]).T @ centered_data_2
-
-        weight_sum_sq = np.sum(weights ** 2)
-        factor = 1 / (1 - weight_sum_sq)
-        weighted_cov_unbiased = weighted_cov2 * factor
-        print(weighted_cov_unbiased)
-
-        # VERSION 2.2
-        cov_matrix_numpy_bias = np.cov(centered_data_2.T, aweights=weights, bias=True)
-        print(cov_matrix_numpy_bias)
-
-        # Version 2.3
-        cov_matrix_biased = np.cov(centered_data_2.T, aweights=weights, bias=True)
-        weight_sum_sq2 = np.sum(weights ** 2)
-        factor = 1 / (1 - weight_sum_sq2)
-        cov_matrix_unbiased = cov_matrix_biased * factor
-        print(cov_matrix_unbiased)
-
-        # VERSION 2.4
-        cov_matrix_numpy_unbias = np.cov(centered_data_2.T, aweights=weights, bias=False)
-        print(cov_matrix_numpy_unbias)
-
+        weighted_mean = np.average(cov_data, axis=0, weights=weights)
+        centered_data = cov_data - weighted_mean
+        cov_matrix_numpy_unbias = np.cov(centered_data.T, aweights=weights, bias=False)
 
         factor_names = list(fct_ret.columns[1:])
         factor_cov_est[d] = pd.DataFrame(cov_matrix_numpy_unbias)

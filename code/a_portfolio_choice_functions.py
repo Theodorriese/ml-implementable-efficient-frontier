@@ -128,7 +128,7 @@ def w_fun(data, dates, w_opt, wealth):
 
 def tpf_implement(data, cov_list, wealth, dates, gam):
     """
-    Implements the Tangency Portfolio (Markowitz-ML).
+    Implements the Tangency Portfolio (Markowitz-ML) using the correct covariance matrix creation.
 
     Parameters:
         data (pd.DataFrame): Dataset containing portfolio information.
@@ -154,26 +154,51 @@ def tpf_implement(data, cov_list, wealth, dates, gam):
             continue  # Skip if no data available
 
         sigma_data = cov_list.get(d, None)
-        sigma = sigma_data["fct_cov"] if sigma_data and "fct_cov" in sigma_data else None
+        if sigma_data is None or "fct_cov" not in sigma_data:
+            print(f"Warning: Missing 'fct_cov' for {d}")
+            continue
 
-        if sigma is None or not isinstance(sigma, (pd.DataFrame, np.ndarray)) or sigma.shape[0] != sigma.shape[1]:
+        # Use create_cov to properly construct sigma
+        ids = data_sub["id"].astype(str).unique()
+        sigma = create_cov(sigma_data, ids)
+
+        if sigma is None or sigma.shape[0] != sigma.shape[1]:
+            print(f"Warning: Invalid covariance matrix for {d}")
             continue  # Skip if covariance matrix is missing or invalid
-
-        ids = data_sub["id"].unique()
-        sigma = sigma.loc[ids, ids] if isinstance(sigma, pd.DataFrame) else None  # Filter sigma to match IDs
-
-        if sigma is None or sigma.shape[0] == 0:
-            continue  # Skip if no valid covariance matrix
 
         pred_ld1 = data_sub.set_index("id")["pred_ld1"].dropna()  # Ensure pred_ld1 aligns with sigma
         sigma = pd.DataFrame(sigma)
         sigma.index = sigma.index.astype(str)
         pred_ld1.index = pred_ld1.index.astype(str)
-        pred_ld1 = pred_ld1.loc[sigma.index].to_numpy()  # Align shapes
 
-        if pred_ld1 is None or pred_ld1.size == 0 or sigma.shape[0] != pred_ld1.shape[0]:
-            continue  # Skip if sizes don't match
+        if not set(pred_ld1.index).issubset(sigma.index):
+            print(f"Warning: Some IDs in pred_ld1 are missing from sigma for {d}")
+            continue
 
+        # Ensure pred_ld1 is not empty
+        if pred_ld1.empty:
+            print(f"Warning: pred_ld1 is empty for date {d}, skipping.")
+            continue
+
+        # Align pred_ld1 with sigma
+        common_ids = pred_ld1.index.intersection(sigma.index)
+
+        # If no common IDs exist, skip
+        if common_ids.empty:
+            print(f"Warning: No common IDs between pred_ld1 and sigma for {d}, skipping.")
+            continue
+
+        # Ensure pred_ld1 is a Pandas Series before using .loc
+        if isinstance(pred_ld1, np.ndarray):
+            pred_ld1 = pd.Series(pred_ld1, index=sigma.index)
+
+        # Now, safely select only matching IDs and convert to NumPy
+        pred_ld1 = pred_ld1.loc[common_ids].to_numpy()
+
+        # Align sigma matrix to common IDs
+        sigma = sigma.loc[common_ids, common_ids]
+
+        # Compute optimal weights
         try:
             w_opt = np.dot(np.linalg.pinv(sigma), pred_ld1) / gam  # Use pseudo-inverse for robustness
         except np.linalg.LinAlgError:
@@ -192,6 +217,7 @@ def tpf_implement(data, cov_list, wealth, dates, gam):
     tpf_pf['type'] = "Markowitz-ML"
 
     return {"w": tpf_w, "pf": tpf_pf}
+
 
 
 def tpf_cf_fun(data, cf_cluster, er_models, cluster_labels, wealth, gamma_rel, cov_list, dates, seed, features):

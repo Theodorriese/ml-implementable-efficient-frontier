@@ -1,12 +1,11 @@
 import os
-import time
 import pandas as pd
 from i1_Main import settings, pf_set, features
 from b_prepare_data import (
     load_risk_free,
     load_market_data,
-    wealth_func,
     load_monthly_data,
+    wealth_func,
     preprocess_chars,
     filter_chars,
     feature_screen,
@@ -153,7 +152,8 @@ def prepare_and_fit_models(settings, pf_set, features, output_path):
     # # Ensure correct date formats for `chars`
     # chars["eom"] = pd.to_datetime(chars["eom"])
 
-    print("Step 16: Fitting return prediction models...")
+    # To fit them
+    print("Step 15: Fitting return prediction models...")
     models = fit_models(
         search_grid=search_grid,
         data_ret=data_ret,

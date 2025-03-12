@@ -63,12 +63,12 @@ settings = {
     "seed_no": 1,
     "months": False,
     "split": {
-        "train_end": pd.Timestamp("2015-12-31"), # obs
-        "test_end": pd.Timestamp("2019-12-31"), # obs
-        "val_years": 2,
-        "model_update_freq": "yearly",  # Options: "once", "yearly", "decade"
-        "train_lookback": 1,
-        "retrain_lookback": 1
+        "train_end": pd.Timestamp("2017-12-31"), # change to 2018
+        "test_end": pd.Timestamp("2020-12-31"),
+        "val_years": 2, # change to 1
+        "model_update_freq": "yearly",
+        "train_lookback": 5,
+        "retrain_lookback": 5
     },
     "feat_prank": True,
     "ret_impute": "zero",  # Impute missing returns
@@ -76,8 +76,8 @@ settings = {
     "addition_n": 12,  # Need to be valid for the past n months to be included in investment universe
     "deletion_n": 12,  # Exclude from universe after N periods where the stock is non-valid
     "screens": {
-        "start": pd.Timestamp("2010-01-01"),
-        "end": pd.Timestamp("2019-12-31"),
+        "start": pd.Timestamp("2010-01-01"),  # First full year of data
+        "end": pd.Timestamp("2020-12-31"),  # Last full year of data
         "feat_pct": 0.5,
         "nyse_stocks": True
     },
@@ -90,8 +90,8 @@ settings = {
     "pf": {
         "dates": {
             "start_year": 2016,
-            "end_yr": 2019,
-            "split_years": 3 # changed from 4
+            "end_yr": 2020,
+            "split_years": 3
         },
         "hps": {
             "cov_type": "cov_add",
@@ -121,7 +121,7 @@ settings = {
     },
     "cov_set": {
         "industries": True,
-        "obs": 252 * 2, # obs
+        "obs": 252 * 5, # obs
         "hl_cor": 252 * 3 / 2,
         "hl_var": 252 / 2,
         "hl_stock_var": 252 / 2,
