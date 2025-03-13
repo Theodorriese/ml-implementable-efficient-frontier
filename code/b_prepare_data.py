@@ -3,14 +3,8 @@ import os
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.stats import rankdata
 from a_general_functions import size_screen_fun, addition_deletion_fun, long_horizon_ret
-import gc
-import openpyxl
 import datetime as dt
-
-# data_path = r"C:\Master"
-
 
 # Function to load the risk-free rate data
 def load_risk_free(data_path):
@@ -44,13 +38,8 @@ def load_risk_free(data_path):
     risk_free["rf"] = risk_free["RF"] / 100
 
     # Generate end-of-month date ('eom') using 'yyyymm'
-    risk_free["eom_m"] = pd.to_datetime(risk_free["yyyymm"].astype(str) + "01", format="%Y%m%d") + pd.offsets.MonthEnd(0)
-
-    # Calculate last business day of the same month
-    # risk_free["eom_bd"] = risk_free["eom"].apply(
-    #     lambda x: x - pd.offsets.BDay(0) if x.weekday() < 5 else x - pd.offsets.BDay(1))
-
-    # return risk_free[["eom", "rf", "eom_bd"]]
+    risk_free["eom_m"] = (pd.to_datetime(risk_free["yyyymm"].astype(str) + "01", format="%Y%m%d")
+                          + pd.offsets.MonthEnd(0))
 
     return risk_free[["eom_m", "rf"]]
 
@@ -221,9 +210,6 @@ def preprocess_chars(data_path, features, settings, data_ret_ld1, wealth):
 
 # Date screen
 def filter_chars(chars, settings):
-    # date_exclusion_pct = round(((chars["eom"] < settings["screens"]["start"]) |
-    #                             (chars["eom"] > settings["screens"]["end"])).mean() * 100, 2)
-    # print(f"Date screen excludes {date_exclusion_pct}% of the observations")
     
     chars = chars[(chars["eom"] >= settings["screens"]["start"]) & 
                   (chars["eom"] <= settings["screens"]["end"])]
@@ -569,8 +555,8 @@ def load_daily_returns_pkl(data_path, chars, risk_free):
     risk_free["month"] = risk_free["date"].dt.to_period("M")
 
     # Calculate daily risk-free rate
-    risk_free["days_in_month"] = risk_free["date"].dt.daysinmonth  # Number of days in each month
-    risk_free["rf_daily"] = risk_free["rf"] / risk_free["days_in_month"]  # Convert to daily rate
+    risk_free["days_in_month"] = risk_free["date"].dt.daysinmonth
+    risk_free["rf_daily"] = risk_free["rf"] / risk_free["days_in_month"]
 
     # Map monthly risk-free rates to daily data
     daily["month"] = daily["date"].dt.to_period("M")

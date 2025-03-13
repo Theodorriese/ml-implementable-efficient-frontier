@@ -195,17 +195,6 @@ def prepare_cluster_data(chars, cluster_labels, daily, settings, features):
         X = char_data[factor_names].fillna(0)
         X.index = char_data["id"].astype(str)
 
-        # # Convert fct_load to a DataFrame with asset IDs as index
-        # fct_load_df = pd.DataFrame(X, index=asset_ids, columns=factor_names)
-        #
-        # # Step 6.1: Compute stock covariance matrix (asset-level covariance)
-        # asset_cov = X @ fct_cov_annual @ X.T + np.diag((char_data["res_vol"] ** 2 * 21).values)
-        #
-        # # Convert `asset_cov` to a DataFrame before storing it
-        # asset_cov_df = pd.DataFrame(asset_cov)
-        # asset_cov_df.index = asset_ids
-        # asset_cov_df.columns = asset_ids
-
         # Step 7: Store results in dictionary (barra_cov)
         barra_cov[d] = {
             "fct_load": X,

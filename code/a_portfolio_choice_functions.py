@@ -8,44 +8,11 @@ from collections import defaultdict
 from functools import reduce
 from a_general_functions import create_cov, create_lambda, sigma_gam_adj, initial_weights_new, pf_ts_fun
 from a_return_prediction_functions import rff
-from b_prepare_data import load_cluster_labels
-import ctypes
-
-# Load the compiled C++ shared library
-try:
-    lib = ctypes.CDLL("sqrtm_cpp.dll")
-except OSError:
-    raise RuntimeError("Failed to load sqrtm_cpp shared library. Ensure it is compiled correctly.")
-
-# Define the function signature in ctypes
-lib.sqrtm_cpp.argtypes = [np.ctypeslib.ndpointer(dtype=np.float64, ndim=2, flags="C_CONTIGUOUS")]
-lib.sqrtm_cpp.restype = ctypes.POINTER(ctypes.c_double)
-
-def sqrtm_cpp(A):
-    """
-    Calls the C++ sqrtm function to compute the matrix square root.
-
-    Parameters:
-        A (ndarray): Input square matrix.
-
-    Returns:
-        ndarray: Square root of matrix A.
-    """
-    n = A.shape[0]
-    A_ctypes = np.ascontiguousarray(A, dtype=np.float64)  # Ensure correct dtype and memory layout
-
-    # Call the C++ function
-    A_sqrt_ptr = lib.sqrtm_cpp(A_ctypes)
-
-    # Convert the output back to a NumPy array
-    A_sqrt = np.ctypeslib.as_array(A_sqrt_ptr, shape=(n, n))
-
-    return np.real(A_sqrt)  # Ensure output is real
 
 
 def m_func(w, mu, rf, sigma_gam, gam, lambda_mat, iterations):
     """
-    Computes the m matrix exactly as in the R function, using C++ for sqrtm.
+    Computes the m matrix exactly as in the R function, using NumPy.
 
     Parameters:
         w (float): Weight scalar.
@@ -73,10 +40,12 @@ def m_func(w, mu, rf, sigma_gam, gam, lambda_mat, iterations):
     x = (1 / w) * lamb_neg05 @ sigma_gam @ lamb_neg05
     y = np.diag(1 + np.diag(sigma_gr))
 
-    # Initial sigma_hat and m_tilde using C++ sqrtm function
+    # Initial sigma_hat and m_tilde using NumPy sqrtm function
     sigma_hat = x + np.diag(1 + g_bar)
     sigma_hat_squared = sigma_hat @ sigma_hat
-    m_tilde = 0.5 * (sigma_hat - sqrtm_cpp(sigma_hat_squared - 4 * np.eye(n)))
+
+    # Use NumPy sqrtm (ensuring real values like Re(sqrtm_cpp(...)) in R)
+    m_tilde = 0.5 * (sigma_hat - np.real(sqrtm(sigma_hat_squared - 4 * np.eye(n))))
 
     # Iterative process (EXACT match to R: `m_tilde <- solve(x + y - m_tilde * sigma_gr)`)
     for _ in range(iterations):
@@ -84,24 +53,6 @@ def m_func(w, mu, rf, sigma_gam, gam, lambda_mat, iterations):
 
     # Final Output (matches `lamb_neg05 %*% m_tilde %*% sqrt(lambda)` in R)
     return lamb_neg05 @ m_tilde @ np.sqrt(lambda_mat)
-
-
-def m_static(sigma_gam, w, lambda_mat, phi):
-    """
-    Computes the static m matrix.
-
-    Parameters:
-        sigma_gam (ndarray): Covariance matrix scaled by gamma.
-        w (float): Weight scalar.
-        lambda_mat (ndarray): Diagonal matrix of lambdas.
-        phi (float): Scaling factor.
-
-    Returns:
-        ndarray: Computed static m matrix.
-    """
-    # Compute the static m matrix
-    term = sigma_gam + (w / phi) * lambda_mat
-    return solve(term, (w / phi) * lambda_mat)
 
 
 def w_fun(data, dates, w_opt, wealth):
@@ -251,7 +202,7 @@ def tpf_implement(data, cov_list, wealth, dates, gam):
     return {"w": tpf_w, "pf": tpf_pf}
 
 
-
+# X
 def tpf_cf_fun(data, cf_cluster, er_models, cluster_labels, wealth, gamma_rel, cov_list, dates, seed, features):
     """
     Counterfactual Tangency Portfolio Implementation.
@@ -273,14 +224,18 @@ def tpf_cf_fun(data, cf_cluster, er_models, cluster_labels, wealth, gamma_rel, c
     """
     np.random.seed(seed)  # Ensures reproducibility
 
-    # Shuffle characteristics and predict counterfactual ER
     if cf_cluster != "bm":
+        # Drop prediction columns & shuffle IDs
         cf = data.drop(columns=[col for col in data.columns if col.startswith("pred_ld")]).copy()
         cf['id_shuffle'] = cf.groupby('eom')['id'].transform(lambda x: np.random.permutation(x))
 
         # Select characteristics for the cluster
-        chars_sub = cluster_labels.loc[(cluster_labels['cluster'] == cf_cluster) &
-                                       (cluster_labels['characteristic'].isin(features)), 'characteristic']
+        chars_sub = cluster_labels.loc[
+            (cluster_labels['cluster'] == cf_cluster) & (cluster_labels['characteristic'].isin(features)), 'characteristic'
+        ]
+
+        if chars_sub.empty:
+            raise ValueError(f"Cluster '{cf_cluster}' has no matching characteristics in cluster_labels.")
 
         chars_data = cf[['id_shuffle', 'eom'] + chars_sub.tolist()].rename(columns={'id_shuffle': 'id'})
         cf = cf.drop(columns=chars_sub).merge(chars_data, on=['id', 'eom'], how='left')
@@ -290,79 +245,30 @@ def tpf_cf_fun(data, cf_cluster, er_models, cluster_labels, wealth, gamma_rel, c
             sub_dates = m_sub['pred']['eom'].unique()
             cf_x = cf.loc[cf['eom'].isin(sub_dates), features].to_numpy()
 
+            if not cf_x.size:  # Skip if empty
+                continue
+
             # Random Fourier Feature Transformation
             cf_new_x = rff(cf_x, W=m_sub['W'])
             cf_new_x = m_sub['opt_hps']['p'] ** -0.5 * np.hstack([cf_new_x['X_cos'], cf_new_x['X_sin']])
 
-            cf.loc[cf['eom'].isin(sub_dates), 'pred_ld1'] = m_sub['fit'].predict(cf_new_x,
-                                                                                 m_sub['opt_hps']['lambda'])
+            cf.loc[cf['eom'].isin(sub_dates), 'pred_ld1'] = m_sub['fit'].predict(cf_new_x, m_sub['opt_hps']['lambda'])
+
     else:
         cf = data[data['valid'] == True]
+
+    # Ensure pred_ld1 does not have NaNs
+    cf['pred_ld1'] = cf['pred_ld1'].fillna(0)
 
     # Implement the tangency portfolio on counterfactual data
     op = tpf_implement(cf, cov_list, wealth, dates, gamma_rel)
 
+    if 'pf' not in op:
+        raise ValueError("Error: `tpf_implement` did not return expected portfolio data.")
+
     # Add cluster information
     op['pf']['cluster'] = cf_cluster
     return op['pf']
-
-
-def mv_risky_fun(data, cov_list, wealth, dates, gam, u_vec):
-    """
-    Mean-variance efficient portfolios of risky assets.
-
-    Parameters:
-        data (pd.DataFrame): DataFrame containing data for portfolio computation.
-        cov_list (dict): Dictionary of covariance matrices indexed by date.
-        wealth (pd.DataFrame): DataFrame containing wealth data.
-        dates (list): List of dates for portfolio computation.
-        gam (float): Risk-aversion parameter.
-        u_vec (list): List of utility values for portfolio construction.
-
-    Returns:
-        pd.DataFrame: DataFrame containing portfolio performance across utility values.
-    """
-    # Get the relevant data subset
-    data_rel = data[(data['valid'] == True) & (data['eom'].isin(dates))]
-    data_rel = data_rel[['id', 'eom', 'me', 'tr_ld1', 'pred_ld1']].sort_values(['id', 'eom'])
-
-    # Desired weights
-    data_split = {date: sub_df for date, sub_df in data_rel.groupby('eom')}
-
-    mv_opt_all = []
-    for d in dates:
-        data_sub = data_split[d]
-        ids = data_sub['id'].values
-        sigma_inv = np.linalg.inv(cov_list[str(d)].create_cov(ids=ids))
-        er = data_sub['pred_ld1'].values
-
-        # Auxiliary constants
-        ones = np.ones(len(er))
-        a = float(er.T @ sigma_inv @ er)
-        b = float(np.sum(sigma_inv @ er))
-        c = float(np.sum(sigma_inv @ ones))
-        d_const = a * c - b ** 2
-
-        # Compute weights for each utility value
-        for u in u_vec:
-            weights = ((c * u - b) / d_const * sigma_inv @ er +
-                       (a - b * u) / d_const * sigma_inv @ ones)
-            weights_df = pd.DataFrame({'id': data_sub['id'], 'eom': data_sub['eom'],
-                                       'u': u * 12, 'w': weights})
-            mv_opt_all.append(weights_df)
-
-    mv_opt_all = pd.concat(mv_opt_all, ignore_index=True)
-
-    # Compute portfolios for each utility value
-    def portfolio_performance(u_sel):
-        w = mv_opt_all[mv_opt_all['u'] == u_sel].drop(columns='u')
-        portfolio = pf_ts_fun(w, data, wealth)
-        portfolio['u'] = u_sel
-        return portfolio
-
-    portfolio_results = pd.concat([portfolio_performance(u) for u in u_vec], ignore_index=True)
-
-    return portfolio_results
 
 
 def factor_ml_implement(data, wealth, dates, n_pfs):
@@ -375,7 +281,6 @@ def factor_ml_implement(data, wealth, dates, n_pfs):
         wealth (pd.DataFrame or list): Wealth data used for weight adjustments.
         dates (list): List of dates for portfolio construction.
         n_pfs (int): Number of portfolios for ranking stocks (e.g., quintiles or deciles).
-        gam (float): Risk-aversion parameter.
 
     Returns:
         dict: A dictionary with:
@@ -462,7 +367,7 @@ def ew_implement(data, wealth, dates):
     return {"w": ew_w, "pf": ew_pf}
 
 
-def mkt_implement(data, wealth, dates, gamma_rel):
+def mkt_implement(data, wealth, dates):
     """
     Market-capitalization weighted portfolio implementation.
 
@@ -471,7 +376,6 @@ def mkt_implement(data, wealth, dates, gamma_rel):
                              `me` (market equity), and `valid` column indicating valid rows.
         wealth (pd.DataFrame or list): Wealth data required for weight adjustments.
         dates (list): List of dates for which the portfolio is to be constructed.
-        gamma_rel (float): Risk-aversion parameter.
 
     Returns:
         dict: A dictionary containing:
@@ -512,7 +416,6 @@ def rw_implement(data, wealth, dates):
                              `pred_ld1` (predicted returns), and `valid` column indicating valid rows.
         wealth (pd.DataFrame or list): Wealth data required for weight adjustments.
         dates (list): List of dates for which the portfolio is to be constructed.
-        gamma_rel (float): Risk-aversion parameter.
 
     Returns:
         dict: A dictionary containing:
@@ -856,7 +759,7 @@ def static_implement(data_tc, cov_list, lambda_list,
 
 
 def pfml_input_fun(data_tc, cov_list, lambda_list, gamma_rel, wealth, mu, dates, lb, scale,
-                   risk_free, features, rff_feat, seed, p_max, g, add_orig, iter_, balanced):
+                   risk_free, features, rff_feat, p_max, g, add_orig, iter_, balanced):
     """
     Prepares inputs for Portfolio-ML computations.
 
@@ -873,7 +776,6 @@ def pfml_input_fun(data_tc, cov_list, lambda_list, gamma_rel, wealth, mu, dates,
         risk_free (pd.DataFrame): Risk-free rate data with columns ['eom', 'rf'].
         features (list): List of feature names for portfolio prediction.
         rff_feat (bool): Whether to use Random Fourier Features.
-        seed (int): Random seed for reproducibility.
         p_max (int): Maximum number of random Fourier features.
         g (float): RFF Gaussian kernel width.
         add_orig (bool): Whether to include original features with RFF.
@@ -1048,7 +950,7 @@ def pfml_input_fun(data_tc, cov_list, lambda_list, gamma_rel, wealth, mu, dates,
         'rff_w': rff_x if rff_feat else None
     }
 
-
+# X
 def pfml_feat_fun(p, orig_feat, features):
     """
     Generate a list of feature names for Portfolio-ML.
@@ -1083,6 +985,7 @@ def denom_sum_fun(train):
     return denom_sum
 
 
+# X
 def pfml_search_coef(pfml_input, p_vec, l_vec, hp_years, orig_feat, features):
     """
     Hyperparameter search for best coefficients in Portfolio-ML.
@@ -1098,11 +1001,11 @@ def pfml_search_coef(pfml_input, p_vec, l_vec, hp_years, orig_feat, features):
     Returns:
         dict: Coefficients for each hyperparameter combination across years.
     """
-    from collections import defaultdict
 
-    # Extract all dates and initialize variables
-    d_all = np.array([np.datetime64(k) for k in pfml_input['reals'].keys()])
+    # Determine the last year before hyperparameter selection starts
     end_bef = min(hp_years) - 1
+
+    # Select training data before `end_bef`
     train_bef = {
         k: v for k, v in pfml_input['reals'].items()
         if np.datetime64(k) < np.datetime64(f"{end_bef - 1}-12-31")
@@ -1117,8 +1020,10 @@ def pfml_search_coef(pfml_input, p_vec, l_vec, hp_years, orig_feat, features):
     coef_list = defaultdict(dict)
     hp_years = sorted(hp_years)
 
+    # Iterate through each hyperparameter year
     for year in hp_years:
-        # Extract training data for current year
+
+        # Select training data for current year
         train_new = {
             k: v for k, v in pfml_input['reals'].items()
             if np.datetime64(f"{year - 2}-12-31") <= np.datetime64(k) <= np.datetime64(f"{year - 1}-11-30")
@@ -1143,6 +1048,7 @@ def pfml_search_coef(pfml_input, p_vec, l_vec, hp_years, orig_feat, features):
     return coef_list
 
 
+# X
 def pfml_hp_reals_fun(pfml_input, hp_coef, p_vec, l_vec, hp_years, orig_feat, features):
     """
     Compute realized utility for each p and lambda in each hyperparameter evaluation year.
@@ -1488,7 +1394,7 @@ def pfml_implement(
                 data_tc, cov_list, lambda_list,
                 gamma_rel, wealth, mu, dates_full,
                 lb, scale, risk_free, features,
-                rff_feat, seed, p_max=max(p_vec),
+                rff_feat, p_max=max(p_vec),
                 g=g, add_orig=orig_feat,
                 iter_=iter, balanced=balanced
             )
@@ -1873,7 +1779,7 @@ def mp_val_fun(data, dates, cov_list, lambda_list, wealth, risk_free, mu, gamma_
 def mp_implement(data_tc, cov_list, lambda_list, rf,
                  wealth, gamma_rel,
                  dates_oos, dates_hp, k_vec, u_vec, g_vec, cov_type, K,
-                 iter_, validation=None, seed=None):
+                 iter_, validation=None, seed=None, mu=None):
     """
     Multiperiod-ML full implementation.
 
@@ -1894,6 +1800,7 @@ def mp_implement(data_tc, cov_list, lambda_list, rf,
         iter_ (int): Number of iterations for optimization.
         validation (pd.DataFrame, optional): Precomputed validation results.
         seed (int, optional): Random seed for reproducibility.
+        mu (float, optional): Drift parameter (required for `mp_val_fun`).
 
     Returns:
         dict: Dictionary containing:
@@ -1923,8 +1830,8 @@ def mp_implement(data_tc, cov_list, lambda_list, rf,
             print(f"Processing hyperparameters {i}/{len(mp_hps)}: k={k}, g={g}")
 
             mp_w_list = mp_val_fun(
-                data_rel, dates_hp, cov_list, lambda_list, wealth, rf, gamma_rel,
-                cov_type, iter_, K, k=k, g=g, u_vec=u_vec, verbose=True
+                data_rel, dates_hp, cov_list, lambda_list, wealth, rf, mu,
+                gamma_rel, cov_type, iter_, K, k=k, g=g, u_vec=u_vec, verbose=True
             )
             for u in u_vec:
                 pf_ts = pf_ts_fun(mp_w_list[str(u)], data_tc, wealth)
@@ -1955,8 +1862,8 @@ def mp_implement(data_tc, cov_list, lambda_list, rf,
         ][['id', 'eom', 'me', 'tr_ld1'] + pred_columns].sort_values(['id', 'eom'])
 
     final_weights = mp_val_fun(
-        data_rel_oos, dates_oos, cov_list, lambda_list, wealth, rf, gamma_rel,
-        cov_type, iter_, K, hps=optimal_hps
+        data_rel_oos, dates_oos, cov_list, lambda_list, wealth, rf, mu,
+        gamma_rel, cov_type, iter_, K, hps=optimal_hps
     )
     portfolio_performance = pf_ts_fun(final_weights, data_tc, wealth)
     portfolio_performance['type'] = "Multiperiod-ML*"
@@ -1968,4 +1875,5 @@ def mp_implement(data_tc, cov_list, lambda_list, rf,
         "w": final_weights,
         "pf": portfolio_performance
     }
+
 

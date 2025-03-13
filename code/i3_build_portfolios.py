@@ -212,7 +212,6 @@ if config_params["update_base"]:
         lambda_list=portfolio_data["lambda_list"],
         risk_free=risk_free,
         features=features,
-        dates_m1=dates_m1,
         dates_m2=dates_m2,
         dates_hp=dates_hp,
         hp_years=hp_years,

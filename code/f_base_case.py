@@ -24,16 +24,16 @@ def benchmark_portfolios(chars, barra_cov, wealth, dates_oos, pf_set, settings, 
                                     wealth=wealth)
 
     print("Generating Market Portfolio...")
-    mkt = mkt_implement(chars, dates=dates_oos, wealth=wealth, gamma_rel=pf_set["gamma_rel"])
+    mkt = mkt_implement(chars, dates=dates_oos, wealth=wealth)
 
     print("Generating 1/N Portfolio...")
-    ew = ew_implement(chars, dates=dates_oos, wealth=wealth, gamma_rel=pf_set["gamma_rel"])
+    ew = ew_implement(chars, dates=dates_oos, wealth=wealth)
 
     print("Generating Rank-Weighted Portfolio...")
-    rw = rw_implement(chars, dates=dates_oos, wealth=wealth, gamma_rel=pf_set["gamma_rel"])
+    rw = rw_implement(chars, dates=dates_oos, wealth=wealth)
 
     print("Generating Minimum Variance Portfolio...")
-    mv = mv_implement(chars, cov_list=barra_cov, dates=dates_oos, wealth=wealth, gamma_rel=pf_set["gamma_rel"])
+    mv = mv_implement(chars, cov_list=barra_cov, dates=dates_oos, wealth=wealth)
 
     # Filter out any None values to avoid errors
     portfolio_results = [tpf, factor_ml, ew, mkt, rw, mv]
@@ -56,7 +56,6 @@ def static_ml(chars, barra_cov, lambda_list, wealth, pf_set, settings, dates_oos
         chars (pd.DataFrame): Characteristics data.
         barra_cov (dict): Covariance matrices.
         lambda_list (dict): Lambda values.
-        risk_free (pd.DataFrame): Risk-free rate data.
         wealth (pd.DataFrame): Wealth data.
         pf_set (dict): Portfolio settings.
         settings (dict): Configuration settings.
@@ -136,10 +135,8 @@ def multiperiod_ml(config_params, chars, barra_cov, lambda_list, risk_free, weal
         wealth (pd.DataFrame): Wealth data.
         pf_set (dict): Portfolio settings.
         settings (dict): Configuration settings.
-        dates_m1 (list): Full dates for Multiperiod-ML.
         dates_oos (list): Out-of-sample dates.
         dates_hp (list): Holding period dates.
-        hp_years (list): Holding period years.
         output_path (str): Path to save the output.
     """
     if config_params["update_mp"]:
@@ -159,7 +156,7 @@ def multiperiod_ml(config_params, chars, barra_cov, lambda_list, risk_free, weal
 
 
 def run_f_base_case(chars, barra_cov, wealth, dates_oos, pf_set, settings, config_params, lambda_list, risk_free,
-                    features, dates_m1, dates_m2, dates_hp, hp_years, output_path):
+                    features, dates_m2, dates_hp, hp_years, output_path):
     """
     Main function to run portfolio implementation steps.
 
@@ -174,7 +171,7 @@ def run_f_base_case(chars, barra_cov, wealth, dates_oos, pf_set, settings, confi
         lambda_list (dict): Lambda values.
         risk_free (pd.DataFrame): Risk-free rate data.
         features (list): Feature columns.
-        dates_m1, dates_m2, dates_hp (list): Date ranges for calculations.
+        dates_m2, dates_hp (list): Date ranges for calculations.
         hp_years (list): Holding period years.
         output_path (str): Path to save the output.
     """

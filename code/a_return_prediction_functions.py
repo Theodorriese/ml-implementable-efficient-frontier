@@ -213,6 +213,7 @@ def rff_hp_search(data, feat, p_vec, g_vec, l_vec, seed):
     }
 
 
+# Not used?
 def ridge_hp_search(data, feat, vol_scale, lambdas):
     """
     Perform Ridge regression hyperparameter search and prediction.
@@ -301,6 +302,7 @@ def ridge_hp_search(data, feat, vol_scale, lambdas):
     }
 
 
+# Not used?
 def fit_xgb(train, val, params, iter, es, cores, seed):
     """
     Fit an XGBoost model using the given training and validation datasets.
@@ -354,7 +356,7 @@ def fit_xgb(train, val, params, iter, es, cores, seed):
     return model
 
 
-
+# Not used?
 def xgb_hp_search(data, feat, vol_scale, hp_grid, iter_, es, cores, seed):
     """
     Perform hyperparameter search for XGBoost.
