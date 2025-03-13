@@ -38,16 +38,6 @@ search_grid = pd.DataFrame({
     "horizon": [[i] for i in range(1, 13)]
 })
 
-# search_grid = pd.DataFrame({
-#     "name": [f"m{i}" for i in range(10, 12)],  # Generates "m11" and "m12"
-#     "horizon": [[i] for i in range(10, 12)]   # Generates [[11], [12]]
-# })
-
-# search_grid = pd.DataFrame({
-#     "name": ["m12"],
-#     "horizon": [[12]]
-# })
-
 # Assign values from config_params to settings and portfolio configurations
 settings["screens"]["size_screen"] = config_params["size_screen"]
 settings["cov_set"]["industries"] = config_params["industry_cov"]
@@ -124,7 +114,7 @@ def prepare_and_fit_models(settings, pf_set, features, output_path):
     chars = apply_size_screen(chars, settings)
 
     print("Step 13: Applying addition and deletion rules...")
-    chars = apply_addition_deletion_rule(chars, settings) # obs
+    chars = apply_addition_deletion_rule(chars, settings)
 
     data_ret.to_pickle(os.path.join(settings["data_path"], "data_ret_processed.pkl"))
     chars.to_pickle(os.path.join(settings["data_path"], "chars_processed.pkl"))

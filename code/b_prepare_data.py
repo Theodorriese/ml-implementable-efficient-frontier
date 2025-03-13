@@ -555,8 +555,8 @@ def load_daily_returns_pkl(data_path, chars, risk_free):
     risk_free["month"] = risk_free["date"].dt.to_period("M")
 
     # Calculate daily risk-free rate
-    risk_free["days_in_month"] = risk_free["date"].dt.daysinmonth
-    risk_free["rf_daily"] = risk_free["rf"] / risk_free["days_in_month"]
+    risk_free["days_in_month"] = risk_free["date"].dt.daysinmonth  # Number of days in each month
+    risk_free["rf_daily"] = risk_free["rf"] / risk_free["days_in_month"]  # Convert to daily rate
 
     # Map monthly risk-free rates to daily data
     daily["month"] = daily["date"].dt.to_period("M")

@@ -1,11 +1,9 @@
 import numpy as np
 import pandas as pd
-import os
 from tqdm import tqdm
 from scipy.linalg import sqrtm, solve
 from itertools import product
 from collections import defaultdict
-from functools import reduce
 from a_general_functions import create_cov, create_lambda, sigma_gam_adj, initial_weights_new, pf_ts_fun
 from a_return_prediction_functions import rff
 
@@ -18,14 +16,21 @@ def m_func(w, mu, rf, sigma_gam, gam, lambda_mat, iterations):
         w (float): Weight scalar.
         mu (float): Expected return.
         rf (float): Risk-free rate.
-        sigma_gam (ndarray): Covariance matrix scaled by gamma.
+        sigma_gam (ndarray or DataFrame): Covariance matrix scaled by gamma.
         gam (float): Risk aversion coefficient.
-        lambda_mat (ndarray): Diagonal matrix of lambdas.
+        lambda_mat (ndarray or DataFrame): Diagonal matrix of lambdas.
         iterations (int): Number of iterations.
 
     Returns:
         ndarray: Computed m matrix.
     """
+    # Convert to NumPy if inputs are Pandas DataFrames
+    if isinstance(sigma_gam, pd.DataFrame):
+        sigma_gam = sigma_gam.to_numpy()
+    if isinstance(lambda_mat, pd.DataFrame):
+        lambda_mat = lambda_mat.to_numpy()
+
+    # Continue with computations
     n = lambda_mat.shape[0]
     g_bar = np.ones(n)
     mu_bar_vec = np.ones(n) * (1 + rf + mu)
@@ -758,197 +763,247 @@ def static_implement(data_tc, cov_list, lambda_list,
     }
 
 
+def scale_constant(df):
+    """Scale a Series or array so that the sum of squares equals 1, unless it's all zero."""
+    s = np.sum(df**2)
+    return df * np.sqrt(1.0 / s) if s != 0 else df
+
+
 def pfml_input_fun(data_tc, cov_list, lambda_list, gamma_rel, wealth, mu, dates, lb, scale,
-                   risk_free, features, rff_feat, p_max, g, add_orig, iter_, balanced):
+                   risk_free, features, rff_feat, seed, p_max, g, add_orig, iter_, balanced):
     """
     Prepares inputs for Portfolio-ML computations.
 
     Parameters:
         data_tc (pd.DataFrame): Data containing features and target variables for portfolio construction.
-        cov_list (dict): Dictionary of covariance matrices indexed by date.
-        lambda_list (dict): Dictionary of lambda matrices indexed by date.
+            Must include columns: 'id', 'eom', 'valid', 'ret_ld1', 'tr_ld0', 'mu_ld0', plus those in features.
+        cov_list (dict): Dictionary of covariance matrices indexed by dates.
+        lambda_list (dict): Dictionary of lambda matrices indexed by dates.
         gamma_rel (float): Relative risk aversion parameter.
         wealth (pd.DataFrame): Wealth data containing columns ['eom', 'wealth'].
         mu (float): Expected return parameter.
-        dates (list): List of dates for portfolio computation.
-        lb (int): Lookback window for data preparation.
+        dates (list): List of dates (as pd.Timestamp or convertible) for portfolio computation.
+        lb (int): Lookback window (in months) for data preparation.
         scale (bool): Whether to scale features by volatility.
-        risk_free (pd.DataFrame): Risk-free rate data with columns ['eom', 'rf'].
-        features (list): List of feature names for portfolio prediction.
+        risk_free (pd.DataFrame): Risk-free rate data with columns ['date', 'rf'].
+        features (list): List of feature column names.
         rff_feat (bool): Whether to use Random Fourier Features.
+        seed (int): Random seed (used if rff_feat is True).
         p_max (int): Maximum number of random Fourier features.
-        g (float): RFF Gaussian kernel width.
-        add_orig (bool): Whether to include original features with RFF.
-        iter_ (int): Iterations for weight computation.
-        balanced (bool): Whether to balance data by scaling columns.
+        g (float): Gaussian kernel width for RFF.
+        add_orig (bool): Whether to include original features along with RFF.
+        iter_ (int): Number of iterations for weight computation (passed to m_func).
+        balanced (bool): Whether to perform balanced (demeaning/scaling) transformation.
 
     Returns:
         dict: A dictionary containing:
-            - "reals": Realizations for r_tilde, denominator, risk, and transaction cost.
-            - "signal_t": Signals for each time period.
-            - "rff_w" (optional): Random Fourier feature weights (if rff_feat=True).
+            - "reals": Dictionary (keyed by date string) of realizations (r_tilde, denom, risk, tc).
+            - "signal_t": Dictionary (keyed by date string) of signal matrices.
+            - "rff_w": Random Fourier feature weights (if rff_feat=True; otherwise None).
     """
-    # Define lookback dates
-    dates_lb = pd.date_range(
-        start=min(dates) - pd.DateOffset(months=lb + 1),
-        end=max(dates),
-        freq='M'
-    )
+    # Convert dates to pd.Timestamp
+    dates = [pd.to_datetime(d) for d in dates]
 
-    # Define rff_x as None by default so it is always in scope
-    rff_x = None
-
-    # Create random Fourier features if required
+    # --- Step 1. Create or augment features with RFF if required ---
+    rff_w = None  # default value
     if rff_feat:
-        # Generate Random Fourier Features using the corrected function
+        np.random.seed(seed)
+        # Assumes a function rff(x, p, g) that returns a dict with keys "W", "X_cos", "X_sin"
         rff_output = rff(data_tc[features].values, p=p_max, g=g)
-
-        # Extract components
-        rff_x = rff_output["W"]  # Store weights separately
+        rff_w = rff_output["W"]
         rff_cos = rff_output["X_cos"]
         rff_sin = rff_output["X_sin"]
-
-        # Stack cosine and sine features
+        # Stack cosine and sine features horizontally
         rff_features = np.hstack([rff_cos, rff_sin])
         rff_columns = [f"rff{i}_cos" for i in range(1, p_max // 2 + 1)] + \
                       [f"rff{i}_sin" for i in range(1, p_max // 2 + 1)]
-
-        # Convert to DataFrame
-        rff_df = pd.DataFrame(rff_features, columns=rff_columns)
-
+        rff_df = pd.DataFrame(rff_features, columns=rff_columns, index=data_tc.index)
+        # Build main data with basic columns then attach RFF features
         data = pd.concat(
             [data_tc[['id', 'eom', 'valid', 'ret_ld1', 'tr_ld0', 'mu_ld0']], rff_df],
             axis=1
         )
-        feat_new = rff_columns
-
+        feat_new = rff_columns.copy()
         if add_orig:
             data = pd.concat([data, data_tc[features]], axis=1)
             feat_new.extend(features)
     else:
-        data = data_tc[['id', 'eom', 'valid', 'ret_ld1', 'tr_ld0', 'mu_ld0'] + features]
-        feat_new = features
+        data = data_tc[['id', 'eom', 'valid', 'ret_ld1', 'tr_ld0', 'mu_ld0'] + features].copy()
+        feat_new = features.copy()
 
-    # We will add 'constant' so we can do a group-based transformation
+    # Ensure that 'id' is treated as string and 'eom' as Timestamp.
+    data['id'] = data['id'].astype(str)
+    data['eom'] = pd.to_datetime(data['eom'])
     feat_cons = feat_new + ['constant']
 
-    # Scale features
+    # --- Step 2. Add volatility scales if requested ---
     if scale:
-        scales = []
-        # Build a monthly DataFrame of vol scaling
+        # Replicate R’s lookback dates:
+        start_lb = (min(dates) + pd.DateOffset(days=1)) - pd.DateOffset(months=lb+1)
+        end_lb = max(dates) + pd.DateOffset(days=1)
+        dates_lb = pd.date_range(start=start_lb, end=end_lb, freq='M')
+        scales_list = []
         for d in dates_lb:
             sigma_data = cov_list.get(d, None)
             if sigma_data is not None:
                 sigma = create_cov(sigma_data)
                 if sigma is not None and isinstance(sigma, pd.DataFrame) and sigma.shape[0] > 0:
                     diag_vol = np.sqrt(np.diag(sigma))
-                    scales.append(
+                    scales_list.append(
                         pd.DataFrame({'id': sigma.index, 'eom': d, 'vol_scale': diag_vol})
                     )
+        if scales_list:
+            scales_df = pd.concat(scales_list, ignore_index=True)
+            data = data.merge(scales_df, on=['id', 'eom'], how='left')
+            data['vol_scale'] = data.groupby('eom')['vol_scale'].transform(lambda x: x.fillna(x.median()))
 
-        # Ensure scales_df is properly created
-        scales_df = pd.concat(scales, ignore_index=True) if scales else pd.DataFrame()
-        data['id'] = data['id'].astype(str)
-        scales_df['id'] = scales_df['id'].astype(str)
-        data = data.merge(scales_df, on=['id', 'eom'], how='left')
-
-        # Fill missing scales with the median for that eom group
-        data['vol_scale'] = data.groupby('eom')['vol_scale'].transform(lambda x: x.fillna(x.median()))
-
-    # If balanced, we want to demean within each date and then scale so norm=1
+    # --- Step 3. If balanced, demean features and add constant then scale ---
     if balanced:
         data[feat_new] = data.groupby('eom')[feat_new].transform(lambda x: x - x.mean())
         data['constant'] = 1
-        data[feat_cons] = data.groupby('eom')[feat_cons].transform(
-            lambda x: x * np.sqrt(1.0 / (x**2).sum())
-        )
+        data[feat_cons] = data.groupby('eom')[feat_cons].transform(scale_constant)
 
-    # Prepare signals and realizations
+    # --- Step 4. Loop over each date to compute signals and realizations ---
     inputs = {}
     for d in dates:
         if pd.Timestamp(d).year % 10 == 0 and pd.Timestamp(d).month == 1:
             print(f"--> PF-ML inputs: {d}")
 
-        # Subset for returns
-        data_ret = data[(data['valid']) & (data['eom'] == d)][['id', 'ret_ld1']]
+        # Subset data for returns on date d
+        data_ret = data[(data['valid'] == True) & (data['eom'] == d)]
+        data_ret = data_ret.sort_values('id')
         ids = data_ret['id'].values
         r = data_ret['ret_ld1'].values
 
-        sigma_data = cov_list.get(d, None)
-        sigma = create_cov(sigma_data, ids) if sigma_data is not None else None
-
-        lambda_data = lambda_list.get(d, None)
-        lambda_mat = create_lambda(lambda_data, ids) if lambda_data is not None else None
-
-        w = wealth.loc[wealth['eom'] == pd.Timestamp(d), 'wealth'].iloc[0]
-        rf = risk_free.loc[risk_free['eom'] == pd.Timestamp(d), 'rf'].iloc[0]
-
-        # m_func used for weighting
-        m = m_func(
-            w=w, mu=mu, rf=rf,
-            sigma_gam=sigma * gamma_rel,
-            gam=gamma_rel, lambda_mat=lambda_mat,
-            iterations=iter_
-        )
-
-        # Subset data for signals over lookback period
-        data_sub = data[
-            (data['id'].isin(ids)) &
-            (data['eom'] >= pd.Timestamp(d) - pd.DateOffset(months=lb)) &
-            (data['eom'] <= pd.Timestamp(d))
-        ]
-        # If not balanced, do the same transformations that balanced does
+        # Define lookback window start date.
+        start_date = (d.replace(day=1) - pd.DateOffset(months=lb)) - pd.DateOffset(days=1)
+        data_sub = data[(data['id'].isin(ids)) & (data['eom'] >= start_date) & (data['eom'] <= d)].copy()
         if not balanced:
             data_sub[feat_new] = data_sub.groupby('eom')[feat_new].transform(lambda x: x - x.mean())
             data_sub['constant'] = 1
-            data_sub[feat_cons] = data_sub.groupby('eom')[feat_cons].transform(
-                lambda x: x * np.sqrt(1.0 / (x**2).sum())
-            )
+            data_sub[feat_cons] = data_sub.groupby('eom')[feat_cons].transform(scale_constant)
 
         data_sub = data_sub.sort_values(['eom', 'id'], ascending=[False, True])
+        groups = {grp: sub.sort_values('id') for grp, sub in data_sub.groupby('eom')}
 
-        # Build signals dictionary by date
+        # Build signals: for each group date, get matrix of feat_cons.
         signals = {}
-        for d_new in data_sub['eom'].unique():
-            s = data_sub[data_sub['eom'] == d_new][feat_cons].values
+        for grp_date, sub in groups.items():
+            s = sub[feat_cons].values
             if scale:
-                # Scale by vol_scale
-                s_scales = np.diag(1.0 / data_sub[data_sub['eom'] == d_new]['vol_scale'].values)
-                s = s_scales @ s
-            signals[d_new] = s
+                vol = sub['vol_scale'].values
+                s = np.diag(1.0 / vol) @ s
+            signals[pd.to_datetime(grp_date)] = s
 
-        # Weighted signals (omega)
+        # Build weighting matrices for each group.
         gtm = {}
-        for d_new in signals.keys():
-            gt = (1.0 + data_sub[data_sub['eom'] == d_new]['tr_ld0'].values) / \
-                 (1.0 + data_sub[data_sub['eom'] == d_new]['mu_ld0'].values)
-            gt[np.isnan(gt)] = 1.0
-            gtm[d_new] = m @ np.diag(gt)
+        for grp_date, sub in groups.items():
+            tr = sub.sort_values('id')['tr_ld0'].values
+            mu_ld = sub.sort_values('id')['mu_ld0'].values
+            gt = (1.0 + tr) / (1.0 + mu_ld)
+            gt = np.where(np.isnan(gt), 1.0, gt)
 
-        omega = np.sum([gtm[d_new] @ signals[d_new] for d_new in signals.keys()], axis=0)
+            # Compute `m` for `grp_date`
+            ids_subset = sub['id'].astype(str).values
+            sigma_data = cov_list.get(grp_date, {})
+            sigma = create_cov(sigma_data, ids=ids_subset) if sigma_data else None
 
-        # Realizations
-        r_tilde = omega.T @ r
-        risk = gamma_rel * (omega.T @ sigma @ omega)
-        tc = w * (omega.T @ lambda_mat @ omega)
-        denom = risk + tc
+            lambda_data = lambda_list.get(grp_date, {})
+            lambda_mat = create_lambda(lambda_data, ids=ids_subset) if lambda_data else None
 
+            w_subset = wealth.loc[wealth['eom'] == grp_date, 'wealth'].iloc[0]
+            rf_subset = risk_free.loc[risk_free['date'] == grp_date, 'rf'].iloc[0]
+
+            # Compute `m` specific to `grp_date`
+            m_subset = m_func(
+                w=w_subset, mu=mu, rf=rf_subset,
+                sigma_gam=sigma * gamma_rel, gam=gamma_rel,
+                lambda_mat=lambda_mat, iterations=iter_
+            )
+
+            # Compute gtm per date
+            gtm[pd.to_datetime(grp_date)] = m_subset @ np.diag(gt)
+
+        # Order the available lookback dates in descending order (most recent first)
+        sorted_dates = sorted(signals.keys(), reverse=True)
+        if d not in sorted_dates:
+            raise ValueError(f"Current date {d} not found in lookback groups.")
+        n = signals[d].shape[0]
+
+        # Build aggregated weighting matrices over the lookback horizon.
+        agg_gtm = []
+        agg_gtm_l1 = []
+        identity_n = np.eye(n)
+        agg_gtm.append(identity_n)
+        agg_gtm_l1.append(identity_n)
+        if len(sorted_dates) < lb + 1:
+            raise ValueError("Not enough lookback groups available for the specified lb.")
+        for i in range(lb):
+            agg_gtm.append(agg_gtm[-1] @ gtm[sorted_dates[i]])
+            agg_gtm_l1.append(agg_gtm_l1[-1] @ gtm[sorted_dates[i + 1]])
+
+        # Compute weighted signals (omega) and lagged omega.
+        omega_sum = None
+        const_sum = None
+        omega_l1_sum = None
+        const_l1_sum = None
+        for i in range(lb + 1):
+            d_new = d - pd.DateOffset(months=i)
+            d_new_l1 = d - pd.DateOffset(months=i + 1)
+            if d_new not in signals or d_new_l1 not in signals:
+                raise ValueError(f"Missing signal for lookback date: {d_new} or {d_new_l1}")
+            s = signals[d_new]
+            s_l1 = signals[d_new_l1]
+            A = agg_gtm[i] @ s
+            B = agg_gtm_l1[i] @ s_l1
+            if omega_sum is None:
+                omega_sum = A.copy()
+                const_sum = agg_gtm[i].copy()
+                omega_l1_sum = B.copy()
+                const_l1_sum = agg_gtm_l1[i].copy()
+            else:
+                omega_sum += A
+                const_sum += agg_gtm[i]
+                omega_l1_sum += B
+                const_l1_sum += agg_gtm_l1[i]
+
+        # Solve for omega and omega_l1.
+        omega = np.linalg.solve(const_sum, omega_sum)
+        omega_l1 = np.linalg.solve(const_l1_sum, omega_l1_sum)
+
+        # Compute current period's gt diagonal (ensuring sorted order by id)
+        tr_current = data_ret.sort_values('id')['tr_ld0'].values
+        mu_current = data_ret.sort_values('id')['mu_ld0'].values
+        gt_diag = np.diag((1.0 + tr_current) / (1.0 + mu_current))
+        omega_chg = omega - gt_diag @ omega_l1
+
+        # --- Step 5. Compute realizations ---
+        r_tilde = (omega.T @ r).item()  # assume scalar
+        risk_val = gamma_rel * (omega.T @ sigma @ omega)
+        tc = w * (omega_chg.T @ lambda_mat @ omega_chg)
+        denom = risk_val + tc
+
+        reals = {
+            'r_tilde': r_tilde,
+            'denom': denom,
+            'risk': risk_val,
+            'tc': tc
+        }
+        signal_t = signals[d]
         inputs[d] = {
-            'reals': {
-                'r_tilde': r_tilde,
-                'denom': denom,
-                'risk': risk,
-                'tc': tc
-            },
-            'signal_t': signals
+            'reals': reals,
+            'signal_t': signal_t
         }
 
-    return {
-        'reals':  {str(d): inputs[d]['reals']   for d in dates},
-        'signal_t': {str(d): inputs[d]['signal_t'] for d in dates},
-        # rff_x is guaranteed to be defined here (either None or the RFF array)
-        'rff_w': rff_x if rff_feat else None
+    output = {
+        'reals': {str(d): inputs[d]['reals'] for d in inputs},
+        'signal_t': {str(d): inputs[d]['signal_t'] for d in inputs},
+        'rff_w': rff_w if rff_feat else None
     }
+    return output
+
+
+
 
 # X
 def pfml_feat_fun(p, orig_feat, features):
@@ -1394,7 +1449,7 @@ def pfml_implement(
                 data_tc, cov_list, lambda_list,
                 gamma_rel, wealth, mu, dates_full,
                 lb, scale, risk_free, features,
-                rff_feat, p_max=max(p_vec),
+                rff_feat, seed, p_max=max(p_vec),
                 g=g, add_orig=orig_feat,
                 iter_=iter, balanced=balanced
             )

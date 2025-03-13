@@ -311,7 +311,6 @@ def pf_ts_fun(weights, data, wealth):
         data (pd.DataFrame): Stock return data with necessary financial metrics.
                              Expected columns: ['id', 'eom', 'ret_ld1', 'pred_ld1', 'lambda'].
         wealth (pd.DataFrame): Portfolio wealth per `eom`. Expected columns: ['eom', 'wealth'].
-        gam (float): Unused parameter (can be removed or used for additional calculations).
 
     Returns:
         pd.DataFrame: Aggregated portfolio statistics with the following columns:
@@ -473,52 +472,187 @@ def size_screen_fun(chars, screen_type):
     return chars
 
 
-# Addition/deletion rule
-def addition_deletion_fun(chars, addition_n, deletion_n):
+def investment_universe(add_series, delete_series):
     """
-    Applies addition and deletion rules to determine stock validity for portfolio inclusion.
+    Mimics the R investment_universe function.
+    Iterates over the add and delete signals:
+      - When an add signal is TRUE, it turns the valid state ON.
+      - When a delete signal is TRUE, it turns the valid state OFF.
+    Returns a boolean Series representing the investment universe.
+    """
+    state = False
+    valid = []
+    for a, d in zip(add_series, delete_series):
+        if a:
+            state = True
+        if d:
+            state = False
+        valid.append(state)
+    return pd.Series(valid, index=add_series.index)
 
-    Parameters:
-        chars (pd.DataFrame): DataFrame containing stock characteristics with the following columns:
-                              - 'id': Stock identifier.
-                              - 'eom': End-of-month date.
-                              - 'valid_data': Boolean indicating if data for the stock is valid.
-                              - 'valid_size': Boolean indicating if the stock passes size screening.
-        addition_n (int): Number of consecutive valid periods required to add a stock to the portfolio.
-        deletion_n (int): Number of consecutive invalid periods required to remove a stock from the portfolio.
+
+def apply_investment_universe(group):
+    """
+    Applies the investment_universe logic on a group.
+    If the group has more than one row, compute valid as per investment_universe;
+    otherwise, set valid to False.
+    """
+    if len(group) > 1:
+        group = group.copy()
+        group['valid'] = investment_universe(group['add'], group['delete'])
+    else:
+        group = group.copy()
+        group['valid'] = False
+    return group
+
+
+def agg_turnover(df):
+    """
+    Aggregates turnover statistics for a single group of rows (one eom).
+    Computes:
+      - sum_valid_temp: sum of 'valid_temp' (raw number of valid_temp=TRUE)
+      - sum_valid: sum of 'valid' (raw number of valid=TRUE)
+      - raw: ratio of changes in valid_temp to sum_valid_temp
+      - adj: ratio of changes in valid to sum_valid
+    Returns a Series with these values.
+    """
+    sum_valid_temp = df["valid_temp"].sum()
+    sum_valid = df["valid"].sum()
+    raw = np.nan
+    adj = np.nan
+
+    if sum_valid_temp != 0:
+        raw = df["chg_raw"].sum() / sum_valid_temp
+    if sum_valid != 0:
+        adj = df["chg_adj"].sum() / sum_valid
+
+    return pd.Series({
+        "raw_n": sum_valid_temp,
+        "adj_n": sum_valid,
+        "raw": raw,
+        "adj": adj
+    })
+
+
+def compute_bool_changes(df, group_col, bool_col):
+    """
+    Faster version using `.transform()` instead of `.apply()`.
+
+    This method avoids the overhead of `apply()` by using `transform()`,
+    which is optimized for element-wise operations.
 
     Returns:
-        pd.DataFrame: The input DataFrame with additional columns:
-                      - 'valid_temp': Combined validity of data and size.
-                      - 'addition_count': Rolling count of consecutive valid periods for addition.
-                      - 'deletion_count': Rolling count of consecutive invalid periods for deletion.
-                      - 'add': Boolean indicating if the stock qualifies for addition.
-                      - 'delete': Boolean indicating if the stock qualifies for deletion.
-                      - 'valid': Final validity flag after applying addition and deletion rules.
+        A boolean Series where True indicates a change from the previous row within a group.
     """
-    # Combine 'valid_data' and 'valid_size' to determine temporary validity
+    return df[bool_col] != df.groupby(group_col)[bool_col].shift(1)
+
+
+def addition_deletion_fun(chars, addition_n, deletion_n):
+    """
+    Replicates the R addition_deletion_fun logic with no nested function definitions.
+
+    Steps:
+      1. Create temporary validity flag: valid_temp = (valid_data & valid_size).
+      2. Sort the data by 'id' and 'eom'.
+      3. For each 'id', compute rolling sums on valid_temp with windows addition_n and deletion_n.
+      4. Flag add (if rolling sum equals addition_n) and delete (if rolling sum equals 0),
+         then replace any NaN with False.
+      5. Count the number of observations (n) per id.
+      6. For groups with n > 1, compute valid using investment_universe (applied via helper);
+         for groups with a single observation, set valid to False.
+      7. Ensure that if valid_data is False, valid is also False.
+      8. Compute turnover measures:
+           - chg_raw: Change in valid_temp from previous row (by id).
+           - chg_adj: Change in valid (from investment_universe) from previous row.
+         Then replace NaN with False.
+      9. Aggregate by eom and compute average turnover across months.
+      10. Print turnover results.
+      11. Drop intermediate columns.
+
+    Parameters:
+      chars (pd.DataFrame): Must contain columns 'id', 'eom', 'valid_data', and 'valid_size'.
+      addition_n (int): Rolling window size for addition.
+      deletion_n (int): Rolling window size for deletion.
+
+    Returns:
+      pd.DataFrame: Modified DataFrame with intermediate columns removed.
+    """
+
+    # Step 1: Temporary validity
+    print("Step 13.1: Creating temporary validity flag")
     chars["valid_temp"] = chars["valid_data"] & chars["valid_size"]
 
-    # Ensure the data is sorted by 'id' and 'eom' for rolling operations
-    chars.sort_values(["id", "eom"], inplace=True)
+    # Step 2: Sort by 'id' and 'eom'
+    print("Step 13.2: Sorting by 'id' and 'eom'")
+    chars.sort_values(by=["id", "eom"], inplace=True)
 
-    # Compute rolling counts for addition and deletion rules
-    chars["addition_count"] = (
-        chars.groupby("id")["valid_temp"]
-        .rolling(window=addition_n)
-        .sum()
-        .reset_index(drop=True)
+    # Step 3: Compute rolling sums
+    print("Step 13.3: Computing rolling sums for addition and deletion")
+    chars["addition_count"] = chars.groupby("id")["valid_temp"].transform(
+        lambda x: x.rolling(window=addition_n, min_periods=addition_n).sum()
+    )
+    chars["deletion_count"] = chars.groupby("id")["valid_temp"].transform(
+        lambda x: x.rolling(window=deletion_n, min_periods=deletion_n).sum()
     )
 
-    chars["deletion_count"] = (
-        chars.groupby("id")["valid_temp"]
-        .rolling(window=deletion_n)
-        .sum()
-        .reset_index(drop=True)
-    )
+    # Step 4: Flag add/delete, replace NaN with False
+    print("Step 13.4: Flagging 'add' and 'delete' signals")
+    chars["add"] = (chars["addition_count"] == addition_n)
+    chars["add"] = chars["add"].replace({np.nan: False})
 
-    chars["add"] = chars["addition_count"] == addition_n
-    chars["delete"] = chars["deletion_count"] == 0
-    chars["valid"] = chars["add"] & ~chars["delete"]
+    chars["delete"] = (chars["deletion_count"] == 0)
+    chars["delete"] = chars["delete"].replace({np.nan: False})
+
+    # Step 5: Count the number of rows per id
+    print("Step 13.5: Counting rows per 'id'")
+    chars["n"] = chars.groupby("id")["id"].transform("count")
+
+    # Step 6: Apply the investment_universe logic
+    print("Step 13.6: Applying investment_universe logic")
+    chars = chars.groupby("id", group_keys=False).apply(apply_investment_universe)
+    # For ids with a single observation, ensure valid is False
+    chars.loc[chars["n"] == 1, "valid"] = False
+
+    # Step 7: If valid_data is False, then valid must be False
+    print("Step 13.7: Ensuring valid_data=False enforces valid=False")
+    chars.loc[chars["valid_data"] == False, "valid"] = False
+
+    # Step 8: Turnover calculations
+    print("Step 13.8: Computing turnover changes (chg_raw and chg_adj)")
+    # Compute raw changes in 'valid_temp'
+    chars["chg_raw"] = compute_bool_changes(chars, "id", "valid_temp")
+
+    # Compute adjusted changes in 'valid'
+    chars["chg_adj"] = compute_bool_changes(chars, "id", "valid")
+
+    # Step 9: Aggregate turnover by end-of-month (eom)
+    print("Step 13.9: Aggregating turnover by end-of-month")
+    agg = chars.groupby("eom").apply(agg_turnover).reset_index()
+
+    # Filter out NaN or zero
+    agg_filtered = agg[(~agg["raw"].isna()) & (~agg["adj"].isna()) & (agg["adj"] != 0)]
+    turnover_stats = {
+        "n_months": len(agg_filtered),
+        "n_raw": agg_filtered["raw_n"].mean() if len(agg_filtered) > 0 else np.nan,
+        "n_adj": agg_filtered["adj_n"].mean() if len(agg_filtered) > 0 else np.nan,
+        "turnover_raw": agg_filtered["raw"].mean() if len(agg_filtered) > 0 else np.nan,
+        "turnover_adjusted": agg_filtered["adj"].mean() if len(agg_filtered) > 0 else np.nan,
+    }
+
+    # Step 10: Print turnover results
+    print("Step 13.10: Computing turnover statistics")
+    print("Turnover wo addition/deletion rule: {}%".format(
+        round(turnover_stats["turnover_raw"] * 100, 2) if not np.isnan(turnover_stats["turnover_raw"]) else np.nan))
+    print("Turnover w  addition/deletion rule: {}%".format(
+        round(turnover_stats["turnover_adjusted"] * 100, 2) if not np.isnan(
+            turnover_stats["turnover_adjusted"]) else np.nan))
+
+    # Step 11: Drop intermediate columns
+    print("Step 13.11: Dropping intermediate columns and returning DataFrame")
+    drop_cols = [
+        "n", "addition_count", "deletion_count", "add", "delete",
+        "valid_temp", "valid_data", "valid_size", "chg_raw", "chg_adj"
+    ]
+    chars.drop(columns=drop_cols, inplace=True, errors="ignore")
 
     return chars
