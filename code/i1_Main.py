@@ -1,11 +1,5 @@
-import os
 import numpy as np
 import pandas as pd
-import datetime as dt
-import matplotlib.pyplot as plt
-from matplotlib.cm import get_cmap
-from collections import defaultdict
-import seaborn as sns
 from matplotlib.cm import get_cmap
 
 
@@ -63,9 +57,9 @@ settings = {
     "seed_no": 1,
     "months": False,
     "split": {
-        "train_end": pd.Timestamp("2017-12-31"), # change to 2018
+        "train_end": pd.Timestamp("2017-12-31"), # change to 2018?
         "test_end": pd.Timestamp("2020-12-31"),
-        "val_years": 2, # change to 1
+        "val_years": 2, # change to 1?
         "model_update_freq": "yearly",
         "train_lookback": 5,
         "retrain_lookback": 5

@@ -6,12 +6,21 @@
   <component name="ChangeListManager">
     <list default="true" id="001ad656-4e1d-41a9-98d4-c3629915c329" name="Changes" comment="Push">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/code/Outputs/model_1.pkl" beforeDir="false" afterPath="$PROJECT_DIR$/code/Outputs/model_1.pkl" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/code/a_general_functions.py" beforeDir="false" afterPath="$PROJECT_DIR$/code/a_general_functions.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/code/Outputs/fitted_models.pkl" beforeDir="false" afterPath="$PROJECT_DIR$/code/Outputs/fitted_models.pkl" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/code/Outputs/model_10.pkl" beforeDir="false" afterPath="$PROJECT_DIR$/code/Outputs/model_10.pkl" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/code/Outputs/model_11.pkl" beforeDir="false" afterPath="$PROJECT_DIR$/code/Outputs/model_11.pkl" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/code/Outputs/model_12.pkl" beforeDir="false" afterPath="$PROJECT_DIR$/code/Outputs/model_12.pkl" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/code/Outputs/model_2.pkl" beforeDir="false" afterPath="$PROJECT_DIR$/code/Outputs/model_2.pkl" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/code/Outputs/model_3.pkl" beforeDir="false" afterPath="$PROJECT_DIR$/code/Outputs/model_3.pkl" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/code/Outputs/model_4.pkl" beforeDir="false" afterPath="$PROJECT_DIR$/code/Outputs/model_4.pkl" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/code/Outputs/model_5.pkl" beforeDir="false" afterPath="$PROJECT_DIR$/code/Outputs/model_5.pkl" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/code/Outputs/model_6.pkl" beforeDir="false" afterPath="$PROJECT_DIR$/code/Outputs/model_6.pkl" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/code/Outputs/model_7.pkl" beforeDir="false" afterPath="$PROJECT_DIR$/code/Outputs/model_7.pkl" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/code/Outputs/model_8.pkl" beforeDir="false" afterPath="$PROJECT_DIR$/code/Outputs/model_8.pkl" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/code/Outputs/model_9.pkl" beforeDir="false" afterPath="$PROJECT_DIR$/code/Outputs/model_9.pkl" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/code/Outputs/model_full.pkl" beforeDir="false" afterPath="$PROJECT_DIR$/code/Outputs/model_full.pkl" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/code/a_portfolio_choice_functions.py" beforeDir="false" afterPath="$PROJECT_DIR$/code/a_portfolio_choice_functions.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/code/b_prepare_data.py" beforeDir="false" afterPath="$PROJECT_DIR$/code/b_prepare_data.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/code/d_estimate_cov_matrix.py" beforeDir="false" afterPath="$PROJECT_DIR$/code/d_estimate_cov_matrix.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/code/i2_fit_models.py" beforeDir="false" afterPath="$PROJECT_DIR$/code/i2_fit_models.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/code/i1_Main.py" beforeDir="false" afterPath="$PROJECT_DIR$/code/i1_Main.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/code/i3_build_portfolios.py" beforeDir="false" afterPath="$PROJECT_DIR$/code/i3_build_portfolios.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -75,7 +84,7 @@
     "Python.f_base_case.executor": "Debug",
     "Python.i1_Main.executor": "Run",
     "Python.i2_build_portfolios.executor": "Debug",
-    "Python.i2_fit_models.executor": "Debug",
+    "Python.i2_fit_models.executor": "Run",
     "Python.i3_build_portfolios.executor": "Debug",
     "Python.main.executor": "Run",
     "Python.temp_data_reduction.executor": "Run",
@@ -197,15 +206,7 @@
       <workItem from="1741789050782" duration="564000" />
       <workItem from="1741789798441" duration="704000" />
       <workItem from="1741790759670" duration="2976000" />
-      <workItem from="1741852646112" duration="27367000" />
-    </task>
-    <task id="LOCAL-00045" summary="Push">
-      <option name="closed" value="true" />
-      <created>1738856921261</created>
-      <option name="number" value="00045" />
-      <option name="presentableId" value="LOCAL-00045" />
-      <option name="project" value="LOCAL" />
-      <updated>1738856921261</updated>
+      <workItem from="1741852646112" duration="37571000" />
     </task>
     <task id="LOCAL-00046" summary="Push">
       <option name="closed" value="true" />
@@ -591,7 +592,15 @@
       <option name="project" value="LOCAL" />
       <updated>1741857922060</updated>
     </task>
-    <option name="localTasksCounter" value="94" />
+    <task id="LOCAL-00094" summary="Push">
+      <option name="closed" value="true" />
+      <created>1741886121022</created>
+      <option name="number" value="00094" />
+      <option name="presentableId" value="LOCAL-00094" />
+      <option name="project" value="LOCAL" />
+      <updated>1741886121022</updated>
+    </task>
+    <option name="localTasksCounter" value="95" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -619,67 +628,22 @@
       <breakpoints>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/code/a_portfolio_choice_functions.py</url>
-          <line>1501</line>
+          <line>1494</line>
           <option name="timeStamp" value="294" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/code/a_portfolio_choice_functions.py</url>
-          <line>1455</line>
+          <line>1448</line>
           <option name="timeStamp" value="297" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/code/a_portfolio_choice_functions.py</url>
-          <line>927</line>
-          <option name="timeStamp" value="398" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/code/a_portfolio_choice_functions.py</url>
-          <line>924</line>
-          <option name="timeStamp" value="402" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/code/d_estimate_cov_matrix.py</url>
-          <line>16</line>
-          <option name="timeStamp" value="403" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/code/i3_build_portfolios.py</url>
-          <line>124</line>
-          <option name="timeStamp" value="404" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/code/d_estimate_cov_matrix.py</url>
-          <line>29</line>
-          <option name="timeStamp" value="405" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/code/d_estimate_cov_matrix.py</url>
-          <line>36</line>
-          <option name="timeStamp" value="406" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/code/d_estimate_cov_matrix.py</url>
-          <line>46</line>
-          <option name="timeStamp" value="407" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/code/i2_fit_models.py</url>
-          <line>156</line>
-          <option name="timeStamp" value="422" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/code/i2_fit_models.py</url>
-          <line>123</line>
-          <option name="timeStamp" value="423" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$d_estimate_cov_matrix.coverage" NAME="d_estimate_cov_matrix Coverage Results" MODIFIED="1741274401679" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />
-    <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$i3_build_portfolios.coverage" NAME="i3_build_portfolios Coverage Results" MODIFIED="1741880618813" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />
+    <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$i3_build_portfolios.coverage" NAME="i3_build_portfolios Coverage Results" MODIFIED="1741896321311" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />
     <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$a_portfolio_choice_functions.coverage" NAME="a_portfolio_choice_functions Coverage Results" MODIFIED="1741878308954" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />
-    <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$i2_fit_models.coverage" NAME="i2_fit_models Coverage Results" MODIFIED="1741885707325" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />
+    <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$i2_fit_models.coverage" NAME="i2_fit_models Coverage Results" MODIFIED="1741886190127" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />
     <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$a_general_functions.coverage" NAME="a_general_functions Coverage Results" MODIFIED="1741884997769" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />
     <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$x_csv_to_pkl_converter.coverage" NAME="x_csv_to_pkl_converter Coverage Results" MODIFIED="1739210117303" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />
     <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$b_prepare_data.coverage" NAME="b_prepare_data Coverage Results" MODIFIED="1739101997429" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />

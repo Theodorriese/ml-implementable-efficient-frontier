@@ -801,6 +801,7 @@ def pfml_input_fun(data_tc, cov_list, lambda_list, gamma_rel, wealth, mu, dates,
             - "signal_t": Dictionary (keyed by date string) of signal matrices.
             - "rff_w": Random Fourier feature weights (if rff_feat=True; otherwise None).
     """
+
     # Convert dates to pd.Timestamp
     dates = [pd.to_datetime(d) for d in dates]
 
@@ -808,21 +809,15 @@ def pfml_input_fun(data_tc, cov_list, lambda_list, gamma_rel, wealth, mu, dates,
     rff_w = None  # default value
     if rff_feat:
         np.random.seed(seed)
-        # Assumes a function rff(x, p, g) that returns a dict with keys "W", "X_cos", "X_sin"
         rff_output = rff(data_tc[features].values, p=p_max, g=g)
         rff_w = rff_output["W"]
         rff_cos = rff_output["X_cos"]
         rff_sin = rff_output["X_sin"]
-        # Stack cosine and sine features horizontally
         rff_features = np.hstack([rff_cos, rff_sin])
         rff_columns = [f"rff{i}_cos" for i in range(1, p_max // 2 + 1)] + \
                       [f"rff{i}_sin" for i in range(1, p_max // 2 + 1)]
         rff_df = pd.DataFrame(rff_features, columns=rff_columns, index=data_tc.index)
-        # Build main data with basic columns then attach RFF features
-        data = pd.concat(
-            [data_tc[['id', 'eom', 'valid', 'ret_ld1', 'tr_ld0', 'mu_ld0']], rff_df],
-            axis=1
-        )
+        data = pd.concat([data_tc[['id', 'eom', 'valid', 'ret_ld1', 'tr_ld0', 'mu_ld0']], rff_df], axis=1)
         feat_new = rff_columns.copy()
         if add_orig:
             data = pd.concat([data, data_tc[features]], axis=1)
@@ -831,14 +826,12 @@ def pfml_input_fun(data_tc, cov_list, lambda_list, gamma_rel, wealth, mu, dates,
         data = data_tc[['id', 'eom', 'valid', 'ret_ld1', 'tr_ld0', 'mu_ld0'] + features].copy()
         feat_new = features.copy()
 
-    # Ensure that 'id' is treated as string and 'eom' as Timestamp.
     data['id'] = data['id'].astype(str)
     data['eom'] = pd.to_datetime(data['eom'])
     feat_cons = feat_new + ['constant']
 
     # --- Step 2. Add volatility scales if requested ---
     if scale:
-        # Replicate R’s lookback dates:
         start_lb = (min(dates) + pd.DateOffset(days=1)) - pd.DateOffset(months=lb+1)
         end_lb = max(dates) + pd.DateOffset(days=1)
         dates_lb = pd.date_range(start=start_lb, end=end_lb, freq='M')
@@ -846,12 +839,10 @@ def pfml_input_fun(data_tc, cov_list, lambda_list, gamma_rel, wealth, mu, dates,
         for d in dates_lb:
             sigma_data = cov_list.get(d, None)
             if sigma_data is not None:
-                sigma = create_cov(sigma_data)
-                if sigma is not None and isinstance(sigma, pd.DataFrame) and sigma.shape[0] > 0:
-                    diag_vol = np.sqrt(np.diag(sigma))
-                    scales_list.append(
-                        pd.DataFrame({'id': sigma.index, 'eom': d, 'vol_scale': diag_vol})
-                    )
+                sigma_temp = create_cov(sigma_data)
+                if sigma_temp is not None and isinstance(sigma_temp, pd.DataFrame) and sigma_temp.shape[0] > 0:
+                    diag_vol = np.sqrt(np.diag(sigma_temp))
+                    scales_list.append(pd.DataFrame({'id': sigma_temp.index, 'eom': d, 'vol_scale': diag_vol}))
         if scales_list:
             scales_df = pd.concat(scales_list, ignore_index=True)
             data = data.merge(scales_df, on=['id', 'eom'], how='left')
@@ -865,8 +856,8 @@ def pfml_input_fun(data_tc, cov_list, lambda_list, gamma_rel, wealth, mu, dates,
 
     # --- Step 4. Loop over each date to compute signals and realizations ---
     inputs = {}
-    for d in dates:
-        if pd.Timestamp(d).year % 10 == 0 and pd.Timestamp(d).month == 1:
+    for d in tqdm(dates, desc="Step 4. Computing signals and realizations"):
+        if d.year % 10 == 0 and d.month == 1:
             print(f"--> PF-ML inputs: {d}")
 
         # Subset data for returns on date d
@@ -875,20 +866,27 @@ def pfml_input_fun(data_tc, cov_list, lambda_list, gamma_rel, wealth, mu, dates,
         ids = data_ret['id'].values
         r = data_ret['ret_ld1'].values
 
-        # Define lookback window start date.
+        # Define variables for current date d from wealth, cov_list, lambda_list, risk_free
+        w = wealth.loc[wealth['eom'] == d, 'wealth'].iloc[0]
+        sigma_data = cov_list.get(d, {})
+        sigma = create_cov(sigma_data, ids=ids) if sigma_data is not None else None
+        lambda_data = lambda_list.get(d, {})
+        lambda_mat = create_lambda(lambda_data, ids=ids) if lambda_data is not None else None
+
+        # Signals: subset data for lookback window
         start_date = (d.replace(day=1) - pd.DateOffset(months=lb)) - pd.DateOffset(days=1)
         data_sub = data[(data['id'].isin(ids)) & (data['eom'] >= start_date) & (data['eom'] <= d)].copy()
         if not balanced:
             data_sub[feat_new] = data_sub.groupby('eom')[feat_new].transform(lambda x: x - x.mean())
             data_sub['constant'] = 1
             data_sub[feat_cons] = data_sub.groupby('eom')[feat_cons].transform(scale_constant)
-
         data_sub = data_sub.sort_values(['eom', 'id'], ascending=[False, True])
+        # Group by 'eom'
         groups = {grp: sub.sort_values('id') for grp, sub in data_sub.groupby('eom')}
 
         # Build signals: for each group date, get matrix of feat_cons.
         signals = {}
-        for grp_date, sub in groups.items():
+        for grp_date, sub in tqdm(groups.items(), desc="Building signals"):
             s = sub[feat_cons].values
             if scale:
                 vol = sub['vol_scale'].values
@@ -897,110 +895,105 @@ def pfml_input_fun(data_tc, cov_list, lambda_list, gamma_rel, wealth, mu, dates,
 
         # Build weighting matrices for each group.
         gtm = {}
-        for grp_date, sub in groups.items():
+        for grp_date, sub in tqdm(groups.items(), desc="Build weighting matrices"):
             tr = sub.sort_values('id')['tr_ld0'].values
             mu_ld = sub.sort_values('id')['mu_ld0'].values
             gt = (1.0 + tr) / (1.0 + mu_ld)
             gt = np.where(np.isnan(gt), 1.0, gt)
 
-            # Compute `m` for `grp_date`
+            # For each group date, compute m_subset based on that date's data:
             ids_subset = sub['id'].astype(str).values
-            sigma_data = cov_list.get(grp_date, {})
-            sigma = create_cov(sigma_data, ids=ids_subset) if sigma_data else None
-
-            lambda_data = lambda_list.get(grp_date, {})
-            lambda_mat = create_lambda(lambda_data, ids=ids_subset) if lambda_data else None
-
+            sigma_grp_data = cov_list.get(grp_date, None)
+            sigma_grp = create_cov(sigma_grp_data, ids=ids_subset) if sigma_grp_data is not None else None
+            lambda_grp_data = lambda_list.get(grp_date, None)
+            lambda_grp = create_lambda(lambda_grp_data, ids=ids_subset) if lambda_grp_data is not None else None
             w_subset = wealth.loc[wealth['eom'] == grp_date, 'wealth'].iloc[0]
             rf_subset = risk_free.loc[risk_free['date'] == grp_date, 'rf'].iloc[0]
-
-            # Compute `m` specific to `grp_date`
-            m_subset = m_func(
-                w=w_subset, mu=mu, rf=rf_subset,
-                sigma_gam=sigma * gamma_rel, gam=gamma_rel,
-                lambda_mat=lambda_mat, iterations=iter_
-            )
-
-            # Compute gtm per date
+            m_subset = m_func(w=w_subset, mu=mu, rf=rf_subset,
+                              sigma_gam=sigma_grp * gamma_rel if sigma_grp is not None else None,
+                              gam=gamma_rel, lambda_mat=lambda_grp, iterations=iter_)
             gtm[pd.to_datetime(grp_date)] = m_subset @ np.diag(gt)
 
-        # Order the available lookback dates in descending order (most recent first)
-        sorted_dates = sorted(signals.keys(), reverse=True)
-        if d not in sorted_dates:
-            raise ValueError(f"Current date {d} not found in lookback groups.")
-        n = signals[d].shape[0]
+            ###########################################################################
+            ###############################  Block 2  #################################
+            ###########################################################################
+            # Order the available lookback dates in descending order (most recent first)
+            sorted_dates = sorted(signals.keys(), reverse=True)
+            if d not in sorted_dates:
+                raise ValueError(f"Current date {d} not found in lookback groups.")
+            n = signals[d].shape[0]
 
-        # Build aggregated weighting matrices over the lookback horizon.
-        agg_gtm = []
-        agg_gtm_l1 = []
-        identity_n = np.eye(n)
-        agg_gtm.append(identity_n)
-        agg_gtm_l1.append(identity_n)
-        if len(sorted_dates) < lb + 1:
-            raise ValueError("Not enough lookback groups available for the specified lb.")
-        for i in range(lb):
-            agg_gtm.append(agg_gtm[-1] @ gtm[sorted_dates[i]])
-            agg_gtm_l1.append(agg_gtm_l1[-1] @ gtm[sorted_dates[i + 1]])
+            # Build aggregated weighting matrices over the lookback horizon.
+            agg_gtm = []
+            agg_gtm_l1 = []
+            identity_n = np.eye(n)
+            agg_gtm.append(identity_n)
+            agg_gtm_l1.append(identity_n)
+            if len(sorted_dates) < lb + 1:
+                raise ValueError("Not enough lookback groups available for the specified lb.")
+            for i in range(lb):
+                agg_gtm.append(agg_gtm[-1] @ gtm[sorted_dates[i]])
+                agg_gtm_l1.append(agg_gtm_l1[-1] @ gtm[sorted_dates[i + 1]])
 
-        # Compute weighted signals (omega) and lagged omega.
-        omega_sum = None
-        const_sum = None
-        omega_l1_sum = None
-        const_l1_sum = None
-        for i in range(lb + 1):
-            d_new = d - pd.DateOffset(months=i)
-            d_new_l1 = d - pd.DateOffset(months=i + 1)
-            if d_new not in signals or d_new_l1 not in signals:
-                raise ValueError(f"Missing signal for lookback date: {d_new} or {d_new_l1}")
-            s = signals[d_new]
-            s_l1 = signals[d_new_l1]
-            A = agg_gtm[i] @ s
-            B = agg_gtm_l1[i] @ s_l1
-            if omega_sum is None:
-                omega_sum = A.copy()
-                const_sum = agg_gtm[i].copy()
-                omega_l1_sum = B.copy()
-                const_l1_sum = agg_gtm_l1[i].copy()
-            else:
-                omega_sum += A
-                const_sum += agg_gtm[i]
-                omega_l1_sum += B
-                const_l1_sum += agg_gtm_l1[i]
+            # Compute weighted signals (omega) and lagged omega.
+            omega_sum = None
+            const_sum = None
+            omega_l1_sum = None
+            const_l1_sum = None
+            for i in range(lb + 1):
+                d_new = d - pd.DateOffset(months=i)
+                d_new_l1 = d - pd.DateOffset(months=i + 1)
+                if d_new not in signals or d_new_l1 not in signals:
+                    raise ValueError(f"Missing signal for lookback date: {d_new} or {d_new_l1}")
+                s = signals[d_new]
+                s_l1 = signals[d_new_l1]
+                A = agg_gtm[i] @ s
+                B = agg_gtm_l1[i] @ s_l1
+                if omega_sum is None:
+                    omega_sum = A.copy()
+                    const_sum = agg_gtm[i].copy()
+                    omega_l1_sum = B.copy()
+                    const_l1_sum = agg_gtm_l1[i].copy()
+                else:
+                    omega_sum += A
+                    const_sum += agg_gtm[i]
+                    omega_l1_sum += B
+                    const_l1_sum += agg_gtm_l1[i]
 
-        # Solve for omega and omega_l1.
-        omega = np.linalg.solve(const_sum, omega_sum)
-        omega_l1 = np.linalg.solve(const_l1_sum, omega_l1_sum)
+            omega = np.linalg.solve(const_sum, omega_sum)
+            omega_l1 = np.linalg.solve(const_l1_sum, omega_l1_sum)
 
-        # Compute current period's gt diagonal (ensuring sorted order by id)
-        tr_current = data_ret.sort_values('id')['tr_ld0'].values
-        mu_current = data_ret.sort_values('id')['mu_ld0'].values
-        gt_diag = np.diag((1.0 + tr_current) / (1.0 + mu_current))
-        omega_chg = omega - gt_diag @ omega_l1
+            # Compute current period's gt diagonal (ensuring sorted order by id)
+            tr_current = data_ret.sort_values('id')['tr_ld0'].values
+            mu_current = data_ret.sort_values('id')['mu_ld0'].values
+            gt_diag = np.diag((1.0 + tr_current) / (1.0 + mu_current))
+            omega_chg = omega - gt_diag @ omega_l1
 
-        # --- Step 5. Compute realizations ---
-        r_tilde = (omega.T @ r).item()  # assume scalar
-        risk_val = gamma_rel * (omega.T @ sigma @ omega)
-        tc = w * (omega_chg.T @ lambda_mat @ omega_chg)
-        denom = risk_val + tc
+            # --- Step 5. Compute realizations ---
+            r_tilde = (omega.T @ r).item()  # assume scalar
+            risk_val = gamma_rel * (omega.T @ sigma @ omega)
+            tc = w * (omega_chg.T @ lambda_mat @ omega_chg)
+            denom = risk_val + tc
 
-        reals = {
-            'r_tilde': r_tilde,
-            'denom': denom,
-            'risk': risk_val,
-            'tc': tc
+            reals = {
+                'r_tilde': r_tilde,
+                'denom': denom,
+                'risk': risk_val,
+                'tc': tc
+            }
+            signal_t = signals[d]
+            inputs[d] = {
+                'reals': reals,
+                'signal_t': signal_t
+            }
+
+        output = {
+            'reals': {str(d): inputs[d]['reals'] for d in inputs},
+            'signal_t': {str(d): inputs[d]['signal_t'] for d in inputs},
+            'rff_w': rff_w if rff_feat else None
         }
-        signal_t = signals[d]
-        inputs[d] = {
-            'reals': reals,
-            'signal_t': signal_t
-        }
+        return output
 
-    output = {
-        'reals': {str(d): inputs[d]['reals'] for d in inputs},
-        'signal_t': {str(d): inputs[d]['signal_t'] for d in inputs},
-        'rff_w': rff_w if rff_feat else None
-    }
-    return output
 
 
 
