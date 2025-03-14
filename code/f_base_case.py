@@ -105,13 +105,19 @@ def portfolio_ml(chars, barra_cov, lambda_list, features, risk_free, wealth, pf_
         output_path (str): Path to save the output.
     """
     print("Implementing Portfolio-ML...")
+
+    ###############################################################################
+    # BE AWARE OF THIS
+    iter = 10
+    ###############################################################################
+
     pfml = pfml_implement(chars, cov_list=barra_cov, lambda_list=lambda_list, features=features, risk_free=risk_free,
                           wealth=wealth, mu=pf_set["mu"], gamma_rel=pf_set["gamma_rel"],
                           dates_full=dates_m2, dates_oos=dates_oos, lb=pf_set["lb_hor"],
                           hp_years=hp_years, rff_feat=True, g_vec=settings["pf_ml"]["g_vec"],
                           p_vec=settings["pf_ml"]["p_vec"], l_vec=settings["pf_ml"]["l_vec"],
                           scale=settings["pf_ml"]["scale"], orig_feat=settings["pf_ml"]["orig_feat"],
-                          iter=100, hps={}, balanced=False, seed=settings["seed_no"])
+                          iter=iter, hps={}, balanced=False, seed=settings["seed_no"])
 
     if isinstance(pfml, dict) and "pf" in pfml:
         pfml_df = pfml["pf"]
