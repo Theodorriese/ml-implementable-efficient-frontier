@@ -51,7 +51,7 @@ def m_func(w, mu, rf, sigma_gam, gam, lambda_mat, iterations):
         try:
             m_tilde = pinv(x + y - m_tilde @ sigma_gr)  # More stable inversion
         except np.linalg.LinAlgError:
-            print(f"⚠️ Singular matrix at iteration {_}. Using pseudo-inverse.")
+            print(f"Singular matrix at iteration {_}. Using pseudo-inverse.")
             m_tilde = pinv(x + y - m_tilde @ sigma_gr)
 
     return lamb_neg05 @ m_tilde @ np.sqrt(lambda_mat)
@@ -766,6 +766,28 @@ def scale_constant(df):
     return df * np.sqrt(1.0 / s) if s != 0 else df
 
 
+def scale_features_v1(df, feat_cons):
+    """Normalize each column so that sum of squares = 1 per period with tqdm tracking."""
+
+    unique_eoms = df["eom"].unique()  # Unique periods
+    total_groups = len(unique_eoms)  # Number of groups to process
+    progress_bar = tqdm(total=total_groups, desc="Scaling Features", unit="month")
+
+    def normalize(x):
+        """Normalize each feature within an `eom` period."""
+        sum_sq = np.sum(x ** 2)
+        scaled_x = x * np.sqrt(1.0 / (sum_sq + 1e-10)) if sum_sq > 0 else x
+        progress_bar.update(1)  # Update progress bar
+        return scaled_x
+
+    # Apply function and track progress
+    result = df.groupby("eom")[feat_cons].transform(lambda x: normalize(x))
+
+    progress_bar.close()  # Close progress bar
+    return result
+
+
+
 def pfml_input_fun(data_tc, cov_list, lambda_list, gamma_rel, wealth, mu, dates, lb, scale,
                    risk_free, features, rff_feat, seed, p_max, g, add_orig, iter_, balanced):
     """
@@ -886,6 +908,7 @@ def pfml_input_fun(data_tc, cov_list, lambda_list, gamma_rel, wealth, mu, dates,
             data_sub[feat_new] = data_sub.groupby('eom')[feat_new].transform(lambda x: x - x.mean())
             data_sub['constant'] = 1
             data_sub[feat_cons] = data_sub.groupby('eom')[feat_cons].transform(scale_constant)
+
         data_sub = data_sub.sort_values(['eom', 'id'], ascending=[False, True])
         groups = {grp: sub.sort_values('id') for grp, sub in data_sub.groupby('eom')}
 
@@ -942,9 +965,9 @@ def pfml_input_fun(data_tc, cov_list, lambda_list, gamma_rel, wealth, mu, dates,
         # ---------------------------------------------------------------------
 
         # Aggregation of the gtm matrices
-        sorted_dates = sorted(gtm.keys(), reverse=True)
+        sorted_dates = sorted(gtm.keys())
         gtm_agg = {sorted_dates[0]: np.eye(gtm[sorted_dates[0]].shape[0])}
-        gtm_agg_l1 = gtm_agg.copy()
+        gtm_agg_l1 = {sorted_dates[0]: np.eye(gtm[sorted_dates[0]].shape[0])}
 
         # Aggregate over lookback period
         for i in range(1, min(lb + 1, len(sorted_dates))):
@@ -989,6 +1012,15 @@ def pfml_input_fun(data_tc, cov_list, lambda_list, gamma_rel, wealth, mu, dates,
 
         omega = np.linalg.pinv(const) @ omega
         omega_l1 = np.linalg.pinv(const_l1) @ omega_l1
+        # omega_v2 = np.linalg.solve(const, omega)
+        # omega_l1_v2 = np.linalg.solve(const_l1, omega_l1)
+
+        # if np.linalg.cond(const) < 1e10:
+        #     omega_v3 = np.linalg.solve(const, omega)
+        #     omega_l1_v3 = np.linalg.solve(const_l1, omega_l1)
+        # else:
+        #     omega_v3 = np.linalg.pinv(const) @ omega
+        #     omega_l1_v3 = np.linalg.pinv(const_l1) @ omega_l1
 
         # Compute current period's gt diagonal
         # Filter `data_sub` to only include rows for date `d`
