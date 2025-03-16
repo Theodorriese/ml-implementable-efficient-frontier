@@ -93,7 +93,8 @@ def rff(X, p=None, g=None, W=None):
     if W is None:
         np.random.seed(0)  # Ensure reproducibility
         k = X.shape[1]
-        W = np.random.normal(0, np.sqrt(g), size=(k, p // 2))  # Random weights
+        cov_matrix = g * np.eye(k)
+        W = np.random.multivariate_normal(mean=np.zeros(k), cov=cov_matrix, size=p // 2).T
     X_new = X @ W
     return {
         "W": W,

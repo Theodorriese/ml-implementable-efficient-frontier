@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
-from scipy.linalg import sqrtm, solve, pinv
+from scipy.linalg import sqrtm, pinv
 from itertools import product
 from collections import defaultdict
 from a_general_functions import create_cov, create_lambda, sigma_gam_adj, initial_weights_new, pf_ts_fun
@@ -9,7 +9,7 @@ from a_return_prediction_functions import rff
 
 def m_func(w, mu, rf, sigma_gam, gam, lambda_mat, iterations):
     """
-    Computes the m matrix exactly as in the R function, using NumPy.
+    Computes the m matrix.
 
     Parameters:
         w (float): Weight scalar.
@@ -841,13 +841,16 @@ def pfml_input_fun(data_tc, cov_list, lambda_list, gamma_rel, wealth, mu, dates,
         if scales_list:
             scales_df = pd.concat(scales_list, ignore_index=True)
             data = data.merge(scales_df, on=['id', 'eom'], how='left')
-            data['vol_scale'] = data.groupby('eom')['vol_scale'].transform(lambda x: x.fillna(x.median()))
+            data['vol_scale'] = data.groupby('eom')['vol_scale'].transform(lambda x: x.fillna(x.median(skipna=True)))
 
     # --- Step 3. If balanced, demean features and add constant then scale ---
     if balanced:
-        data[feat_new] = data.groupby('eom')[feat_new].transform(lambda x: x - x.mean())
+        for col in feat_new:
+            data[col] = data.groupby('eom')[col].transform(lambda x: x - x.mean())
         data['constant'] = 1
-        data[feat_cons] = data.groupby('eom')[feat_cons].transform(scale_constant)
+        for col in feat_cons:
+            data[col] = data.groupby('eom')[col].transform(
+                lambda x: x * np.sqrt(1 / (np.sum(x ** 2) + 1e-10)))  # Avoid div by 0
 
     # --- Step 4. Loop over each date to compute signals and realizations ---
     inputs = {}
