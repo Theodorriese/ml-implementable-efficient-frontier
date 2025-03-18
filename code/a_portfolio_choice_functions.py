@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import pickle
 from tqdm import tqdm
 from scipy.linalg import sqrtm, pinv
 from itertools import product
@@ -885,7 +886,7 @@ def pfml_input_fun(data_tc, cov_list, lambda_list, gamma_rel, wealth, mu, dates,
         data_ret = data_ret.sort_values('id')
         ids = data_ret['id'].values
         r = data_ret['ret_ld1'].values
-        n = len(ids)
+        # n = len(ids)
 
         # Compute sigma, lambda, etc. based solely on data_ret ids.
         w = wealth.loc[wealth['eom'] == d, 'wealth'].iloc[0]
@@ -991,24 +992,10 @@ def pfml_input_fun(data_tc, cov_list, lambda_list, gamma_rel, wealth, mu, dates,
             gtm_d_new_l1 = gtm_agg_l1.get(d_new_l1, np.eye(len(s)))
 
             if s is not None and s_l1 is not None:
-                print(f"--- Debugging at i={i}, d_new={d_new}, d_new_l1={d_new_l1} ---")
-
-                # Update and print after each step
                 omega += gtm_d_new @ s
-                print(
-                    f"omega - Min: {np.min(omega):.6f}, Max: {np.max(omega):.6f}, Mean: {np.mean(omega):.6f}, Std: {np.std(omega):.6f}")
-
                 const += gtm_d_new
-                print(
-                    f"const - Min: {np.min(const):.6f}, Max: {np.max(const):.6f}, Mean: {np.mean(const):.6f}, Std: {np.std(const):.6f}")
-
                 omega_l1 += gtm_d_new_l1 @ s_l1
-                print(
-                    f"omega_l1 - Min: {np.min(omega_l1):.6f}, Max: {np.max(omega_l1):.6f}, Mean: {np.mean(omega_l1):.6f}, Std: {np.std(omega_l1):.6f}")
-
                 const_l1 += gtm_d_new_l1
-                print(
-                    f"const_l1 - Min: {np.min(const_l1):.6f}, Max: {np.max(const_l1):.6f}, Mean: {np.mean(const_l1):.6f}, Std: {np.std(const_l1):.6f}")
 
         omega = np.linalg.pinv(const) @ omega
         omega_l1 = np.linalg.pinv(const_l1) @ omega_l1
@@ -1041,7 +1028,7 @@ def pfml_input_fun(data_tc, cov_list, lambda_list, gamma_rel, wealth, mu, dates,
         omega_chg = omega - gt_diag @ omega_l1
 
         # Realizations
-        r_tilde = np.dot(omega.T, r)  # scalar
+        r_tilde = pd.Series(np.dot(omega.T, r), index=feat_cons)  # Preserve feature names
         risk_val = gamma_rel * np.dot(omega.T, np.dot(sigma, omega))
         tc = w * np.dot(np.dot(omega_chg.T, lambda_mat), omega_chg)
         denom = risk_val + tc
@@ -1521,6 +1508,7 @@ def pfml_implement(
                 g=g, add_orig=orig_feat,
                 iter_=iter, balanced=balanced
             )
+            pickle.dump(pfml_input, open("C:/Master/pfml_input.pkl", "wb"))
             rff_w = pfml_input.get("rff_w")
 
             # Restrict "reals" and "signal_t" to final set of features
@@ -1590,7 +1578,6 @@ def pfml_implement(
     aims = pd.concat([x["aim"] for x in best_hps_list], ignore_index=True)
 
     # 4. Final portfolio weights
-    # Make sure we pass all arguments that pfml_w expects:
     w = pfml_w(
         data=data_tc,
         dates=dates_oos,
