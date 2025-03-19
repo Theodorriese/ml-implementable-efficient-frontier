@@ -83,7 +83,7 @@ settings = {
     },
     "pf": {
         "dates": {
-            "start_year": 2016,
+            "start_year": 2017,
             "end_yr": 2020,
             "split_years": 3
         },
@@ -115,7 +115,7 @@ settings = {
     },
     "cov_set": {
         "industries": True,
-        "obs": 252 * 5, # obs
+        "obs": 252 * 2, # obs
         "hl_cor": 252 * 3 / 2,
         "hl_var": 252 / 2,
         "hl_stock_var": 252 / 2,

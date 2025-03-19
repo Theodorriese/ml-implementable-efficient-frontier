@@ -5,9 +5,6 @@ from tqdm import tqdm
 
 def prepare_cluster_data(chars, cluster_labels, daily, settings, features):
     # 1) Monthly cluster exposures
-
-    print(chars[chars["id"] == 10299])
-
     cluster_data_m = chars[chars["valid"]].copy()
     cluster_data_m = cluster_data_m[["id", "eom", "size_grp", "ff12"] + features]
     clusters = cluster_labels["cluster"].unique()

@@ -322,6 +322,9 @@ def pf_ts_fun(weights, data, wealth):
             - 'eom_ret': End-of-month return date.
     """
 
+    weights["id"] = weights["id"].astype(str)
+    data["id"] = data["id"].astype(str)
+
     # Step 1: Merge weights with relevant columns from data
     comb = pd.merge(
         weights,

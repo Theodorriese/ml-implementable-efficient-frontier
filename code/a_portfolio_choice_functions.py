@@ -32,7 +32,7 @@ def m_func(w, mu, rf, sigma_gam, gam, lambda_mat, iterations):
     # Ensure lambda_mat is diagonal & avoid division by zero
     n = lambda_mat.shape[0]
     eps = 1e-8
-    lamb_neg05 = np.diag(1.0 / np.sqrt(np.diag(lambda_mat) + eps))  # Prevent div-by-zero
+    lamb_neg05 = np.diag(1.0 / np.sqrt(np.diag(lambda_mat) + eps))
 
     g_bar = np.ones(n)
     mu_bar_vec = np.ones(n) * (1 + rf + mu)
@@ -788,7 +788,6 @@ def scale_features_v1(df, feat_cons):
     return result
 
 
-
 def pfml_input_fun(data_tc, cov_list, lambda_list, gamma_rel, wealth, mu, dates, lb, scale,
                    risk_free, features, rff_feat, seed, p_max, g, add_orig, iter_, balanced):
     """
@@ -1028,19 +1027,26 @@ def pfml_input_fun(data_tc, cov_list, lambda_list, gamma_rel, wealth, mu, dates,
         omega_chg = omega - gt_diag @ omega_l1
 
         # Realizations
-        r_tilde = pd.Series(np.dot(omega.T, r), index=feat_cons)  # Preserve feature names
+        r_tilde = pd.Series(np.dot(omega.T, r), index=feat_cons)
         risk_val = gamma_rel * np.dot(omega.T, np.dot(sigma, omega))
         tc = w * np.dot(np.dot(omega_chg.T, lambda_mat), omega_chg)
         denom = risk_val + tc
 
+        denom_df = pd.DataFrame(denom, index=feat_cons, columns=feat_cons)
+        risk_df = pd.DataFrame(risk_val, index=feat_cons, columns=feat_cons)
+        tc_df = pd.DataFrame(tc, index=feat_cons, columns=feat_cons)
+
+        # Ensure correct indexing
         reals = {
             "r_tilde": r_tilde,
-            "denom": denom,
-            "risk": risk_val,
-            "tc": tc
+            "denom": denom_df.loc[feat_cons, feat_cons],
+            "risk": risk_df.loc[feat_cons, feat_cons],
+            "tc": tc_df.loc[feat_cons, feat_cons]
         }
 
-        signal_t = signals.get(d, np.zeros((len(m_ids), len(feat_cons))))
+        signal_t = pd.DataFrame(signals.get(d, np.zeros((len(m_ids), len(feat_cons)))),
+                                index=m_ids,
+                                columns=feat_cons)
 
         # Output
         inputs[d] = {
@@ -1055,12 +1061,6 @@ def pfml_input_fun(data_tc, cov_list, lambda_list, gamma_rel, wealth, mu, dates,
     }
 
 
-
-
-
-
-
-# X
 def pfml_feat_fun(p, orig_feat, features):
     """
     Generate a list of feature names for Portfolio-ML.
@@ -1086,79 +1086,108 @@ def denom_sum_fun(train):
     Compute the sum of 'denom' matrices from a list of training data.
 
     Parameters:
-        train (list): A list of dictionaries, each containing a 'denom' matrix.
+        train (list): A list of dictionaries, each containing a 'denom' DataFrame.
 
     Returns:
-        numpy.ndarray: Sum of all 'denom' matrices in the list.
+        pd.DataFrame: Sum of all 'denom' matrices in the list.
     """
-    denom_sum = sum(x['denom'] for x in train)
+    if not train:
+        return None
+
+    # Extract all 'denom' DataFrames
+    denom_list = [x['denom'] for x in train]
+
+    # Sum all DataFrames element-wise
+    denom_sum = sum(denom_list, start=pd.DataFrame(0, index=denom_list[0].index, columns=denom_list[0].columns))
+
     return denom_sum
 
 
-# X
 def pfml_search_coef(pfml_input, p_vec, l_vec, hp_years, orig_feat, features):
     """
     Hyperparameter search for best coefficients in Portfolio-ML.
 
     Parameters:
-        pfml_input (dict): Input containing 'reals' with realizations and denominators.
-        p_vec (list): List of numbers of random Fourier features (RFF) to evaluate.
-        l_vec (list): List of regularization parameters (lambdas) to evaluate.
-        hp_years (list): List of hyperparameter evaluation years.
+        pfml_input (dict): Dictionary containing 'reals' with:
+            - 'r_tilde': Series (vector of target values)
+            - 'denom': DataFrame (square matrix of denominators)
+        p_vec (list): List of feature dimensions to evaluate.
+        l_vec (numpy.ndarray): Array of regularization parameters (lambdas) to evaluate.
+        hp_years (list): List of years for hyperparameter selection.
         orig_feat (bool): Whether to include original features.
         features (list): List of original feature names.
 
     Returns:
-        dict: Coefficients for each hyperparameter combination across years.
+        dict: Nested dictionary containing coefficients for each (year, p, lambda).
     """
 
-    # Determine the last year before hyperparameter selection starts
+    # Identify the last year before hyperparameter selection starts
     end_bef = min(hp_years) - 1
 
-    # Select training data before `end_bef`
-    train_bef = {
-        k: v for k, v in pfml_input['reals'].items()
-        if np.datetime64(k) < np.datetime64(f"{end_bef - 1}-12-31")
-    }
+    # Convert dictionary keys to datetime for comparison
+    reals_dates = {pd.to_datetime(k): v for k, v in pfml_input['reals'].items()}
 
-    # Compute initial sums
-    r_tilde_sum = np.sum([v['r_tilde'] for v in train_bef.values()], axis=0)
+    # Select all data strictly before (end_bef-1)-12-31
+    cutoff_date = pd.to_datetime(f"{end_bef - 1}-12-31")
+    train_bef = {k: v for k, v in reals_dates.items() if k < cutoff_date}
+
+    # Compute the initial sum of r_tilde and denom before hyperparameter years
+    r_tilde_sum = pd.DataFrame({k: v['r_tilde'] for k, v in train_bef.items()}).sum(axis=1)
     denom_raw_sum = denom_sum_fun(list(train_bef.values()))
+
+    # Count of training samples used
     n = len(train_bef)
 
-    # Prepare output container
-    coef_list = defaultdict(dict)
+    # Sort hyperparameter years
     hp_years = sorted(hp_years)
+    coef_list = defaultdict(dict)
 
-    # Iterate through each hyperparameter year
+    # Iterate through each hyperparameter evaluation year
     for year in hp_years:
+        # Define training date range for this hyperparameter year
+        start_dt = pd.to_datetime(f"{year - 2}-12-31")
+        end_dt = pd.to_datetime(f"{year - 1}-11-30")
 
-        # Select training data for current year
-        train_new = {
-            k: v for k, v in pfml_input['reals'].items()
-            if np.datetime64(f"{year - 2}-12-31") <= np.datetime64(k) <= np.datetime64(f"{year - 1}-11-30")
-        }
+        # Select relevant training data
+        train_new = {k: v for k, v in reals_dates.items() if start_dt <= k <= end_dt}
 
-        # Update counts and sums
+        # Update training sample count
         n += len(train_new)
-        r_tilde_sum += np.sum([v['r_tilde'] for v in train_new.values()], axis=0)
-        denom_raw_sum += denom_sum_fun(list(train_new.values()))
 
-        # Compute coefficients for each p and lambda
+        if train_new:
+            # Update r_tilde and denom sums
+            r_tilde_new = pd.DataFrame({k: v['r_tilde'] for k, v in train_new.items()}).sum(axis=1)
+            denom_raw_new = denom_sum_fun(list(train_new.values()))
+
+            r_tilde_sum += r_tilde_new
+            denom_raw_sum += denom_raw_new
+
+        # Compute the coefficients for each (p, lambda) combination
         for p in p_vec:
+            # Select the feature subset based on p and orig_feat setting
             feat_p = pfml_feat_fun(p, orig_feat, features)
-            r_tilde_sub = r_tilde_sum[feat_p] / n
-            denom_sub = denom_raw_sum[np.ix_(feat_p, feat_p)] / n
 
-            coef_list[year][p] = {
-                l: np.linalg.solve(denom_sub + l * np.eye(len(feat_p)), r_tilde_sub)
-                for l in l_vec
-            }
+            # Subset r_tilde and denom, then normalize by n
+            r_tilde_sub = r_tilde_sum.loc[feat_p] / n
+            denom_sub = denom_raw_sum.loc[feat_p, feat_p] / n
 
-    return coef_list
+            # Solve for each lambda in l_vec
+            lambda_solutions = {}
+            for l_ in l_vec:
+                # Convert denom_sub to NumPy before modifying diagonal
+                denom_reg = denom_sub.to_numpy().copy()
+                np.fill_diagonal(denom_reg, denom_reg.diagonal() + l_)
+
+                # Solve the system: (denom_sub + lambda * I)^{-1} * r_tilde_sub
+                coef_vector = np.linalg.solve(denom_reg, r_tilde_sub.to_numpy())
+                lambda_solutions[l_] = pd.Series(coef_vector, index=feat_p)
+
+            # Store solutions for this p-value
+            coef_list[year][p] = lambda_solutions
+
+    return dict(coef_list)
 
 
-# X
 def pfml_hp_reals_fun(pfml_input, hp_coef, p_vec, l_vec, hp_years, orig_feat, features):
     """
     Compute realized utility for each p and lambda in each hyperparameter evaluation year.
@@ -1177,30 +1206,31 @@ def pfml_hp_reals_fun(pfml_input, hp_coef, p_vec, l_vec, hp_years, orig_feat, fe
     """
     validation = []
 
-    for end in hp_years:
+    for end in tqdm(hp_years, desc="Processing Out-of-Sample Years"):
         # Filter realizations for the current year
         reals_all = {
             k: v for k, v in pfml_input['reals'].items()
             if np.datetime64(f"{end - 1}-12-31") <= np.datetime64(k) <= np.datetime64(f"{end}-11-30")
         }
 
-        coef_list_yr = hp_coef[str(end)]
+        # Fix integer indexing issue
+        coef_list_yr = hp_coef[end]
 
-        for p in p_vec:
+        for p in tqdm(p_vec, desc=f"Processing p-values for Year {end}", leave=False):
             # Generate features for the given p
             feat_p = pfml_feat_fun(p, orig_feat, features)
-            coef_list_p = coef_list_yr[str(p)]
+            coef_list_p = coef_list_yr[p]
 
             # Extract relevant realizations
             reals = {
                 nm: {
-                    "r_tilde": x["r_tilde"][feat_p],
-                    "denom": x["denom"][np.ix_(feat_p, feat_p)]
+                    "r_tilde": x["r_tilde"].loc[feat_p],
+                    "denom": x["denom"].loc[feat_p, feat_p]
                 }
                 for nm, x in reals_all.items()
             }
 
-            for i, l in enumerate(l_vec):
+            for l in l_vec:
                 coef = coef_list_p[l]
                 objs = []
 
@@ -1208,8 +1238,8 @@ def pfml_hp_reals_fun(pfml_input, hp_coef, p_vec, l_vec, hp_years, orig_feat, fe
                     # Compute objective value
                     r = (x["r_tilde"].T @ coef - 0.5 * coef.T @ x["denom"] @ coef).item()
                     objs.append({
-                        "eom": np.datetime64(nm),
-                        "eom_ret": np.datetime64(nm) + np.timedelta64(1, 'M'),
+                        "eom": pd.Timestamp(nm),
+                        "eom_ret": pd.Timestamp(nm) + pd.DateOffset(months=1),
                         "obj": r,
                         "l": l,
                         "p": p,
@@ -1227,7 +1257,6 @@ def pfml_hp_reals_fun(pfml_input, hp_coef, p_vec, l_vec, hp_years, orig_feat, fe
     validation_df["rank"] = validation_df.groupby("eom_ret")["cum_obj"].rank(ascending=False)
 
     return validation_df
-
 
 
 def pfml_aims_fun(pfml_input, validation, data_tc, hp_coef, hp_years, dates_oos, l_vec, orig_feat, features):
@@ -1267,14 +1296,23 @@ def pfml_aims_fun(pfml_input, validation, data_tc, hp_coef, hp_years, dates_oos,
 
         # Extract features for the aim portfolio
         feat = pfml_feat_fun(p=hps_d['p'].iloc[0], orig_feat=orig_feat, features=features)
-        s = pfml_input['signal_t'][str(d)][:, feat]
 
-        # Match lambda and extract coefficients
-        l_no = l_vec.index(hps_d['l'].iloc[0])
-        coef = hp_coef[str(oos_year)][str(hps_d['p'].iloc[0])][l_no]
+        pfml_input['signal_t'] = {pd.Timestamp(k): v for k, v in pfml_input['signal_t'].items()}
+
+        # Now access it normally without converting every time
+        s = pfml_input['signal_t'][pd.Timestamp(d)].loc[:, feat]
+
+        # Match lambda and extract coefficients correctly
+        l_value = hps_d['l'].iloc[0]
+        p_value = hps_d['p'].iloc[0]
+
+        if l_value not in hp_coef[oos_year][p_value]:
+            continue  # Skip if the lambda value is missing
+
+        coef = hp_coef[oos_year][p_value][l_value]
 
         # Calculate aim portfolio weights
-        data_subset = data_tc[(data_tc['valid'] == True) & (data_tc['eom'] == d)]
+        data_subset = data_tc[(data_tc['valid'] == True) & (data_tc['eom'] == d)].copy()
         aim_pf = data_subset[['id', 'eom']].copy()
         aim_pf['w_aim'] = np.dot(s, coef)
 
@@ -1298,7 +1336,7 @@ def pfml_w(
     aim_coef: any = None
 ) -> pd.DataFrame:
     """
-    Compute Portfolio-ML weights, mirroring the R code logic.
+    Compute Portfolio-ML weights.
 
     If 'aims' is None, an Aim Portfolio is constructed from 'signal_t' and 'aim_coef'.
     Otherwise, we simply reuse the provided aims.
@@ -1508,7 +1546,16 @@ def pfml_implement(
                 g=g, add_orig=orig_feat,
                 iter_=iter, balanced=balanced
             )
-            pickle.dump(pfml_input, open("C:/Master/pfml_input.pkl", "wb"))
+            save_path = fr"C:\Master\pfml_input_g{g}.pkl"
+
+            # Save the file
+            with open(save_path, "wb") as file:
+                pickle.dump(pfml_input, file)
+
+            # save_path = r"C:\Master\all_pfml_inputs.pkl"
+            # with open(save_path, "rb") as file:
+            #     pfml_input = pickle.load(file)
+
             rff_w = pfml_input.get("rff_w")
 
             # Restrict "reals" and "signal_t" to final set of features
@@ -1516,16 +1563,19 @@ def pfml_implement(
             reals_adj = {}
             for date_key, val in pfml_input["reals"].items():
                 reals_adj[date_key] = {
-                    "r_tilde": val["r_tilde"][feat_all]
+                    "r_tilde": val["r_tilde"].loc[feat_all]
                 }
                 for subk, mat_ in val.items():
                     if subk != "r_tilde":
-                        reals_adj[date_key][subk] = mat_[feat_all][:, feat_all]
+                        reals_adj[date_key][subk] = mat_.loc[feat_all, feat_all]
 
+            # Adjust "signal_t"
             signals_adj = {
-                date_key: mat_[feat_all]
+                date_key: mat_.loc[:, feat_all]
                 for date_key, mat_ in pfml_input["signal_t"].items()
             }
+
+            # Update pfml_input
             pfml_input = {
                 "reals": reals_adj,
                 "signal_t": signals_adj
@@ -1536,6 +1586,9 @@ def pfml_implement(
                 pfml_input, p_vec, l_vec, hp_years,
                 orig_feat, features
             )
+            # with open(r"C:\Master\pfml_hp_coef.pkl", "rb") as f:
+            #     pfml_hp_coef = pickle.load(f)
+
             validation = pfml_hp_reals_fun(
                 pfml_input, pfml_hp_coef, p_vec, l_vec,
                 hp_years, orig_feat, features
@@ -1553,6 +1606,12 @@ def pfml_implement(
                 "validation": validation,
                 "rff_w": rff_w
             }
+
+    save_hps_path = r"C:\Master\final_pfml_hps.pkl"
+    with open(save_hps_path, "wb") as file:
+        pickle.dump(hps, file)
+
+    print(f"Final hps saved to: {save_hps_path}")
 
     # 2. Find best hyperparameters at end of year
     best_hps = pd.concat([hps[g]["validation"] for g in hps], ignore_index=True)
@@ -1588,9 +1647,8 @@ def pfml_implement(
         risk_free=risk_free,
         wealth=wealth,
         mu=mu,
-        # If pfml_w requires these:
-        signal_t=None,   # or your actual signals if needed
-        aim_coef=None,   # or your actual aim coefficients if needed
+        signal_t=None,
+        aim_coef=None,
         aims=aims
     )
 
