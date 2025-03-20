@@ -119,8 +119,6 @@ def rff_hp_search(data, feat, p_vec, g_vec, l_vec, seed):
         dict: Dictionary containing the fitted model, predictions, hyperparameter search results, weights, and optimal hyperparameters.
     """
     # Initialize progress tracker
-    total_models = len(g_vec) * len(p_vec) * len(l_vec)
-    current_model = 0
 
     np.random.seed(seed)
     val_errors = []
@@ -143,10 +141,6 @@ def rff_hp_search(data, feat, p_vec, g_vec, l_vec, seed):
             y_val = data['val']['ret_pred'].values
 
             for l_idx, l in enumerate(l_vec):
-                # Update progress tracker
-                current_model += 1
-                if current_model % 10 == 0 or current_model == total_models:
-                    print(f"Progress: {current_model}/{total_models} models completed...")
 
                 # Fit Ridge regression
                 model = Ridge(alpha=l, fit_intercept=True)
@@ -184,10 +178,6 @@ def rff_hp_search(data, feat, p_vec, g_vec, l_vec, seed):
     # Predict on test data
     rff_test = rff(data['test'][feat].values, W=optimal_rff_train['W'][:, :opt_p // 2])
     X_test = (opt_p ** -0.5) * np.hstack([rff_test['X_cos'], rff_test['X_sin']])
-
-    print(f"X_test shape: {X_test.shape}")
-    print(f"data['test'] length: {len(data['test'])}")
-    print(data['test'].head())
 
     data['test']['pred'] = final_model.predict(X_test)
 

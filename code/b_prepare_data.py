@@ -259,7 +259,8 @@ def feature_screen(chars, features, settings, n_start, me_start, run_sub):
     # Summary statistics
     final_obs_pct = round((len(chars) / n_start) * 100, 2)
     final_market_cap_pct = round((chars["me"].sum() / me_start) * 100, 2)
-    print(f"In total, the final dataset has {final_obs_pct}% of the observations and {final_market_cap_pct}% of the market cap in the post {settings['screens']['start']} data")
+    print(f"In total, the final dataset has {final_obs_pct}% of the observations and"
+          f" {final_market_cap_pct}% of the market cap in the post {settings['screens']['start']} data")
 
     # Screen out if running subset
     if run_sub:

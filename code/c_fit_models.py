@@ -27,6 +27,7 @@ def fit_models(search_grid, data_ret, chars, settings, features, output_path):
         h = row["horizon"] if isinstance(row["horizon"], list) else [row["horizon"]]
         pred_y = data_ret[[f"ret_ld{h_i}" for h_i in h]].mean(axis=1)
         pred_y = data_ret[["id", "eom_m"]].assign(  # Use eom_m here instead of eom
+
             # Add `max(h)` months to `eom_m` and adjust to the last day of the resulting month
             eom_pred_last=(data_ret["eom_m"] + pd.DateOffset(months=max(h))).apply(
                 lambda x: x.replace(day=1) + pd.offsets.MonthEnd(0)),
@@ -66,7 +67,6 @@ def fit_models(search_grid, data_ret, chars, settings, features, output_path):
 
         # Train models for each validation endpoint
         for val_end in val_ends:
-            print(f"Processing validation endpoint: {val_end}")
             train_test_val = data_split(
                 data=data_pred,
                 val_end=val_end,

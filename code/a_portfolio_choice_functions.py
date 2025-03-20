@@ -563,7 +563,7 @@ def static_val_fun(data, dates, cov_list, lambda_list, wealth, cov_type, gamma_r
         how='left'
     )
 
-    # Resolve duplicate column issue by choosing the correct version
+    # Resolve duplicate column issue
     for col in ["tr_ld1", "pred_ld1", "mu_ld1"]:
         x_col, y_col = f"{col}_x", f"{col}_y"
         if x_col in static_weights.columns and y_col in static_weights.columns:
@@ -604,16 +604,24 @@ def static_val_fun(data, dates, cov_list, lambda_list, wealth, cov_type, gamma_r
         lambda_mat = create_lambda(lambda_data, ids)
         lambda_mat *= k
 
-        # Extract weights
-        pred_ld1 = static_weights.loc[static_weights['eom'] == d, 'pred_ld1'].values.reshape(-1, 1)
+        # Extract weights and ensure pred_ld1 contains zeros for missing predictions
+        pred_ld1 = static_weights.loc[static_weights['eom'] == d, 'pred_ld1'].fillna(0).values.reshape(-1, 1)  # Replace NaN with 0
         static_weights.loc[static_weights['eom'] == d, 'w_start'] = static_weights.loc[
-            static_weights['eom'] == d, 'w_start'].fillna(0)
+            static_weights['eom'] == d, 'w_start'].fillna(0)  # Replace NaN with 0 for w_start
         w_start = static_weights.loc[static_weights['eom'] == d, 'w_start'].values.reshape(-1, 1)
+        pred_ld1 = np.nan_to_num(pred_ld1, nan=0.0)
 
-        ## VERSION 2
+        # Calculate RHS and A matrix
         rhs = (pred_ld1 * u) + wealth_t * (lambda_mat @ w_start)
         A = sigma_gam + wealth_t * lambda_mat
-        w_solution = np.linalg.solve(A, rhs)
+
+        try:
+            # Try solving the matrix equation
+            w_solution = np.linalg.solve(A, rhs)
+        except np.linalg.LinAlgError:
+            # Handle singular matrix case
+            print(f"Warning: Matrix inversion failed for date {d}. Returning zero weights instead.")
+            w_solution = np.zeros_like(rhs)  # Return zero weights as fallback
 
         # Assign weights back to static_weights
         static_weights.loc[static_weights['eom'] == d, 'w'] = w_solution.flatten()

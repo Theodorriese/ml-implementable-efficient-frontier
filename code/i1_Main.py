@@ -57,7 +57,7 @@ settings = {
     "seed_no": 1,
     "months": False,
     "split": {
-        "train_end": pd.Timestamp("2018-12-31"),
+        "train_end": pd.Timestamp("2017-12-31"),
         "test_end": pd.Timestamp("2020-12-31"),
         "val_years": 1,
         "model_update_freq": "yearly",
@@ -83,9 +83,9 @@ settings = {
     },
     "pf": {
         "dates": {
-            "start_year": 2016, # 2017?
+            "start_year": 2018,
             "end_yr": 2020,
-            "split_years": 3
+            "split_years": 1
         },
         "hps": {
             "cov_type": "cov_add",
