@@ -69,7 +69,7 @@ def create_lambda(x, ids):
     x = {str(k): v for k, v in x.items()}  # Convert keys to strings
     ids = [str(i) for i in ids]  # Ensure IDs are also strings
 
-    return np.diag([x[i] for i in ids])  # Now lookup works
+    return np.diag([x[i] for i in ids])
 
 
 
