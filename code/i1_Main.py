@@ -57,9 +57,9 @@ settings = {
     "seed_no": 1,
     "months": False,
     "split": {
-        "train_end": pd.Timestamp("2017-12-31"), # change to 2018?
+        "train_end": pd.Timestamp("2018-12-31"),
         "test_end": pd.Timestamp("2020-12-31"),
-        "val_years": 2, # change to 1?
+        "val_years": 1,
         "model_update_freq": "yearly",
         "train_lookback": 5,
         "retrain_lookback": 5
@@ -83,7 +83,7 @@ settings = {
     },
     "pf": {
         "dates": {
-            "start_year": 2017,
+            "start_year": 2016, # 2017?
             "end_yr": 2020,
             "split_years": 3
         },
