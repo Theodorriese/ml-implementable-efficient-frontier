@@ -1617,6 +1617,10 @@ def pfml_implement(
                 "rff_w": rff_w
             }
 
+        # Save hps to pkl after all g's in g_vec
+        with open('C:\Master\hps.pkl', 'wb') as file:
+            pickle.dump(hps, file)
+
     # 2. Find best hyperparameters at end of year
     best_hps = pd.concat([hps[g]["validation"] for g in hps], ignore_index=True)
     best_hps["rank"] = best_hps.groupby("eom_ret")["cum_obj"].rank(ascending=False)

@@ -206,8 +206,6 @@ def preprocess_chars(data_path, features, settings, data_ret_ld1, wealth):
     return chars
 
 
-
-
 # Date screen
 def filter_chars(chars, settings):
     
@@ -248,10 +246,6 @@ def feature_screen(chars, features, settings, n_start, me_start, run_sub):
 
     # Calculate minimum required features per row
     min_feat = np.floor(len(features) * settings["screens"]["feat_pct"])
-
-    # Compute exclusion percentage
-    # feat_exclusion_pct = round((feat_available < min_feat).mean() * 100, 2)
-    # print(f"At least {settings['screens']['feat_pct'] * 100}% of feature excludes {feat_exclusion_pct}% of the observations")
 
     # Filter dataset
     chars = chars[feat_available >= min_feat]
@@ -536,19 +530,19 @@ def load_daily_returns_pkl(data_path, chars, risk_free):
     Returns:
         pd.DataFrame: Preprocessed daily returns data with calculated excess returns.
     """
-    # Load daily returns data from a pickle file
-    daily = pd.read_pickle(os.path.join(data_path, "usa_dsf.pkl"))
+    # Load daily returns data from a CSV file #CHANGED FROM PKL
+    daily = pd.read_csv(os.path.join(data_path, "usa_dsf.csv"))
 
     # Rename columns for consistency
     daily.rename(columns={"PERMNO": "id", "RET": "ret"}, inplace=True)
 
     # Filter for valid data (non-NA returns and IDs <= 99999)
     daily = daily[daily["ret"].notna() & daily["id"].le(99999)]
-    valid_ids = chars.loc[chars["valid"], "id"].unique()  # Get valid stock IDs from `chars`
+    valid_ids = chars.loc[chars["valid"], "id"].unique()
     daily = daily[daily["id"].isin(valid_ids)]
 
     # Convert `date` to datetime
-    daily["date"] = pd.to_datetime(daily["date"], format="%Y-%m-%d")  # Pickle already preserves date format
+    daily['date'] = pd.to_datetime(daily['date'], errors='coerce', dayfirst=True)
 
     # Prepare `risk_free` data for merging
     risk_free.rename(columns={"eom_m": "date"}, inplace=True)

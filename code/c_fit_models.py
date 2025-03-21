@@ -19,15 +19,13 @@ def fit_models(search_grid, data_ret, chars, settings, features, output_path):
     Returns:
         dict: Dictionary containing models for each grid.
     """
-    start_time = time.process_time()
     models = {}
 
     for i, row in search_grid.iterrows():
         # Prepare y variable
         h = row["horizon"] if isinstance(row["horizon"], list) else [row["horizon"]]
         pred_y = data_ret[[f"ret_ld{h_i}" for h_i in h]].mean(axis=1)
-        pred_y = data_ret[["id", "eom_m"]].assign(  # Use eom_m here instead of eom
-
+        pred_y = data_ret[["id", "eom_m"]].assign(
             # Add `max(h)` months to `eom_m` and adjust to the last day of the resulting month
             eom_pred_last=(data_ret["eom_m"] + pd.DateOffset(months=max(h))).apply(
                 lambda x: x.replace(day=1) + pd.offsets.MonthEnd(0)),
@@ -100,7 +98,5 @@ def fit_models(search_grid, data_ret, chars, settings, features, output_path):
     full_model_path = Path(output_path) / "model_full.pkl"
     pd.to_pickle(models, full_model_path)
 
-    elapsed_time = time.process_time() - start_time
-    print(f"Total runtime: {elapsed_time:.2f} seconds")
 
     return models

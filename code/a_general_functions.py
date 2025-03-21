@@ -552,8 +552,6 @@ def compute_bool_changes(df, group_col, bool_col):
 
 def addition_deletion_fun(chars, addition_n, deletion_n):
     """
-    Replicates the R addition_deletion_fun logic with no nested function definitions.
-
     Steps:
       1. Create temporary validity flag: valid_temp = (valid_data & valid_size).
       2. Sort the data by 'id' and 'eom'.
