@@ -1830,112 +1830,160 @@ def mp_aim_fun(preds, sigma_gam, lambda_, m, w, K):
     return aim_pf_rescaled
 
 
-
-# X
-def mp_val_fun(data, dates, cov_list, lambda_list, wealth, risk_free, mu, gamma_rel, cov_type, iter_, K,
-               k=None, g=None, u_vec=None, hps=None, verbose=True):
+def mp_val_fun(
+    data,
+    dates,
+    cov_list,
+    lambda_list,
+    wealth,
+    risk_free,
+    mu,
+    gamma_rel,
+    cov_type,
+    iter_,
+    K,
+    k=None,
+    g=None,
+    u_vec=None,
+    hps=None,
+    verbose=True
+):
     """
-    Multiperiod-ML validation function.
+    Portfolio-ML implementation with counterfactual inputs.
 
     Parameters:
-        data (pd.DataFrame): Input dataset with required fields.
-        dates (list): List of pd.Timestamp dates for validation.
+        data (pd.DataFrame): Portfolio dataset with required features and returns.
+        cf_cluster (str): Counterfactual cluster identifier ("bm" for benchmark or cluster name).
+        pfml_base (dict): Base Portfolio-ML implementation containing hyperparameters and aim coefficients.
+        dates (list): List of dates for the portfolio implementation.
         cov_list (dict): Covariance matrices indexed by date.
         lambda_list (dict): Lambda matrices indexed by date.
+        scale (bool): Whether to scale features by their volatility.
+        orig_feat (bool): Whether to include original features in the implementation.
+        gamma_rel (float): Relative risk aversion parameter.
         wealth (pd.DataFrame): Wealth data by date.
         risk_free (pd.DataFrame): Risk-free rate data by date.
-        mu (float): Drift parameter.
-        gamma_rel (float): Relative risk-aversion parameter.
-        cov_type (str): Covariance type for adjustments.
-        iter_ (int): Number of iterations for convergence.
-        K (int): Prediction horizon.
-        k (float, optional): Regularization scaling parameter.
-        g (float, optional): Covariance adjustment scaling parameter.
-        u_vec (list, optional): List of utility parameters.
-        hps (pd.DataFrame, optional): Hyperparameters for optimization.
-        verbose (bool, optional): Whether to print progress information.
+        mu (float): Drift parameter for portfolio adjustment.
+        iter (int): Number of iterations for matrix computations.
+        seed (int): Seed for reproducibility.
+        features (list): List of feature names for the input data.
+        cluster_labels (pd.DataFrame): Pre-loaded cluster labels, including clusters and their respective characteristics.
 
     Returns:
-        pd.DataFrame or dict: Validation weights by utility parameter or combined results.
+        pd.DataFrame: Counterfactual portfolio performance metrics.
     """
-    # Initialize weights for each utility parameter
-    w_init = data.copy()
-    w_init['w_start'] = 0  # Initialize with zero weights
-    w_list = {str(u): w_init.copy() for u in u_vec} if hps is None else {'opt': w_init}
 
-    last_u, last_g, last_k = None, None, None  # Store last valid parameters
+    # Step 1: Initialize base weights (VW)
+    w_init = initial_weights_new(data.copy(), w_type="vw")
+    if 'tr_ld1' not in w_init.columns:
+        w_init = pd.merge(w_init, data[['id','eom','tr_ld1']], on=['id','eom'], how='left')
+    if 'mu_ld1' not in w_init.columns:
+        w_init = pd.merge(w_init, wealth[['eom','mu_ld1']], on='eom', how='left')
 
+    # Step 2: Create container(s) for weights
+    if hps is not None:
+        w_list = {"opt": w_init.copy()}
+    else:
+        if u_vec is None:
+            raise ValueError("If hps is None, you must provide u_vec.")
+        w_list = {str(u_val): w_init.copy() for u_val in u_vec}
+
+    iden = None
+
+    # Step 3: Main loop over dates
     for d in dates:
-        # Make sure date is a timestamp
-        d_ts = pd.Timestamp(d)
+        if verbose and (pd.to_datetime(d).year % 10 == 0) and (pd.to_datetime(d).month == 12):
+            print(f"   {d}")
 
-        if verbose and (d_ts.year % 10 == 0) and (d_ts.month == 12):
-            print(f"Processing date: {d}")
-
-        # Extract hyperparameters if hps is provided
+        # Step 3.1: Pick or use hyperparameters
         if hps is not None:
-            hps_sub = hps[hps['eom_ret'].dt.year < d_ts.year]
-            if not hps_sub.empty:
-                hp_row = hps_sub.loc[hps_sub['eom_ret'].idxmax()]
-                g, u, k = hp_row['g'], hp_row['u'], hp_row['k']
-                last_g, last_u, last_k = g, u, k
-            else:
-                if last_g is None or last_u is None or last_k is None:
-                    raise ValueError("No valid hyperparameters found in `hps` and no previous values to retain.")
-                g, u, k = last_g, last_u, last_k
+            hps_subset = hps.loc[hps['eom_ret'] < d]
+            if hps_subset.empty:
+                continue
+            hps_row = hps_subset.loc[hps_subset['eom_ret'].idxmax()]
+            k_val, g_val, u_val = hps_row['k'], hps_row['g'], hps_row['u']
         else:
-            if last_u is None:
-                raise ValueError("No `hps` provided, and `u` is not initialized.")
-            u = last_u
+            k_val, g_val = k, g
 
-        wealth_t = wealth.loc[wealth['eom'] == d_ts, 'wealth'].values[0]
-        rf = risk_free.loc[risk_free['eom'] == d_ts, 'rf'].values[0]
-        data_d = data[data['eom'] == d_ts].copy()
+        # Step 3.2: Extract wealth & rf
+        w_val = wealth.loc[wealth['eom'] == d, 'wealth']
+        if w_val.empty: continue
+        wealth_t = w_val.iloc[0]
 
-        sigma_raw = create_cov(cov_list[d_ts], ids=data_d['id'])
-        sigma_gam = sigma_raw * gamma_rel
-        sigma_gam = sigma_gam_adj(sigma_gam, g, cov_type)
+        rf_val = risk_free.loc[risk_free['date'] == d, 'rf']
+        if rf_val.empty: continue
+        rf_val = rf_val.iloc[0]
 
-        lambda_raw = create_lambda(lambda_list[d_ts], ids=data_d['id'])
-        lambda_ = lambda_raw * k
+        data_d = data.loc[data['eom'] == d].copy()
+        if data_d.empty: continue
 
-        m = m_func(w=wealth_t, mu=mu, rf=rf, sigma_gam=sigma_gam, gam=gamma_rel, lambda_mat=lambda_, iterations=iter_)
+        # Step 3.3: Build sigma_gam & m
+        ids = data_d['id'].astype(str).unique()
+        sigma_raw = create_cov(cov_list[d], ids=ids)
+        sigma_gam = sigma_gam_adj(sigma_raw * gamma_rel, g_val, cov_type)
+        lam_raw = create_lambda(lambda_list[d], ids=ids) * k_val
+        m_mat = m_func(w=wealth_t, mu=mu, rf=rf_val, sigma_gam=sigma_gam, gam=gamma_rel, lambda_mat=lam_raw, iterations=iter_)
+        if iden is None or iden.shape[0] != m_mat.shape[0]:
+            iden = np.eye(m_mat.shape[0])
 
-        w_aim_one = mp_aim_fun(data_d, sigma_gam=sigma_gam, lambda_=lambda_, m=m, w=wealth_t, K=K)
+        # Step 3.4: Compute baseline aim (u=1)
+        w_aim_one = mp_aim_fun(
+            preds=data_d,
+            sigma_gam=sigma_gam,
+            lambda_=lam_raw,
+            m=m_mat,
+            w=wealth_t,
+            K=K
+        )
+        fa_aims_one = data_d[['id','eom']].copy()
+        fa_aims_one['w_aim_base'] = w_aim_one
 
-        for u_key, df_w in w_list.items():
-            u_val = u if hps is not None else float(u_key)
+        # Step 3.5: Loop over each portfolio
+        for u_nm, w_df in w_list.items():
+            if hps is not None:
+                curr_u = u_val
+            else:
+                curr_u = float(u_nm)
 
-            fa_aims = data_d[['id', 'eom']].copy()
-            fa_aims['w_aim'] = w_aim_one['w_aim'] * u_val
+            fa_aims = fa_aims_one.copy()
+            fa_aims['w_aim'] = fa_aims['w_aim_base'] * curr_u
+            w_cur = pd.merge(fa_aims, w_df[w_df['eom'] == d], on=['id','eom'], how='left')
+            w_cur['w_start'] = w_cur['w_start'].fillna(0)
+            w_cur.sort_values(by='id', key=lambda c: pd.Categorical(c, categories=ids, ordered=True), inplace=True)
 
-            w_cur = pd.merge(fa_aims, df_w[df_w['eom'] == d_ts], on=['id', 'eom'], how='left')
-            w_cur['w_opt'] = (m @ w_cur['w_start'].fillna(0).values) + ((np.eye(m.shape[0]) - m) @ w_cur['w_aim'].values)
+            vec_w_start = w_cur['w_start'].values
+            vec_w_aim = w_cur['w_aim'].values
+            w_opt = (m_mat @ vec_w_start) + ((iden - m_mat) @ vec_w_aim)
+            w_cur['w_opt'] = w_opt
+            w_cur['w_opt_ld1'] = w_cur['w_opt'] * (1 + w_cur['tr_ld1'].fillna(0)) / (1 + w_cur['mu_ld1'].fillna(0))
 
-            next_month_idx = dates.index(d) + 1
-            next_month = dates[next_month_idx] if next_month_idx < len(dates) else None
+            # Overwrite current month's w
+            w_opt_df = w_cur[['id','w_opt']]
+            w_df = pd.merge(w_df, w_opt_df, on='id', how='left')
+            w_df.loc[w_df['eom'] == d, 'w'] = w_df.loc[w_df['eom'] == d, 'w_opt']
+            w_df.drop(columns=['w_opt'], inplace=True)
 
-            w_update = w_cur[['id', 'w_opt']].copy()
-            if next_month:
-                w_cur['w_opt_ld1'] = w_cur['w_opt'] * (1 + w_cur['tr_ld1']) / (
-                    1 + wealth.loc[wealth['eom'] == pd.Timestamp(next_month), 'mu_ld1'].iloc[0])
-                w_update['w_opt_ld1'] = w_cur['w_opt_ld1']
+            # Next month
+            next_idx = dates.index(d) + 1
+            if next_idx < len(dates):
+                next_d = dates[next_idx]
+                w_ld1_df = w_cur[['id','w_opt_ld1']]
+                w_df = pd.merge(w_df, w_ld1_df, on='id', how='left')
+                mask_next = (w_df['eom'] == next_d) & (~w_df['w_opt_ld1'].isna())
+                w_df.loc[mask_next, 'w_start'] = w_df.loc[mask_next, 'w_opt_ld1']
+                mask_missing = (w_df['eom'] == next_d) & (w_df['w_start'].isna())
+                w_df.loc[mask_missing, 'w_start'] = 0
+                w_df.drop(columns=['w_opt_ld1'], inplace=True)
+            else:
+                w_df.drop(columns=['w_opt_ld1'], errors='ignore', inplace=True)
 
-            df_w = pd.merge(w_update, df_w, on='id', how='right')
-            df_w.loc[(df_w['eom'] == d_ts) & (~df_w['w_opt'].isna()), 'w'] = df_w['w_opt']
+            w_list[u_nm] = w_df
 
-            if next_month:
-                mask_next = (df_w['eom'] == pd.Timestamp(next_month)) & (~df_w['w_opt_ld1'].isna())
-                df_w.loc[mask_next, 'w_start'] = df_w.loc[mask_next, 'w_opt_ld1']
-                df_w.loc[(df_w['eom'] == pd.Timestamp(next_month)) & (df_w['w_start'].isna()), 'w_start'] = 0.0
-
-            df_w.drop(columns=['w_opt', 'w_opt_ld1'], inplace=True, errors='ignore')
-
-            w_list[u_key] = df_w
-
-        last_u = u
-
-    return list(w_list.values())[0].reset_index(drop=True) if hps is not None else w_list
+    # Step 4: Return
+    if hps is not None:
+        return w_list["opt"]
+    else:
+        return w_list
 
 
 

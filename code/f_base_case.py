@@ -147,11 +147,24 @@ def multiperiod_ml(config_params, chars, barra_cov, lambda_list, risk_free, weal
     """
     if config_params["update_mp"]:
         print("Implementing Multiperiod-ML...")
-        mp = mp_implement(chars, cov_list=barra_cov, lambda_list=lambda_list, rf=risk_free, wealth=wealth,
-                          gamma_rel=pf_set["gamma_rel"], dates_oos=dates_oos, dates_hp=dates_hp,
-                          k_vec=settings["pf"]["hps"]["m1"]["k"], u_vec=settings["pf"]["hps"]["m1"]["u"],
-                          g_vec=settings["pf"]["hps"]["m1"]["g"], cov_type=settings["pf"]["hps"]["cov_type"],
-                          validation=None, iter_=10, K=settings["pf"]["hps"]["m1"]["K"])
+        mp = mp_implement(
+            data_tc=chars,
+            cov_list=barra_cov,
+            lambda_list=lambda_list,
+            rf=risk_free,
+            wealth=wealth,
+            mu=pf_set["mu"],
+            gamma_rel=pf_set["gamma_rel"],
+            dates_oos=dates_oos,
+            dates_hp=dates_hp,
+            k_vec=settings["pf"]["hps"]["m1"]["k"],
+            u_vec=settings["pf"]["hps"]["m1"]["u"],
+            g_vec=settings["pf"]["hps"]["m1"]["g"],
+            cov_type=settings["pf"]["hps"]["cov_type"],
+            validation=None,
+            iter_=10,
+            K=settings["pf"]["hps"]["m1"]["K"]
+        )
 
         if isinstance(mp, dict) and "pf" in mp:
             mp_df = mp["pf"]
@@ -188,7 +201,7 @@ def run_f_base_case(chars, barra_cov, wealth, dates_oos, pf_set, settings, confi
     # static_ml(chars, barra_cov, lambda_list, wealth, pf_set, settings, dates_oos, dates_hp, output_path)
 
     # Run Portfolio-ML
-    portfolio_ml(chars, barra_cov, lambda_list, features, risk_free, wealth, pf_set, settings, dates_m2, dates_oos, hp_years, output_path)
+    # portfolio_ml(chars, barra_cov, lambda_list, features, risk_free, wealth, pf_set, settings, dates_m2, dates_oos, hp_years, output_path)
 
     # Run Multiperiod-ML
     multiperiod_ml(config_params, chars, barra_cov, lambda_list, risk_free, wealth, pf_set, settings,
