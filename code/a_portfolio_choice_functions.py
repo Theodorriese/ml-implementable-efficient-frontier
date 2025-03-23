@@ -9,6 +9,7 @@ from collections import defaultdict
 from a_general_functions import create_cov, create_lambda, sigma_gam_adj, initial_weights_new, pf_ts_fun
 from a_return_prediction_functions import rff
 
+
 def m_func(w, mu, rf, sigma_gam, gam, lambda_mat, iterations):
     """
     Computes the m matrix.
@@ -209,21 +210,6 @@ def tpf_implement(data, cov_list, wealth, dates, gam):
 def tpf_cf_fun(data, cf_cluster, er_models, cluster_labels, wealth, gamma_rel, cov_list, dates, seed, features):
     """
     Counterfactual Tangency Portfolio Implementation.
-
-    Parameters:
-        data (pd.DataFrame): Main dataset.
-        cf_cluster (str): Counterfactual cluster type.
-        er_models (list): List of expected return models.
-        cluster_labels (pd.DataFrame): Cluster labels for characteristics.
-        wealth (pd.DataFrame): Wealth data.
-        gamma_rel (float): Risk-aversion parameter.
-        cov_list (dict): Dictionary of covariance matrices indexed by date.
-        dates (list): List of dates for portfolio implementation.
-        seed (int): Random seed for reproducibility.
-        features (list): List of feature names to be used.
-
-    Returns:
-        pd.DataFrame: Portfolio performance with cluster information.
     """
     np.random.seed(seed)
 
@@ -234,33 +220,46 @@ def tpf_cf_fun(data, cf_cluster, er_models, cluster_labels, wealth, gamma_rel, c
 
         # Select characteristics for the cluster
         chars_sub = cluster_labels.loc[
-            (cluster_labels['cluster'] == cf_cluster) & (cluster_labels['characteristic'].isin(features)), 'characteristic'
+            (cluster_labels['cluster'] == cf_cluster) &
+            (cluster_labels['characteristic'].isin(features)), 'characteristic'
         ]
 
         if chars_sub.empty:
             raise ValueError(f"Cluster '{cf_cluster}' has no matching characteristics in cluster_labels.")
 
+        # Prepare the shuffled DataFrame
         chars_data = cf[['id_shuffle', 'eom'] + chars_sub.tolist()].rename(columns={'id_shuffle': 'id'})
-        cf = cf.drop(columns=chars_sub).merge(chars_data, on=['id', 'eom'], how='left')
+        cf.drop(columns=chars_sub, inplace=True)
+        cf = pd.merge(cf, chars_data, on=['id', 'eom'], how='left')
 
-        # Predict expected returns
+        # Predict expected returns for each model in er_models
         for m_sub in er_models:
-            sub_dates = m_sub['pred']['eom'].unique()
-            cf_x = cf.loc[cf['eom'].isin(sub_dates), features].to_numpy()
+            if 'pred' in m_sub:
+                sub_dates = m_sub['pred']['eom'].unique()
 
-            if not cf_x.size:  # Skip if empty
-                continue
+                # Filter the data for relevant dates
+                cf_subset = cf.loc[cf['eom'].isin(sub_dates)].copy()
 
-            # Random Fourier Feature Transformation
-            cf_new_x = rff(cf_x, W=m_sub['W'])
-            cf_new_x = m_sub['opt_hps']['p'] ** -0.5 * np.hstack([cf_new_x['X_cos'], cf_new_x['X_sin']])
+                if cf_subset.empty:
+                    continue
 
-            cf.loc[cf['eom'].isin(sub_dates), 'pred_ld1'] = m_sub['fit'].predict(cf_new_x, m_sub['opt_hps']['lambda'])
+                # Apply RFF Transformation
+                cf_x = cf_subset[features].to_numpy()
+                if cf_x.size == 0:
+                    continue
+
+                cf_new_x = rff(cf_x, W=m_sub['W'])
+                cf_new_x = m_sub['opt_hps']['p'] ** -0.5 * np.hstack([cf_new_x['X_cos'], cf_new_x['X_sin']])
+
+                # Generate predictions and update the main DataFrame
+                cf.loc[cf['eom'].isin(sub_dates), 'pred_ld1'] = m_sub['fit'].predict(cf_new_x,
+                                                                                     m_sub['opt_hps']['lambda'])
 
     else:
-        cf = data[data['valid'] == True]
+        # Just work with valid data if it's "bm"
+        cf = data[data['valid'] == True].copy()
 
-    # Ensure pred_ld1 does not have NaNs
+    # Ensure pred_ld1 is not NaN for subsequent calculations
     cf['pred_ld1'] = cf['pred_ld1'].fillna(0)
 
     # Implement the tangency portfolio on counterfactual data
@@ -269,7 +268,7 @@ def tpf_cf_fun(data, cf_cluster, er_models, cluster_labels, wealth, gamma_rel, c
     if 'pf' not in op:
         raise ValueError("Error: `tpf_implement` did not return expected portfolio data.")
 
-    # Add cluster information
+    # Add the cluster label for identification
     op['pf']['cluster'] = cf_cluster
     return op['pf']
 
@@ -663,8 +662,7 @@ def static_val_fun(data, dates, cov_list, lambda_list, wealth, cov_type, gamma_r
 
 
 def static_implement(data_tc, cov_list, lambda_list,
-                     wealth, gamma_rel,
-                     dates_oos, dates_hp,
+                     wealth, gamma_rel, dates_oos, dates_hp,
                      k_vec, u_vec, g_vec, cov_type,
                      validation=None, seed=None):
     """
@@ -1338,20 +1336,9 @@ def pfml_aims_fun(pfml_input, validation, data_tc, hp_coef, dates_oos, orig_feat
     return aim_pfs_list
 
 
-def pfml_w(
-    data: pd.DataFrame,
-    dates: list,
-    cov_list: dict,
-    lambda_list: dict,
-    gamma_rel: float,
-    iter_: int,
-    risk_free: pd.DataFrame,
-    wealth: pd.DataFrame,
-    mu: float,
-    aims: pd.DataFrame = None,
-    signal_t: dict = None,
-    aim_coef: any = None
-) -> pd.DataFrame:
+def pfml_w(data: pd.DataFrame, dates: list, cov_list: dict, lambda_list: dict, gamma_rel: float,
+           iter_: int, risk_free: pd.DataFrame, wealth: pd.DataFrame, mu: float,
+           aims: pd.DataFrame = None, signal_t: dict = None, aim_coef: any = None) -> pd.DataFrame:
     """
     Compute Portfolio-ML weights.
 
@@ -1495,30 +1482,9 @@ def pfml_w(
     return fa_weights
 
 
-def pfml_implement(
-    data_tc,
-    cov_list,
-    lambda_list,
-    risk_free,
-    features,
-    wealth,
-    mu,
-    gamma_rel,
-    dates_full,
-    dates_oos,
-    lb,
-    hp_years,
-    rff_feat,
-    scale,
-    g_vec=None,
-    p_vec=None,
-    l_vec=None,
-    orig_feat=None,
-    iter=100,
-    hps=None,
-    balanced=False,
-    seed=None
-):
+def pfml_implement(data_tc, cov_list, lambda_list, risk_free, features, wealth, mu, gamma_rel,
+                   dates_full, dates_oos, lb, hp_years, rff_feat, scale, g_vec=None, p_vec=None,
+                   l_vec=None, orig_feat=None, iter=100, hps=None, balanced=False, seed=None):
     """
     Portfolio-ML implementation with hyperparameter search and portfolio computation.
 
@@ -1679,68 +1645,44 @@ def pfml_implement(
     }
 
 
-def pfml_cf_fun(data, cf_cluster, pfml_base, dates, cov_list, lambda_list, scale, orig_feat, gamma_rel, wealth,
-                risk_free, mu, iter, seed, features, cluster_labels):
+def pfml_cf_fun(data, cf_cluster, pfml_base, dates, cov_list, lambda_list, scale,
+                orig_feat, gamma_rel, wealth, risk_free, mu, iter, seed,
+                features, cluster_labels):
     """
     Portfolio-ML implementation with counterfactual inputs.
-
-    Parameters:
-        data (pd.DataFrame): Portfolio dataset with required features and returns.
-        cf_cluster (str): Counterfactual cluster identifier ("bm" for benchmark or cluster name).
-        pfml_base (dict): Base Portfolio-ML implementation containing hyperparameters and aim coefficients.
-        dates (list): List of dates for the portfolio implementation.
-        cov_list (dict): Covariance matrices indexed by date.
-        lambda_list (dict): Lambda matrices indexed by date.
-        scale (bool): Whether to scale features by their volatility.
-        orig_feat (bool): Whether to include original features in the implementation.
-        gamma_rel (float): Relative risk aversion parameter.
-        wealth (pd.DataFrame): Wealth data by date.
-        risk_free (pd.DataFrame): Risk-free rate data by date.
-        mu (float): Drift parameter for portfolio adjustment.
-        iter (int): Number of iterations for matrix computations.
-        seed (int): Seed for reproducibility.
-        features (list): List of feature names for the input data.
-        cluster_labels (pd.DataFrame): Pre-loaded cluster labels, including clusters and their respective characteristics.
-
-    Returns:
-        pd.DataFrame: Counterfactual portfolio performance metrics.
     """
+    np.random.seed(seed)
+    cf = data.copy()
 
-    # Step 1: Handle scaling if required
     if scale:
         scales = []
         for d in dates:
             sigma_arr = create_cov(cov_list[str(d)])
             sigma = pd.DataFrame(sigma_arr)
-
             diag_vol = np.sqrt(np.diag(sigma.values))
 
-            scales.append(
-                pd.DataFrame(
-                    {'id': sigma.index, 'eom': d, 'vol_scale': diag_vol}
-                )
-            )
-        scales = pd.concat(scales, ignore_index=True)
-        data = data.merge(scales, on=['id', 'eom'], how='left')
-        data['vol_scale'] = data.groupby('eom')['vol_scale'].apply(lambda x: x.fillna(x.median()))
+            scales.append(pd.DataFrame({'id': sigma.index, 'eom': d, 'vol_scale': diag_vol}))
 
-    # Step 2: Prepare counterfactual data
-    np.random.seed(seed)
-    cf = data[['id', 'eom', 'vol_scale'] + features].copy()
+        scales = pd.concat(scales, ignore_index=True)
+        cf = cf.merge(scales, on=['id', 'eom'], how='left')
+        cf['vol_scale'] = cf.groupby('eom')['vol_scale'].transform(lambda x: x.fillna(x.median()))
+
     if cf_cluster != "bm":
-        cf['id_shuffle'] = cf.groupby('eom')['id'].transform(lambda x: np.random.permutation(x.values))
+        cf['id_shuffle'] = cf.groupby('eom')['id'].transform(lambda x: np.random.permutation(x))
+
+        # Identify characteristics to replace for this cluster
         chars_sub = cluster_labels.loc[
             (cluster_labels['cluster'] == cf_cluster) & (cluster_labels['characteristic'].isin(features)),
             'characteristic'
         ]
-        cf = cf.drop(columns=chars_sub).merge(
-            cf[['id_shuffle', 'eom'] + list(chars_sub)],
-            left_on=['id_shuffle', 'eom'],
-            right_on=['id', 'eom'],
-            suffixes=('', '_shuffle')
-        ).drop(columns=['id_shuffle'])
 
-    # Step 3: Compute counterfactual aim portfolios
+        if not chars_sub.empty:
+            # Replace the features for the shuffled IDs
+            chars_data = cf[['id_shuffle', 'eom'] + chars_sub.tolist()].rename(columns={'id_shuffle': 'id'})
+            cf.drop(columns=chars_sub, inplace=True)
+            cf = pd.merge(cf, chars_data, on=['id', 'eom'], how='left')
+
+    # Generate aim portfolios
     aim_cf = []
     for d in dates:
         stocks = cf.loc[cf['eom'] == d, 'id']
@@ -1749,13 +1691,12 @@ def pfml_cf_fun(data, cf_cluster, pfml_base, dates, cov_list, lambda_list, scale
         aim_coef = pfml_base['best_hps_list'][d]['coef']
         W = pfml_base['hps'][str(best_g)]['rff_w'][:, :best_p // 2]
 
-        # Random Fourier features for counterfactual data
-        rff_x = rff(cf.loc[cf['eom'] == d, features], W=W)
+        # RFF for counterfactuals
+        rff_x = rff(cf.loc[cf['eom'] == d, features].values, W=W)
         s = np.hstack([rff_x['X_cos'], rff_x['X_sin']])
         s = (s - s.mean(axis=0)) * np.sqrt(1 / np.sum(s ** 2, axis=0))
         s = np.hstack([s, np.ones((s.shape[0], 1))])
 
-        # Reorder to align with coefficients
         feat = pfml_feat_fun(p=best_p, orig_feat=orig_feat, features=features)
         s = s[:, [feat.index(f) for f in feat]]
 
@@ -1763,15 +1704,11 @@ def pfml_cf_fun(data, cf_cluster, pfml_base, dates, cov_list, lambda_list, scale
             scale_diag = np.diag(1 / cf.loc[cf['eom'] == d, 'vol_scale'])
             s = scale_diag @ s
 
-        # Compute weights
-        aim_cf.append(pd.DataFrame({
-            'id': stocks,
-            'eom': d,
-            'w_aim': s @ aim_coef
-        }))
+        aim_cf.append(pd.DataFrame({'id': stocks, 'eom': d, 'w_aim': s @ aim_coef}))
+
     aim_cf = pd.concat(aim_cf, ignore_index=True)
 
-    # Step 4: Compute counterfactual portfolio weights
+    # Compute weights using the aim portfolio
     w_cf = pfml_w(data, dates, cov_list, lambda_list, gamma_rel, iter, risk_free, wealth, mu, aim_cf)
     pf_cf = pf_ts_fun(w_cf, data, wealth)
     pf_cf['type'] = "Portfolio-ML"
@@ -1838,23 +1775,9 @@ def mp_aim_fun(preds, sigma_gam, lambda_, m, w, K):
 
 
 def mp_val_fun(
-        data,
-        dates,
-        cov_list,
-        lambda_list,
-        wealth,
-        risk_free,
-        mu,
-        gamma_rel,
-        cov_type,
-        iter_,
-        K,
-        k=None,
-        g=None,
-        u_vec=None,
-        hps=None,
-        verbose=True
-):
+        data, dates, cov_list, lambda_list, wealth, risk_free, mu,
+        gamma_rel, cov_type, iter_, K, k=None, g=None, u_vec=None,
+        hps=None, verbose=True):
     """
     Portfolio-ML implementation with counterfactual inputs.
     """

@@ -6,8 +6,11 @@ from datetime import datetime
 from b_prepare_data import load_cluster_labels, load_risk_free, load_daily_returns_pkl
 from d_estimate_cov_matrix import prepare_cluster_data  # Covariance estimation
 from e_prepare_portfolio_data import run_prepare_portfolio_data  # Portfolio prep
+from f_feature_importance_ret import run_counterfactuals
+from f_feature_importance_base import run_feature_importance_base
 from f_base_case import run_f_base_case
 from i1_Main import settings, pf_set, features
+
 
 # -------------------- CONFIGURATION --------------------
 
@@ -199,25 +202,62 @@ dates_m1, dates_m2, dates_oos, dates_hp, hp_years = (
 print("Loaded portfolio data from latest folder.")
 
 # -------------------- Step 4: Run Base Case and Feature Importance --------------------
-if config_params["update_base"]:
-    print("Running Base Case...")
+# if config_params["update_base"]:
+#     print("Running Base Case...")
+#
+#     run_f_base_case(
+#         chars=portfolio_data["chars"],
+#         barra_cov=barra_cov,
+#         wealth=wealth,
+#         dates_oos=dates_oos,
+#         pf_set=pf_set,
+#         settings=settings,
+#         config_params=config_params,
+#         lambda_list=portfolio_data["lambda_list"],
+#         risk_free=risk_free,
+#         features=features,
+#         dates_m2=dates_m2,
+#         dates_hp=dates_hp,
+#         hp_years=hp_years,
+#         output_path=output_path
+#     )
 
-    run_f_base_case(
-        chars=portfolio_data["chars"],
+
+# ----------------- Step 5: Run the feature importance scripts -----------------
+# -------------------- Feature Importance - Base Case --------------------
+if config_params.get('update_fi_base', True):
+    print("Running Feature Importance Base Case...")
+
+    run_feature_importance_base(
+        chars=portfolio_data['chars'],
+        er_models=fitted_models,
+        cluster_labels=cluster_labels,
         barra_cov=barra_cov,
-        wealth=wealth,
-        dates_oos=dates_oos,
-        pf_set=pf_set,
         settings=settings,
-        config_params=config_params,
-        lambda_list=portfolio_data["lambda_list"],
+        pf_set=pf_set,
+        tpf_cf_wealth=wealth,
+        wealth=wealth,
         risk_free=risk_free,
+        lambda_list=portfolio_data['lambda_list'],
         features=features,
-        dates_m2=dates_m2,
-        dates_hp=dates_hp,
-        hp_years=hp_years,
+        dates_oos=dates_oos,
         output_path=output_path
     )
+
+
+# ---------------- Feature importance - Expected return models ---------------- #
+
+if config_params.get('update_cf', True):
+    print("Running Counterfactual Estimation...")
+
+    run_counterfactuals(
+        chars=portfolio_data['chars'],
+        cluster_labels=cluster_labels,
+        features=features,
+        settings=settings,
+        output_path=output_path
+    )
+
 
 # -------------------- Finalization --------------------
 print(f"Portfolio construction script completed")
