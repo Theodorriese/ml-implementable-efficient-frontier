@@ -1,4 +1,5 @@
 import pandas as pd
+import pickle
 from a_portfolio_choice_functions import (tpf_implement, factor_ml_implement, mkt_implement, ew_implement, rw_implement,
                                           mv_implement, static_implement, pfml_implement, mp_implement)
 
@@ -119,12 +120,8 @@ def portfolio_ml(chars, barra_cov, lambda_list, features, risk_free, wealth, pf_
                           scale=settings["pf_ml"]["scale"], orig_feat=settings["pf_ml"]["orig_feat"],
                           iter=iter, hps={}, balanced=False, seed=settings["seed_no"])
 
-    if isinstance(pfml, dict) and "pf" in pfml:
-        pfml_df = pfml["pf"]
-    else:
-        pfml_df = pd.DataFrame(pfml)
-
-    pfml_df.to_pickle(f"{output_path}/portfolio-ml.pkl")
+    with open(f"{output_path}/portfolio-ml.pkl", 'wb') as file:
+        pickle.dump(pfml, file)
 
 
 def multiperiod_ml(config_params, chars, barra_cov, lambda_list, risk_free, wealth, pf_set, settings,
@@ -166,12 +163,9 @@ def multiperiod_ml(config_params, chars, barra_cov, lambda_list, risk_free, weal
             K=settings["pf"]["hps"]["m1"]["K"]
         )
 
-        if isinstance(mp, dict) and "pf" in mp:
-            mp_df = mp["pf"]
-        else:
-            mp_df = pd.DataFrame(mp)
-
-        mp_df.to_pickle(f"{output_path}/multiperiod-ml.pkl")
+        # Save the entire dictionary to 'multiperiod-ml.pkl'
+        with open(f"{output_path}/multiperiod-ml.pkl", 'wb') as file:
+            pickle.dump(mp, file)
 
 
 def run_f_base_case(chars, barra_cov, wealth, dates_oos, pf_set, settings, config_params, lambda_list, risk_free,
@@ -201,10 +195,10 @@ def run_f_base_case(chars, barra_cov, wealth, dates_oos, pf_set, settings, confi
     # static_ml(chars, barra_cov, lambda_list, wealth, pf_set, settings, dates_oos, dates_hp, output_path)
 
     # Run Portfolio-ML
-    # portfolio_ml(chars, barra_cov, lambda_list, features, risk_free, wealth, pf_set, settings, dates_m2, dates_oos, hp_years, output_path)
+    portfolio_ml(chars, barra_cov, lambda_list, features, risk_free, wealth, pf_set, settings, dates_m2, dates_oos, hp_years, output_path)
 
     # Run Multiperiod-ML
-    multiperiod_ml(config_params, chars, barra_cov, lambda_list, risk_free, wealth, pf_set, settings,
-                   dates_oos, dates_hp, output_path)
+    # multiperiod_ml(config_params, chars, barra_cov, lambda_list, risk_free, wealth, pf_set, settings,
+    #                dates_oos, dates_hp, output_path)
 
 

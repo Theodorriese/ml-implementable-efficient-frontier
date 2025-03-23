@@ -39,12 +39,13 @@ def implement_portfolio_ml_base(chars, output_path, dates_oos, barra_cov, settin
     Implement Portfolio-ML Base Case.
     """
     print("Loading Portfolio-ML Base Case model...")
-    pfml_path = f"{output_path}/static-ml.pkl"
+    pfml_path = f"{output_path}/portfolio-ml.pkl"
     pfml = pd.read_pickle(pfml_path)
     print(f"Portfolio-ML Base Case model loaded from {pfml_path}.")
 
     print("Implementing Portfolio-ML Base Case...")
-    cf_clusters = ["bm"] + settings["clusters"]
+    clusters = sorted(cluster_labels['cluster'].unique())
+    cf_clusters = ["bm"] + clusters
     pfml_cf_base = []
 
     for cf_cluster in tqdm(cf_clusters, desc="Processing Clusters (Portfolio-ML)", unit="cluster"):
@@ -64,7 +65,7 @@ def implement_portfolio_ml_base(chars, output_path, dates_oos, barra_cov, settin
             iter=10,
             seed=settings["seed_no"],
             features=features,
-            cluster_labels=cluster_labels  # Make sure to pass this in
+            cluster_labels=cluster_labels
         )
 
         pfml_cf_base.append(cluster_result)
@@ -79,19 +80,19 @@ def run_feature_importance_base(chars, er_models, cluster_labels, barra_cov, set
     """
     Main function to execute implementations for Markowitz-ML and Portfolio-ML.
     """
-    # Implement Markowitz-ML Base Case
-    print("Running Markowitz-ML Base Case...")
-    implement_markowitz_ml_base(
-        chars=chars,
-        er_models=er_models,
-        cluster_labels=cluster_labels,
-        dates_oos=dates_oos,
-        barra_cov=barra_cov,
-        settings=settings,
-        tpf_cf_wealth=tpf_cf_wealth,
-        features=features,
-        output_path=output_path,
-    )
+    # # Implement Markowitz-ML Base Case
+    # print("Running Markowitz-ML Base Case...")
+    # implement_markowitz_ml_base(
+    #     chars=chars,
+    #     er_models=er_models,
+    #     cluster_labels=cluster_labels,
+    #     dates_oos=dates_oos,
+    #     barra_cov=barra_cov,
+    #     settings=settings,
+    #     tpf_cf_wealth=tpf_cf_wealth,
+    #     features=features,
+    #     output_path=output_path,
+    # )
 
     # Implement Portfolio-ML Base Case
     print("Running Portfolio-ML Base Case...")

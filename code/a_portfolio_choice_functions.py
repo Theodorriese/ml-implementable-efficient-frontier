@@ -193,15 +193,18 @@ def tpf_implement(data, cov_list, wealth, dates, gam):
             continue  # Skip if there's a numerical issue
 
         data_sub["id"] = data_sub["id"].astype(str)
-        data_sub = data_sub.loc[data_sub["id"].isin(sigma.index)].assign(w=w_opt)  # Assign weights correctly
+        data_sub = data_sub.loc[data_sub["id"].isin(sigma.index)].assign(w=w_opt)
         tpf_opt.append(data_sub[['id', 'eom', 'w']])
 
     if not tpf_opt:
         return {"w": pd.DataFrame(), "pf": pd.DataFrame()}  # Return empty results if no valid weights
 
     tpf_opt = pd.concat(tpf_opt, ignore_index=True)
-    tpf_w = w_fun(data, dates, tpf_opt, wealth)
+
+    data_filtered = data[data['eom'].isin(dates)]
+    tpf_w = w_fun(data_filtered, dates, tpf_opt, wealth)
     tpf_pf = pf_ts_fun(tpf_w, data, wealth)
+
     tpf_pf['type'] = "Markowitz-ML"
 
     return {"w": tpf_w, "pf": tpf_pf}
@@ -233,27 +236,27 @@ def tpf_cf_fun(data, cf_cluster, er_models, cluster_labels, wealth, gamma_rel, c
         cf = pd.merge(cf, chars_data, on=['id', 'eom'], how='left')
 
         # Predict expected returns for each model in er_models
-        for m_sub in er_models:
-            if 'pred' in m_sub:
-                sub_dates = m_sub['pred']['eom'].unique()
+        for model_key, model_dict in er_models.items():
+            for date_key, m_sub in model_dict.items():
+                if all(key in m_sub for key in ['fit', 'W', 'opt_hps', 'pred']):
+                    sub_dates = m_sub['pred']['eom'].unique()
 
-                # Filter the data for relevant dates
-                cf_subset = cf.loc[cf['eom'].isin(sub_dates)].copy()
+                    # Filter the data for relevant dates
+                    cf_subset = cf.loc[cf['eom'].isin(sub_dates)].copy()
 
-                if cf_subset.empty:
-                    continue
+                    if cf_subset.empty:
+                        continue
 
-                # Apply RFF Transformation
-                cf_x = cf_subset[features].to_numpy()
-                if cf_x.size == 0:
-                    continue
+                    # Apply RFF Transformation
+                    cf_x = cf_subset[features].to_numpy()
+                    if cf_x.size == 0:
+                        continue
 
-                cf_new_x = rff(cf_x, W=m_sub['W'])
-                cf_new_x = m_sub['opt_hps']['p'] ** -0.5 * np.hstack([cf_new_x['X_cos'], cf_new_x['X_sin']])
+                    cf_new_x = rff(cf_x, W=m_sub['W'])
+                    cf_new_x = m_sub['opt_hps']['p'] ** -0.5 * np.hstack([cf_new_x['X_cos'], cf_new_x['X_sin']])
 
-                # Generate predictions and update the main DataFrame
-                cf.loc[cf['eom'].isin(sub_dates), 'pred_ld1'] = m_sub['fit'].predict(cf_new_x,
-                                                                                     m_sub['opt_hps']['lambda'])
+                    # Generate predictions and update the main DataFrame
+                    cf.loc[cf['eom'].isin(sub_dates), 'pred_ld1'] = m_sub['fit'].predict(cf_new_x)
 
     else:
         # Just work with valid data if it's "bm"
@@ -323,8 +326,11 @@ def factor_ml_implement(data, wealth, dates, n_pfs):
     # Combine all computed weights
     hml_opt = pd.concat(hml_opt, ignore_index=True)
 
+    # Filter the calculated weights to only include the relevant dates
+    hml_opt_filtered = hml_opt[hml_opt['eom'].isin(dates)]
+
     # Compute actual portfolio weights
-    hml_w = w_fun(data[data["eom"].isin(dates) & data["valid"]], dates, hml_opt, wealth)
+    hml_w = w_fun(data[data["eom"].isin(dates) & data["valid"]], dates, hml_opt_filtered, wealth)
 
     # Compute portfolio performance
     hml_pf = pf_ts_fun(hml_w, data, wealth)
@@ -868,7 +874,6 @@ def pfml_input_fun(data_tc, cov_list, lambda_list, gamma_rel, wealth, mu, dates,
                     scales_list.append(pd.DataFrame({'id': sigma_temp.index, 'eom': d_, 'vol_scale': diag_vol}))
         if scales_list:
             scales_df = pd.concat(scales_list, ignore_index=True)
-            # data = data.merge(scales_df, on=['id', 'eom'], how='left')
 
             chunk_size = 100000
             chunked_data = []
@@ -931,7 +936,7 @@ def pfml_input_fun(data_tc, cov_list, lambda_list, gamma_rel, wealth, mu, dates,
 
         # Build signals: for each group (by eom), extract the matrix of features.
         signals = {}
-        for grp_date, sub in tqdm(groups.items(), desc="Building signals"):
+        for grp_date, sub in groups.items():
             sub = sub.sort_values('id')  # Ensure sorted order
 
             # Check if vol_scale is completely NaN
@@ -959,7 +964,7 @@ def pfml_input_fun(data_tc, cov_list, lambda_list, gamma_rel, wealth, mu, dates,
 
         # Build weighting matrices
         gtm = {}
-        for grp_date, sub in tqdm(groups.items(), desc="Build weighting matrices"):
+        for grp_date, sub in groups.items():
             # Compute gt for the current group (sub)
             sub = sub.sort_values('id')  # Ensure IDs are sorted consistently
             tr = sub['tr_ld0'].values
@@ -997,7 +1002,7 @@ def pfml_input_fun(data_tc, cov_list, lambda_list, gamma_rel, wealth, mu, dates,
         const = 0
         omega_l1 = 0
         const_l1 = 0
-        for i in tqdm(range(lb + 1), desc="Processing lookback periods"):
+        for i in range(lb + 1):
             d_new = (d - pd.DateOffset(months=i)).to_period('M').to_timestamp('M')
             d_new_l1 = (d - pd.DateOffset(months=i + 1)).to_period('M').to_timestamp('M')
 
@@ -1657,14 +1662,17 @@ def pfml_cf_fun(data, cf_cluster, pfml_base, dates, cov_list, lambda_list, scale
     if scale:
         scales = []
         for d in dates:
-            sigma_arr = create_cov(cov_list[str(d)])
+            sigma_arr = create_cov(cov_list[d])
             sigma = pd.DataFrame(sigma_arr)
             diag_vol = np.sqrt(np.diag(sigma.values))
 
             scales.append(pd.DataFrame({'id': sigma.index, 'eom': d, 'vol_scale': diag_vol}))
 
         scales = pd.concat(scales, ignore_index=True)
+        cf['id'] = cf['id'].astype(str)  # Ensure 'id' in 'cf' is of type string
+        scales['id'] = scales['id'].astype(str)  # Ensure 'id' in 'scales' is of type string
         cf = cf.merge(scales, on=['id', 'eom'], how='left')
+
         cf['vol_scale'] = cf.groupby('eom')['vol_scale'].transform(lambda x: x.fillna(x.median()))
 
     if cf_cluster != "bm":
