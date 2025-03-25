@@ -54,14 +54,14 @@ def implement_pfml_cf_clusters(chars, pfml, dates_oos, barra_cov, settings, pf_s
             lambda_list=lambda_list,
             scale=settings["pf_ml"]["scale"],
             orig_feat=settings["pf_ml"]["orig_feat"],
-            gamma_rel=pf_set["gamma_rel"],  # Consistent usage of 'gamma_rel'
+            gamma_rel=pf_set["gamma_rel"],
             wealth=wealth,
             risk_free=risk_free,
             mu=pf_set["mu"],
             iter=10,
             seed=settings["seed_no"],
-            features=pf_set["features"],  # Passed from 'pf_set'
-            cluster_labels=cluster_labels  # Passed directly as input
+            features=pf_set["features"],
+            cluster_labels=cluster_labels
         )
 
         cluster_result["gamma_rel"] = gamma_rel

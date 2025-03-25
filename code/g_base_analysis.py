@@ -37,73 +37,90 @@ def load_base_case_portfolios(base_path):
 
 
 # Final Portfolios ---------------------
-def combine_portfolios(mp, pfml, static, bm_pfs, pf_order, gamma_rel):
+def combine_portfolios(mp, pfml, static, bm_pfs, pf_order_new, gamma_rel):
     """
     Combine multiple portfolios into a single dataframe.
 
     Parameters:
-        mp (pd.DataFrame): Multiperiod-ML portfolio data.
-        pfml (pd.DataFrame): Portfolio-ML data.
-        static (pd.DataFrame): Static-ML data.
+        mp (dict): Multiperiod-ML portfolio data.
+        pfml (dict): Portfolio-ML data.
+        static (dict): Static-ML data (now handled as a dictionary).
         bm_pfs (pd.DataFrame): Benchmark portfolios data.
-        pf_order (list): Order of portfolio types for factor conversion.
+        pf_order_new (list): Order of portfolio types for factor conversion.
         gamma_rel (float): Gamma value for risk aversion.
 
     Returns:
         pd.DataFrame: Combined portfolio dataframe with utility adjustments.
     """
-    # Combine portfolios
-    pfs = pd.concat([
-        mp["pf"],
-        pfml["pf"],
-        static["pf"],
-        bm_pfs,
-        mp["hps"].loc[
-            (mp["hps"]["eom_ret"].isin(mp["pf"]["eom_ret"])) &
-            (mp["hps"]["k"] == 1) &
-            (mp["hps"]["g"] == 0) &
-            (mp["hps"]["u"] == 1),
-            ["eom_ret", "inv", "shorting", "turnover", "r", "tc"]
-        ].assign(type="Multiperiod-ML"),
-        static["hps"].loc[
-            (static["hps"]["eom_ret"].isin(static["pf"]["eom_ret"])) &
-            (static["hps"]["k"] == 1) &
-            (static["hps"]["g"] == 0) &
-            (static["hps"]["u"] == 1),
-            ["eom_ret", "inv", "shorting", "turnover", "r", "tc"]
-        ].assign(type="Static-ML")
-    ])
+    # Ensure all relevant dates are converted to Timestamps
+    mp['pf']['eom_ret'] = pd.to_datetime(mp['pf']['eom_ret'])
+    pfml['pf']['eom_ret'] = pd.to_datetime(pfml['pf']['eom_ret'])
+    static['pf']['eom_ret'] = pd.to_datetime(static['pf']['eom_ret'])  # Now reading 'pf' from static
+    bm_pfs['eom_ret'] = pd.to_datetime(bm_pfs['eom_ret'])
+
+    # Process each component separately
+    mp_pf = mp['pf'].copy()
+    pfml_pf = pfml['pf'].copy()
+    static_pf = static['pf'].copy()  # Use 'pf' from the 'static' dictionary
+    bm_pfs_pf = bm_pfs.copy()
+
+    # Extract and process hps data for Multiperiod-ML and Static-ML
+    mp_hps = mp['hps'].loc[
+        (mp['hps']['eom_ret'].isin(mp['pf']['eom_ret'])) &
+        (mp['hps']['k'] == 1) & (mp['hps']['g'] == 0) & (mp['hps']['u'] == 1),
+        ['eom_ret', 'inv', 'shorting', 'turnover', 'r', 'tc']
+    ].assign(type='Multiperiod-ML')
+
+    static_hps = static['hps'].loc[
+        (static['hps']['eom_ret'].isin(static['pf']['eom_ret'])) &  # Match only those with relevant 'eom_ret'
+        (static['hps']['k'] == 1) & (static['hps']['g'] == 0) & (static['hps']['u'] == 1),
+        ['eom_ret', 'inv', 'shorting', 'turnover', 'r', 'tc']
+    ].assign(type='Static-ML')
+
+    # Combine all parts together
+    pfs = pd.concat([mp_pf, pfml_pf, static_pf, bm_pfs_pf, mp_hps, static_hps], ignore_index=True)
+
+    # Remove the 'eom' column if it exists in the combined DataFrame
+    if 'eom' in pfs.columns:
+        pfs.drop(columns=['eom'], inplace=True)
 
     # Convert 'type' to categorical with specified order
-    pfs["type"] = pd.Categorical(pfs["type"], categories=pf_order, ordered=True)
+    pfs['type'] = pd.Categorical(pfs['type'], categories=pf_order_new, ordered=True)
 
     # Sort the dataframe
-    pfs.sort_values(by=["type", "eom_ret"], inplace=True)
+    pfs.sort_values(by=['type', 'eom_ret'], inplace=True)
 
     # Compute utility and adjusted variables
-    pfs["e_var_adj"] = pfs.groupby("type")["r"].transform(lambda x: (x - x.mean()) ** 2)
-    pfs["utility_t"] = pfs["r"] - pfs["tc"] - 0.5 * pfs["e_var_adj"] * gamma_rel
+    pfs['e_var_adj'] = pfs.groupby('type')['r'].transform(lambda x: (x - x.mean()) ** 2)
+    pfs['utility_t'] = pfs['r'] - pfs['tc'] - 0.5 * pfs['e_var_adj'] * gamma_rel
 
     return pfs
 
 
 # Portfolio summary stats --------------
-def compute_portfolio_summary(pfs, main_types, gamma_rel):
+def compute_portfolio_summary(pfs, main_types, pf_order, gamma_rel):
     """
     Compute portfolio summary statistics.
 
     Parameters:
         pfs (pd.DataFrame): Combined portfolio dataframe.
         main_types (list): List of essential portfolio types to include.
+        pf_order (list): Full list of portfolio types for categorization.
         gamma_rel (float): Gamma value for risk aversion.
 
     Returns:
         pd.DataFrame: Summary statistics for each portfolio type.
         pd.DataFrame: Filtered portfolios containing only main types.
     """
+    # Make a copy to avoid modifying the original DataFrame
+    pfs_copy = pfs.copy()
+
+    # Convert 'type' to categorical with full order
+    pfs_copy["type"] = pd.Categorical(pfs_copy["type"], categories=pf_order, ordered=True)
+
     # Calculate summary statistics for each type
     pf_summary = (
-        pfs.groupby("type")
+        pfs_copy.groupby("type")
         .agg(
             n=("type", "size"),
             inv=("inv", "mean"),
@@ -113,21 +130,21 @@ def compute_portfolio_summary(pfs, main_types, gamma_rel):
             sd=("r", lambda x: x.std() * np.sqrt(12)),
             sr_gross=("r", lambda x: x.mean() / x.std() * np.sqrt(12)),
             tc=("tc", lambda x: x.mean() * 12),
-            r_tc=("r", lambda x: (x - pfs.loc[x.index, "tc"]).mean() * 12),
-            sr=("r", lambda x: ((x - pfs.loc[x.index, "tc"]).mean()) / x.std() * np.sqrt(12)),
-            obj=("r", lambda x: (x.mean() - 0.5 * x.var() * gamma_rel - pfs.loc[x.index, "tc"].mean()) * 12),
+            r_tc=("r", lambda x: (x - pfs_copy.loc[x.index, "tc"]).mean() * 12),
+            sr=("r", lambda x: ((x - pfs_copy.loc[x.index, "tc"]).mean()) / x.std() * np.sqrt(12)),
+            obj=("r", lambda x: (x.mean() - 0.5 * x.var() * gamma_rel - pfs_copy.loc[x.index, "tc"].mean()) * 12),
         )
         .reset_index()
     )
 
     # Filter the portfolio to include only main types
-    pfs = pfs[pfs["type"].isin(main_types)]
-    pfs["type"] = pd.Categorical(pfs["type"], categories=main_types, ordered=True)
+    pfs_filtered = pfs_copy[pfs_copy["type"].isin(main_types)].copy()
+    pfs_filtered["type"] = pd.Categorical(pfs_filtered["type"], categories=main_types, ordered=True)
 
-    # Sort the dataframe
-    pfs = pfs.sort_values(by=["type", "eom_ret"])
+    # Sort the filtered dataframe
+    pfs_filtered = pfs_filtered.sort_values(by=["type", "eom_ret"])
 
-    return pf_summary, pfs
+    return pf_summary, pfs_filtered
 
 
 # Performance Time-Series -----------
