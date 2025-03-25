@@ -5,12 +5,10 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from matplotlib.dates import DateFormatter
 from scipy.stats import norm
-from datetime import datetime
 from tqdm import tqdm
 import math
 
 
-# Need to run everything from main to right before bm_pfs in 5 - base case
 # Load base case portfolios -----------
 def load_base_case_portfolios(base_path):
     """

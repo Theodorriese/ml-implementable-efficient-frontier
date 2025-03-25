@@ -6,8 +6,9 @@ from datetime import datetime
 from b_prepare_data import load_cluster_labels, load_risk_free, load_daily_returns_pkl
 from d_estimate_cov_matrix import prepare_cluster_data  # Covariance estimation
 from e_prepare_portfolio_data import run_prepare_portfolio_data  # Portfolio prep
-from f_feature_importance_ret import run_counterfactuals
 from f_feature_importance_base import run_feature_importance_base
+from f_feature_importance_ret import run_counterfactuals
+from f_feature_importance_IEF import run_feature_importance_IEF
 from f_base_case import run_f_base_case
 from i1_Main import settings, pf_set, features
 
@@ -244,6 +245,22 @@ if config_params.get('update_fi_base', True):
         output_path=output_path
     )
 
+# -------------------- Feature Importance - IEF Case --------------------
+if config_params.get('update_fi_ief', True):
+    print("Running Feature Importance IEF Case...")
+
+    run_feature_importance_IEF(
+        chars=portfolio_data['chars'],
+        barra_cov=barra_cov,
+        wealth=wealth,
+        dates_oos=dates_oos,
+        risk_free=risk_free,
+        settings=settings,
+        pf_set=pf_set,
+        lambda_list=portfolio_data['lambda_list'],
+        output_path=output_path,
+        cluster_labels=cluster_labels
+    )
 
 # # ---------------- Feature importance - Expected return models ---------------- #
 #

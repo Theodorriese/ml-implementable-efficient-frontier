@@ -20,7 +20,7 @@ def load_pfml_for_gamma(gamma_rel, ief_path, settings):
 
 
 def implement_pfml_cf_clusters(chars, pfml, dates_oos, barra_cov, settings, pf_set, wealth, risk_free,
-                               gamma_rel, lambda_list):
+                               gamma_rel, lambda_list, cluster_labels):
     """
     Implement PFML for specified clusters with lambda_list.
 
@@ -35,6 +35,7 @@ def implement_pfml_cf_clusters(chars, pfml, dates_oos, barra_cov, settings, pf_s
         risk_free (pd.DataFrame): Risk-free rate data.
         gamma_rel (float): Gamma value for risk aversion.
         lambda_list (dict): Lambda values for each date.
+        cluster_labels (Any): Cluster labels to be passed to pfml_cf_fun.
 
     Returns:
         pd.DataFrame: Combined PFML cluster results.
@@ -45,22 +46,24 @@ def implement_pfml_cf_clusters(chars, pfml, dates_oos, barra_cov, settings, pf_s
     for cf_cluster in ief_cf_clusters:
         print(f"Processing cluster: {cf_cluster} with gamma: {gamma_rel}")
         cluster_result = pfml_cf_fun(
-            data=chars[chars["valid"] == True],  # Filter valid rows
+            data=chars[chars["valid"] == True],
             cf_cluster=cf_cluster,
             pfml_base=pfml,
             dates=dates_oos,
             cov_list=barra_cov,
-            lambda_list=lambda_list,  # Pass lambda_list here
+            lambda_list=lambda_list,
             scale=settings["pf_ml"]["scale"],
             orig_feat=settings["pf_ml"]["orig_feat"],
-            gamma_rel=gamma_rel,
+            gamma_rel=pf_set["gamma_rel"],  # Consistent usage of 'gamma_rel'
             wealth=wealth,
             risk_free=risk_free,
             mu=pf_set["mu"],
             iter=10,
             seed=settings["seed_no"],
-            features=pf_set["features"],  # Pass features explicitly
+            features=pf_set["features"],  # Passed from 'pf_set'
+            cluster_labels=cluster_labels  # Passed directly as input
         )
+
         cluster_result["gamma_rel"] = gamma_rel
         pfml_cf_base.append(cluster_result)
 
@@ -68,7 +71,7 @@ def implement_pfml_cf_clusters(chars, pfml, dates_oos, barra_cov, settings, pf_s
 
 
 def portfolio_ml_ief(chars, barra_cov, wealth, dates_oos, risk_free, settings, pf_set, lambda_list,
-                     output_path):
+                     output_path, cluster_labels):
     """
     Implement Portfolio-ML - IEF.
 
@@ -82,6 +85,7 @@ def portfolio_ml_ief(chars, barra_cov, wealth, dates_oos, risk_free, settings, p
         pf_set (dict): Portfolio settings.
         lambda_list (dict): Lambda values for each date.
         output_path (str): Path to save results.
+        cluster_labels (Any): Cluster labels to be passed to implement_pfml_cf_clusters.
     """
     print("Implementing Portfolio-ML - IEF...")
     ief_path = "Data/Generated/Portfolios/IEF/"
@@ -89,7 +93,7 @@ def portfolio_ml_ief(chars, barra_cov, wealth, dates_oos, risk_free, settings, p
 
     for gamma_rel in settings["ef"]["gamma_rel"]:
         print(f"Processing gamma: {gamma_rel}")
-        pfml = load_pfml_for_gamma(gamma_rel, ief_path, settings)  # Load PFML for the given gamma
+        pfml = load_pfml_for_gamma(gamma_rel, ief_path, settings)
         pfml_cf_base = implement_pfml_cf_clusters(
             chars=chars,
             pfml=pfml,
@@ -100,7 +104,8 @@ def portfolio_ml_ief(chars, barra_cov, wealth, dates_oos, risk_free, settings, p
             wealth=wealth,
             risk_free=risk_free,
             gamma_rel=gamma_rel,
-            lambda_list=lambda_list,  # Pass lambda_list here
+            lambda_list=lambda_list,
+            cluster_labels=cluster_labels
         )
         pfml_cf_ief.append(pfml_cf_base)
 
@@ -110,7 +115,8 @@ def portfolio_ml_ief(chars, barra_cov, wealth, dates_oos, risk_free, settings, p
 
 
 # Main function
-def run_feature_importance_IEF(chars, barra_cov, wealth, dates_oos, risk_free, settings, pf_set, lambda_list, output_path):
+def run_feature_importance_IEF(chars, barra_cov, wealth, dates_oos, risk_free, settings, pf_set, lambda_list,
+                               output_path, cluster_labels):
     """
     Main function to execute Portfolio-ML IEF.
 
@@ -124,7 +130,18 @@ def run_feature_importance_IEF(chars, barra_cov, wealth, dates_oos, risk_free, s
         pf_set (dict): Portfolio settings.
         lambda_list (dict): Lambda values for each date.
         output_path (str): Path to save the output.
+        cluster_labels (Any): Cluster labels to be passed to portfolio_ml_ief.
     """
     print("Starting Portfolio-ML IEF execution...")
-    portfolio_ml_ief(chars, barra_cov, wealth, dates_oos, risk_free, settings, pf_set, lambda_list, output_path)
-
+    portfolio_ml_ief(
+        chars=chars,
+        barra_cov=barra_cov,
+        wealth=wealth,
+        dates_oos=dates_oos,
+        risk_free=risk_free,
+        settings=settings,
+        pf_set=pf_set,
+        lambda_list=lambda_list,
+        output_path=output_path,
+        cluster_labels=cluster_labels
+    )

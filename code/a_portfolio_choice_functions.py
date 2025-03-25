@@ -210,7 +210,8 @@ def tpf_implement(data, cov_list, wealth, dates, gam):
     return {"w": tpf_w, "pf": tpf_pf}
 
 
-def tpf_cf_fun(data, cf_cluster, er_models, cluster_labels, wealth, gamma_rel, cov_list, dates, seed, features):
+def tpf_cf_fun(data, cf_cluster, er_models, cluster_labels, wealth,
+               gamma_rel, cov_list, dates, seed, features):
     """
     Counterfactual Tangency Portfolio Implementation.
     """
@@ -532,7 +533,8 @@ def mv_implement(data, cov_list, wealth, dates):
     return {"w": mv_w, "pf": mv_pf}
 
 
-def static_val_fun(data, dates, cov_list, lambda_list, wealth, cov_type, gamma_rel, k=None, g=None, u=None, hps=None):
+def static_val_fun(data, dates, cov_list, lambda_list, wealth, cov_type,
+                   gamma_rel, k=None, g=None, u=None, hps=None):
     """
     Static portfolio validation for ML-based portfolios.
 
@@ -1453,6 +1455,8 @@ def pfml_w(data: pd.DataFrame, dates: list, cov_list: dict, lambda_list: dict, g
         iden = np.eye(m.shape[0])
 
         # Merge aims with the existing weights for this date
+        aims['id'] = aims['id'].astype(str)
+        fa_weights['id'] = fa_weights['id'].astype(str)
         w_cur = aims.loc[aims['eom'] == cur_date, ['id','eom','w_aim']].merge(
             fa_weights.loc[fa_weights['eom'] == cur_date],
             on=['id','eom'], how='left'
@@ -1695,23 +1699,20 @@ def pfml_cf_fun(data, cf_cluster, pfml_base, dates, cov_list, lambda_list, scale
     for d in dates:
         stocks = cf.loc[cf['eom'] == d, 'id']
 
-        # A workaround:
-        # Find the matching index for the current date `d` in `best_hps_list` as the
-        # items in the list are named with number (01, 02...) instead of dates. Even
-        # though they should match the dates. So, one extra safety layer
+        # Find the matching index by searching the 'eom' column in the 'aim' DataFrame of each item
         matched_index = next(
-            (i for i, item in enumerate(pfml_base['best_hps_list']) if item['eom'] == d),
+            (i for i, item in enumerate(pfml_base['best_hps_list']) if d in item['aim']['eom'].values),
             None
         )
 
         if matched_index is None:
-            raise ValueError(f"Date {d} not found in best_hps_list.")
+            raise ValueError(f"Date {d} not found in any 'aim' DataFrame in 'best_hps_list'.")
 
         # Accessing the values using the matched index
         best_g = pfml_base['best_hps_list'][matched_index]['g']
         best_p = pfml_base['best_hps_list'][matched_index]['p']
         aim_coef = pfml_base['best_hps_list'][matched_index]['coef']
-        W = pfml_base['hps'][str(best_g)]['rff_w'][:, :best_p // 2]
+        W = pfml_base['hps'][best_g]['rff_w'][:, :best_p // 2]
 
         # RFF for counterfactuals
         rff_x = rff(cf.loc[cf['eom'] == d, features].values, W=W)
@@ -1728,6 +1729,9 @@ def pfml_cf_fun(data, cf_cluster, pfml_base, dates, cov_list, lambda_list, scale
 
         aim_cf.append(pd.DataFrame({'id': stocks, 'eom': d, 'w_aim': s @ aim_coef}))
 
+    if not aim_cf:
+        return pd.DataFrame()
+
     aim_cf = pd.concat(aim_cf, ignore_index=True)
 
     # Compute weights using the aim portfolio
@@ -1735,6 +1739,9 @@ def pfml_cf_fun(data, cf_cluster, pfml_base, dates, cov_list, lambda_list, scale
     pf_cf = pf_ts_fun(w_cf, data, wealth)
     pf_cf['type'] = "Portfolio-ML"
     pf_cf['cluster'] = cf_cluster
+
+    # Remove rows where relevant columns are 0
+    pf_cf = pf_cf[~(pf_cf[['inv', 'shorting', 'turnover', 'r', 'tc']].sum(axis=1) == 0)]
 
     return pf_cf
 
