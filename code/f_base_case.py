@@ -1,5 +1,6 @@
 import pandas as pd
 import pickle
+import os
 from a_portfolio_choice_functions import (tpf_implement, factor_ml_implement, mkt_implement, ew_implement, rw_implement,
                                           mv_implement, static_implement, pfml_implement, mp_implement)
 
@@ -19,22 +20,27 @@ def benchmark_portfolios(chars, barra_cov, wealth, dates_oos, pf_set, settings, 
     """
     print("Generating Markowitz-ML Portfolio...")
     tpf = tpf_implement(chars, cov_list=barra_cov, wealth=wealth, dates=dates_oos, gam=pf_set["gamma_rel"])
+    pd.to_pickle(tpf, os.path.join(output_path, "tpf.pkl"))
 
     print("Generating Factor-ML Portfolio...")
-    factor_ml = factor_ml_implement(chars, dates=dates_oos, n_pfs=settings["factor_ml"]["n_pfs"],
-                                    wealth=wealth)
+    factor_ml = factor_ml_implement(chars, dates=dates_oos, n_pfs=settings["factor_ml"]["n_pfs"], wealth=wealth)
+    pd.to_pickle(factor_ml, os.path.join(output_path, "factor_ml.pkl"))
 
     print("Generating Market Portfolio...")
     mkt = mkt_implement(chars, dates=dates_oos, wealth=wealth)
+    pd.to_pickle(mkt, os.path.join(output_path, "mkt.pkl"))
 
     print("Generating 1/N Portfolio...")
     ew = ew_implement(chars, dates=dates_oos, wealth=wealth)
+    pd.to_pickle(ew, os.path.join(output_path, "ew.pkl"))
 
     print("Generating Rank-Weighted Portfolio...")
     rw = rw_implement(chars, dates=dates_oos, wealth=wealth)
+    pd.to_pickle(rw, os.path.join(output_path, "rw.pkl"))
 
     print("Generating Minimum Variance Portfolio...")
     mv = mv_implement(chars, cov_list=barra_cov, dates=dates_oos, wealth=wealth)
+    pd.to_pickle(mv, os.path.join(output_path, "mv.pkl"))
 
     # Filter out any None values to avoid errors
     portfolio_results = [tpf, factor_ml, ew, mkt, rw, mv]
@@ -43,7 +49,12 @@ def benchmark_portfolios(chars, barra_cov, wealth, dates_oos, pf_set, settings, 
     if valid_portfolios:
         print("Combining Benchmark Portfolios...")
         bm_pfs = pd.concat(valid_portfolios, ignore_index=True)
+
+        # Save as CSV
         bm_pfs.to_csv(f"{output_path}/bms.csv", index=False)
+
+        # Save the full dictionary as .pkl
+        pd.to_pickle({"bm_pfs": bm_pfs}, os.path.join(output_path, "bms.pkl"))
     else:
         print("No valid benchmark portfolios generated.")
 
@@ -188,16 +199,17 @@ def run_f_base_case(chars, barra_cov, wealth, dates_oos, pf_set, settings, confi
         output_path (str): Path to save the output.
     """
     # Run benchmark portfolios
-    # benchmark_portfolios(chars, barra_cov, wealth, dates_oos, pf_set, settings, output_path)
+    benchmark_portfolios(chars, barra_cov, wealth, dates_oos, pf_set, settings, output_path)
 
     # Run Static-ML
     static_ml(chars, barra_cov, lambda_list, wealth, pf_set, settings, dates_oos, dates_hp, output_path)
 
     # Run Portfolio-ML
-    # portfolio_ml(chars, barra_cov, lambda_list, features, risk_free, wealth, pf_set, settings, dates_m2, dates_oos, hp_years, output_path)
+    portfolio_ml(chars, barra_cov, lambda_list, features, risk_free, wealth, pf_set, settings, dates_m2,
+                 dates_oos, hp_years, output_path)
 
     # Run Multiperiod-ML
-    # multiperiod_ml(config_params, chars, barra_cov, lambda_list, risk_free, wealth, pf_set, settings,
-    #                dates_oos, dates_hp, output_path)
+    multiperiod_ml(config_params, chars, barra_cov, lambda_list, risk_free, wealth, pf_set, settings,
+                   dates_oos, dates_hp, output_path)
 
 

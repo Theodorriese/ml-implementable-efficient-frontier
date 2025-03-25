@@ -202,26 +202,26 @@ dates_m1, dates_m2, dates_oos, dates_hp, hp_years = (
 
 print("Loaded portfolio data from latest folder.")
 
-# -------------------- Step 4: Run Base Case and Feature Importance --------------------
-# if config_params["update_base"]:
-#     print("Running Base Case...")
-#
-#     run_f_base_case(
-#         chars=portfolio_data["chars"],
-#         barra_cov=barra_cov,
-#         wealth=wealth,
-#         dates_oos=dates_oos,
-#         pf_set=pf_set,
-#         settings=settings,
-#         config_params=config_params,
-#         lambda_list=portfolio_data["lambda_list"],
-#         risk_free=risk_free,
-#         features=features,
-#         dates_m2=dates_m2,
-#         dates_hp=dates_hp,
-#         hp_years=hp_years,
-#         output_path=output_path
-#     )
+# -------------------------- Step 4: Run Base Case ------------------------------
+if config_params["update_base"]:
+    print("Running Base Case...")
+
+    run_f_base_case(
+        chars=portfolio_data["chars"],
+        barra_cov=barra_cov,
+        wealth=wealth,
+        dates_oos=dates_oos,
+        pf_set=pf_set,
+        settings=settings,
+        config_params=config_params,
+        lambda_list=portfolio_data["lambda_list"],
+        risk_free=risk_free,
+        features=features,
+        dates_m2=dates_m2,
+        dates_hp=dates_hp,
+        hp_years=hp_years,
+        output_path=output_path
+    )
 
 
 # ----------------- Step 5: Run the feature importance scripts -----------------

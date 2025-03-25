@@ -18,7 +18,7 @@ def load_base_case_portfolios(base_path):
         base_path (str): Path to the base portfolio directory.
 
     Returns:
-        dict: Dictionary containing dataframes for 'mp', 'pfml', 'static', and 'bm_pfs'.
+        dict: Dictionary containing dataframes for 'mp', 'pfml', 'static', 'bm_pfs', 'tpf', and 'factor_ml'.
     """
     # Locate the base folder
     base_folder = next(os.walk(base_path))[1][0]
@@ -28,12 +28,21 @@ def load_base_case_portfolios(base_path):
     pfml = pd.read_pickle(os.path.join(base_path, base_folder, "portfolio-ml.pkl"))
     static = pd.read_pickle(os.path.join(base_path, base_folder, "static-ml.pkl"))
     bm_pfs = pd.read_csv(os.path.join(base_path, base_folder, "bms.csv"))
+    tpf = pd.read_pickle(os.path.join(base_path, base_folder, "tpf.pkl"))
+    factor_ml = pd.read_pickle(os.path.join(base_path, base_folder, "factor_ml.pkl"))
 
     # Update type naming convention for bm_pfs
     bm_pfs["eom_ret"] = pd.to_datetime(bm_pfs["eom_ret"])
     bm_pfs["type"] = bm_pfs["type"].replace("Rank-Weighted", "Rank-ML")
 
-    return {"mp": mp, "pfml": pfml, "static": static, "bm_pfs": bm_pfs}
+    return {
+        "mp": mp,
+        "pfml": pfml,
+        "static": static,
+        "bm_pfs": bm_pfs,
+        "tpf": tpf,
+        "factor_ml": factor_ml
+    }
 
 
 # Final Portfolios ---------------------
@@ -55,7 +64,7 @@ def combine_portfolios(mp, pfml, static, bm_pfs, pf_order_new, gamma_rel):
     # Ensure all relevant dates are converted to Timestamps
     mp['pf']['eom_ret'] = pd.to_datetime(mp['pf']['eom_ret'])
     pfml['pf']['eom_ret'] = pd.to_datetime(pfml['pf']['eom_ret'])
-    static['pf']['eom_ret'] = pd.to_datetime(static['pf']['eom_ret'])  # Now reading 'pf' from static
+    static['pf']['eom_ret'] = pd.to_datetime(static['pf']['eom_ret'])
     bm_pfs['eom_ret'] = pd.to_datetime(bm_pfs['eom_ret'])
 
     # Process each component separately
@@ -162,9 +171,10 @@ def compute_and_plot_performance_time_series(pfs, main_types, start_date, end_da
         matplotlib.figure.Figure: Figure containing the cumulative performance plots.
     """
     # Filter and compute cumulative returns
-    pfs['cumret'] = pfs.groupby('type')['r'].cumsum()
-    pfs['cumret_tc'] = pfs.groupby('type').apply(lambda x: x['r'] - x['tc']).groupby(level=0).cumsum()
-    pfs['cumret_tc_risk'] = pfs.groupby('type').apply(lambda x: x['utility_t']).groupby(level=0).cumsum()
+    pfs['cumret'] = pfs.groupby('type', observed=True)['r'].cumsum()
+    pfs['cumret_tc'] = pfs['r'] - pfs['tc']
+    pfs['cumret_tc'] = pfs.groupby('type', observed=True)['cumret_tc'].cumsum()
+    pfs['cumret_tc_risk'] = pfs.groupby('type', observed=True)['utility_t'].cumsum()
 
     # Filter for main types and reshape data
     ts_data = (
@@ -183,7 +193,7 @@ def compute_and_plot_performance_time_series(pfs, main_types, start_date, end_da
 
     # Create pretty labels for the metrics
     metric_labels = {
-        'cumret': 'Gross return',
+        'cumret': 'Gross Return',
         'cumret_tc': 'Return net of TC',
         'cumret_tc_risk': 'Return net of TC and Risk'
     }
@@ -196,18 +206,26 @@ def compute_and_plot_performance_time_series(pfs, main_types, start_date, end_da
 
     for ax, metric in zip(axes, ts_data['metric_pretty'].cat.categories):
         plot_data = ts_data[ts_data['metric_pretty'] == metric]
+
         for portfolio_type in main_types:
             portfolio_data = plot_data[plot_data['type'] == portfolio_type]
             ax.plot(portfolio_data['eom_ret'], portfolio_data['value'], label=portfolio_type)
+
         ax.set_title(metric)
         ax.set_xlabel("")
         ax.set_ylabel("Cumulative Performance")
         ax.xaxis.set_major_formatter(DateFormatter('%Y'))
+        ax.tick_params(axis='x', rotation=45)
+        ax.grid(True)
+
+        # Set axis limits
         ax.set_xlim(pd.Timestamp(start_date), pd.Timestamp(end_date))
-        if metric == 'Gross return':
+
+        if metric == 'Gross Return':
             max_val = plot_data[plot_data['type'] != "Markowitz-ML"]['value'].max()
             min_val = plot_data[plot_data['type'] != "Markowitz-ML"]['value'].min()
             ax.set_ylim(min_val, max_val)
+
         ax.legend(loc="upper left", fontsize='small', title="Method:")
 
     # Adjust layout
@@ -273,14 +291,24 @@ def compute_expected_risk(dates, cov_list, weights):
         pd.DataFrame: DataFrame containing expected risks for each portfolio and date.
     """
     risk_records = []
+
     for date in dates:
         if date in cov_list:
             cov_matrix = cov_list[date]
+
+            if isinstance(cov_matrix, pd.DataFrame):  # Ensure it's a numpy array
+                cov_matrix = cov_matrix.values
+
             weights_at_date = weights[weights["eom"] == date]
+
             for portfolio_type in weights_at_date["type"].unique():
-                w = weights_at_date[weights_at_date["type"] == portfolio_type]["weights"].values
-                risk = np.dot(w.T, np.dot(cov_matrix, w))  # Portfolio variance
-                risk_records.append({"type": portfolio_type, "eom": date, "pf_var": risk})
+                w = weights_at_date.loc[weights_at_date["type"] == portfolio_type, "w"].values.flatten()
+
+                if len(w) == cov_matrix.shape[0]:  # Making sure weights match the covariance matrix size
+                    risk = np.dot(w.T, np.dot(cov_matrix, w))  # Portfolio variance
+                    risk_records.append({"type": portfolio_type, "eom": date, "pf_var": risk})
+                else:
+                    print(f"Warning: Size mismatch for weights and covariance matrix on {date} for {portfolio_type}")
 
     return pd.DataFrame(risk_records)
 

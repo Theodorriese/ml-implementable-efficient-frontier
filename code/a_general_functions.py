@@ -72,37 +72,6 @@ def create_lambda(x, ids):
     return np.diag([x[i] for i in ids])
 
 
-
-# Compute expected risk
-def expected_risk_fun(ws, dates, cov_list):
-    """
-    Computes the expected portfolio risk for different portfolio types over specified dates.
-
-    Parameters:
-        ws (pd.DataFrame): DataFrame containing portfolio weights with columns ['type', 'eom', 'id', 'w'].
-        dates (list): List of dates for which to compute portfolio risk.
-        cov_list (dict): Dictionary of covariance matrices, keyed by date.
-
-    Returns:
-        pd.DataFrame: DataFrame containing portfolio type, risk (variance), and associated date.
-    """
-    ws = ws.sort_values(by=["type", "eom", "id"])
-    types = ws["type"].unique()
-    w_list = {date: group for date, group in ws.groupby("eom")}
-
-    results = []
-    for d in dates:
-        w_sub = w_list.get(d)
-        if w_sub is not None:
-            ids = w_sub["id"].unique()
-            sigma = create_cov(cov_list[d], ids)
-            for t in types:
-                w = w_sub.loc[w_sub["type"] == t, "w"].values
-                pf_var = w.T @ sigma @ w
-                results.append({"type": t, "pf_var": pf_var, "eom": d})
-    return pd.DataFrame(results)
-
-
 # Long horizon returns
 def long_horizon_ret(data, h, impute):
     """
@@ -170,7 +139,6 @@ def long_horizon_ret(data, h, impute):
     full_ret.drop(columns=["start", "end"], inplace=True)
 
     return full_ret
-
 
 
 # Sigma adjustment
