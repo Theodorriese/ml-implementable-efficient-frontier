@@ -1694,9 +1694,23 @@ def pfml_cf_fun(data, cf_cluster, pfml_base, dates, cov_list, lambda_list, scale
     aim_cf = []
     for d in dates:
         stocks = cf.loc[cf['eom'] == d, 'id']
-        best_g = pfml_base['best_hps_list'][d]['g']
-        best_p = pfml_base['best_hps_list'][d]['p']
-        aim_coef = pfml_base['best_hps_list'][d]['coef']
+
+        # A workaround:
+        # Find the matching index for the current date `d` in `best_hps_list` as the
+        # items in the list are named with number (01, 02...) instead of dates. Even
+        # though they should match the dates. So, one extra safety layer
+        matched_index = next(
+            (i for i, item in enumerate(pfml_base['best_hps_list']) if item['eom'] == d),
+            None
+        )
+
+        if matched_index is None:
+            raise ValueError(f"Date {d} not found in best_hps_list.")
+
+        # Accessing the values using the matched index
+        best_g = pfml_base['best_hps_list'][matched_index]['g']
+        best_p = pfml_base['best_hps_list'][matched_index]['p']
+        aim_coef = pfml_base['best_hps_list'][matched_index]['coef']
         W = pfml_base['hps'][str(best_g)]['rff_w'][:, :best_p // 2]
 
         # RFF for counterfactuals
