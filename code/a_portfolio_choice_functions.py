@@ -190,7 +190,7 @@ def tpf_implement(data, cov_list, wealth, dates, gam):
         try:
             w_opt = np.dot(np.linalg.pinv(sigma), pred_ld1) / gam  # Use pseudo-inverse for robustness
         except np.linalg.LinAlgError:
-            continue  # Skip if there's a numerical issue
+            continue  # Skip if numerical issue
 
         data_sub["id"] = data_sub["id"].astype(str)
         data_sub = data_sub.loc[data_sub["id"].isin(sigma.index)].assign(w=w_opt)
@@ -201,7 +201,8 @@ def tpf_implement(data, cov_list, wealth, dates, gam):
 
     tpf_opt = pd.concat(tpf_opt, ignore_index=True)
 
-    data_filtered = data[data['eom'].isin(dates)]
+    # Compute final portfolio weights and performance
+    data_filtered = data[(data['eom'].isin(dates)) & (data['valid'] == True)]
     tpf_w = w_fun(data_filtered, dates, tpf_opt, wealth)
     tpf_pf = pf_ts_fun(tpf_w, data, wealth)
 
@@ -463,7 +464,7 @@ def rw_implement(data, wealth, dates):
 
 def mv_implement(data, cov_list, wealth, dates):
     """
-    Minimum-variance portfolio implementation using `create_cov`.
+    Minimum-variance portfolio implementation.
 
     Parameters:
         data (pd.DataFrame): Portfolio data.
@@ -490,7 +491,7 @@ def mv_implement(data, cov_list, wealth, dates):
             continue  # Skip if no data for the date
 
         data_sub = data_split[d]
-        ids = data_sub['id'].astype(str).values  # Convert to str
+        ids = data_sub['id'].astype(str).values
 
         # Retrieve covariance data and construct sigma using create_cov
         sigma_data = cov_list.get(d, None)

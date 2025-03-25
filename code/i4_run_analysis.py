@@ -1,18 +1,21 @@
 import os
 import pandas as pd
+from b_prepare_data import load_cluster_labels
 from g_base_analysis import (
     load_base_case_portfolios, combine_portfolios, compute_portfolio_summary,
     compute_and_plot_performance_time_series, compute_probability_of_outperformance,
     compute_and_plot_portfolio_statistics_over_time, compute_and_plot_correlation_matrix,
-    plot_apple_vs_xerox
+    plot_apple_vs_xerox, plot_optimal_hyperparameters, compute_ar1_plot
 )
 from i1_Main import settings, pf_set, features, pf_order, pf_order_new, main_types, cluster_order
 
 
 # -------------------- CONFIGURATION --------------------
+data_path = r"C:\Master"
 base_path = r"C:\Master\Data\Generated\Portfolios"
 output_path = r"C:\Master\Data\Generated\Analysis"
 latest_folder = r"C:\Master\Data\Generated\Portfolios\demo"
+model_folder = r"C:\Master\Outputs"
 
 if not os.path.exists(output_path):
     os.makedirs(output_path)
@@ -36,6 +39,10 @@ dates_path = os.path.join(latest_folder, "dates.pkl")
 chars = pd.read_pickle(chars_path)
 lambda_list = pd.read_pickle(lambda_list_path)
 dates_data = pd.read_pickle(dates_path)
+
+# Load cluster labels
+cluster_labels = load_cluster_labels(data_path)
+print("Loaded cluster labels")
 
 # Extract dates
 dates_oos = dates_data["dates_oos"]
@@ -68,67 +75,98 @@ static = base_case["static"]
 bm_pfs = base_case["bm_pfs"]
 tpf = base_case["tpf"]
 factor_ml = base_case["factor_ml"]
-
-
-# Combine portfolios
-pfs = combine_portfolios(mp, pfml, static, bm_pfs, pf_order, gamma_rel)
-
-# 2) Compute portfolio summary
-pf_summary, filtered_pfs = compute_portfolio_summary(pfs, main_types, pf_order_new, gamma_rel)
-pf_summary.to_csv(os.path.join(output_path, "portfolio_summary.csv"), index=False)
+mkt = base_case["mkt"]
 
 
 
-# -------------------- 1) PERFORMANCE TIME SERIES --------------------
-print("Computing and plotting performance time series...")
 
-# Dynamically determine start_date and end_date based on pfs['eom_ret']
-start_date = pd.to_datetime(pfs['eom_ret'].min()).strftime('%Y-%m-%d')
-end_date = pd.to_datetime(pfs['eom_ret'].max()).strftime('%Y-%m-%d')
+# # Combine portfolios
+# pfs = combine_portfolios(mp, pfml, static, bm_pfs, pf_order, gamma_rel)
+#
+# # 2) Compute portfolio summary
+# pf_summary, filtered_pfs = compute_portfolio_summary(pfs, main_types, pf_order_new, gamma_rel)
+# pf_summary.to_csv(os.path.join(output_path, "portfolio_summary.csv"), index=False)
+#
+#
+#
+# # -------------------- 1) PERFORMANCE TIME SERIES --------------------
+# print("Computing and plotting performance time series...")
+#
+# # Dynamically determine start_date and end_date based on pfs['eom_ret']
+# start_date = pd.to_datetime(pfs['eom_ret'].min()).strftime('%Y-%m-%d')
+# end_date = pd.to_datetime(pfs['eom_ret'].max()).strftime('%Y-%m-%d')
+#
+# # Now, plot the performance time series
+# performance_fig = compute_and_plot_performance_time_series(filtered_pfs, main_types, start_date, end_date)
+# performance_fig.savefig(os.path.join(output_path, "performance_time_series.png"))
+#
+#
+# # -------------------- PROBABILITY OF OUTPERFORMANCE --------------------
+# print("Computing probability of outperformance...")
+#
+# prob_outperformance_df = compute_probability_of_outperformance(filtered_pfs, main_types)
+# prob_outperformance_df.to_csv(os.path.join(output_path, "probability_of_outperformance.csv"), index=False)
+#
+# # -------------------- PORTFOLIO STATISTICS OVER TIME --------------------
+# print("Computing portfolio statistics over time...")
+#
+# compute_and_plot_portfolio_statistics_over_time(
+#     pfml=pfml,
+#     tpf=tpf,
+#     mp=mp,
+#     static=static,
+#     factor_ml=factor_ml,
+#     pfs=pfs,
+#     barra_cov=barra_cov,
+#     dates_oos=dates_oos,
+#     pf_order=pf_order,
+#     main_types=main_types
+# )
+#
+#
+# # -------------------- CORRELATION MATRIX --------------------
+# print("Computing and plotting correlation matrix...")
+#
+# correlation_matrix = compute_and_plot_correlation_matrix(filtered_pfs, main_types)
+# correlation_matrix.to_csv(os.path.join(output_path, "correlation_matrix.csv"))
+#
+# # -------------------- APPLE VS. XEROX PLOT --------------------
+# print("Generating plot...")
+#
+# liquid_id = 22111
+# illiquid_id = 27983
+# start_year = 2019
+#
+# plot_apple_vs_xerox(
+#     mp=mp,
+#     pfml=pfml,
+#     static=static,
+#     tpf=tpf,
+#     factor_ml=factor_ml,
+#     mkt=mkt,
+#     pfs=pfs,
+#     liquid_id=liquid_id,
+#     illiquid_id=illiquid_id,
+#     start_year=start_year
+# )
 
-# Now, plot the performance time series
-performance_fig = compute_and_plot_performance_time_series(filtered_pfs, main_types, start_date, end_date)
-performance_fig.savefig(os.path.join(output_path, "performance_time_series.png"))
+
+# # Optimal Hyper-parameters Plot
+# plot_optimal_hyperparameters(
+#     model_folder=model_folder,
+#     mp=mp["hps"],
+#     static=static["hps"],
+#     pfml=pfml["best_hps"],
+#     colours_theme=colours_theme,
+#     start_year=start_year
+# )
 
 
-# -------------------- PROBABILITY OF OUTPERFORMANCE --------------------
-print("Computing probability of outperformance...")
-
-prob_outperformance_df = compute_probability_of_outperformance(filtered_pfs, main_types)
-prob_outperformance_df.to_csv(os.path.join(output_path, "probability_of_outperformance.csv"), index=False)
-
-# -------------------- PORTFOLIO STATISTICS OVER TIME --------------------
-print("Computing portfolio statistics over time...")
-
-compute_and_plot_portfolio_statistics_over_time(
-    pfml=pfml,
-    tpf=tpf,
-    mp=mp,
-    static=static,
-    factor_ml=factor_ml,
-    pfs=pfs,
-    barra_cov=barra_cov,
-    dates_oos=dates_oos,
-    pf_order=pf_order,
-    main_types=main_types
-)
-
-
-# -------------------- CORRELATION MATRIX --------------------
-print("Computing and plotting correlation matrix...")
-
-correlation_matrix = compute_and_plot_correlation_matrix(filtered_pfs, main_types)
-correlation_matrix.to_csv(os.path.join(output_path, "correlation_matrix.csv"))
-
-# -------------------- APPLE VS. XEROX PLOT --------------------
-print("Generating Apple vs. Xerox plot...")
-
-liquid_id = 22111  # Johnson & Johnson (example liquid stock ID)
-illiquid_id = 27983  # Xerox (example illiquid stock ID)
-
-plot_apple_vs_xerox(
-    mp, pfml, static, bm_pfs, filtered_pfs,
-    liquid_id, illiquid_id, start_year=2015
+compute_ar1_plot(
+    chars=chars,
+    features=features,
+    cluster_labels=cluster_labels,
+    output_path=output_path
 )
 
 print("Analysis completed successfully!")

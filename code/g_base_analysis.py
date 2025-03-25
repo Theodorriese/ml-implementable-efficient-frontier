@@ -7,6 +7,7 @@ from matplotlib.dates import DateFormatter
 from scipy.stats import norm
 from tqdm import tqdm
 import math
+from a_general_functions import create_cov
 
 
 # Load base case portfolios -----------
@@ -18,7 +19,7 @@ def load_base_case_portfolios(base_path):
         base_path (str): Path to the base portfolio directory.
 
     Returns:
-        dict: Dictionary containing dataframes for 'mp', 'pfml', 'static', 'bm_pfs', 'tpf', and 'factor_ml'.
+        dict: Dictionary containing dataframes for 'mp', 'pfml', 'static', 'bm_pfs', 'tpf', 'factor_ml', and 'mkt'.
     """
     # Locate the base folder
     base_folder = next(os.walk(base_path))[1][0]
@@ -30,6 +31,7 @@ def load_base_case_portfolios(base_path):
     bm_pfs = pd.read_csv(os.path.join(base_path, base_folder, "bms.csv"))
     tpf = pd.read_pickle(os.path.join(base_path, base_folder, "tpf.pkl"))
     factor_ml = pd.read_pickle(os.path.join(base_path, base_folder, "factor_ml.pkl"))
+    mkt = pd.read_pickle(os.path.join(base_path, base_folder, "mkt.pkl"))
 
     # Update type naming convention for bm_pfs
     bm_pfs["eom_ret"] = pd.to_datetime(bm_pfs["eom_ret"])
@@ -41,7 +43,8 @@ def load_base_case_portfolios(base_path):
         "static": static,
         "bm_pfs": bm_pfs,
         "tpf": tpf,
-        "factor_ml": factor_ml
+        "factor_ml": factor_ml,
+        "mkt": mkt  # Include market portfolio
     }
 
 
@@ -284,7 +287,7 @@ def compute_expected_risk(dates, cov_list, weights):
 
     Parameters:
         dates (list): Out-of-sample dates.
-        cov_list (dict): Covariance matrices.
+        cov_list (dict): Covariance matrices (as dictionaries with keys: 'fct_load', 'fct_cov', 'ivol_vec').
         weights (pd.DataFrame): Portfolio weights.
 
     Returns:
@@ -292,24 +295,36 @@ def compute_expected_risk(dates, cov_list, weights):
     """
     risk_records = []
 
+    # Sort weights to ensure consistency
+    weights = weights.sort_values(by=['type', 'eom', 'id'])
+    weights_list = {date: weights[weights["eom"] == date] for date in dates}
+
     for date in dates:
-        if date in cov_list:
-            cov_matrix = cov_list[date]
+        if date not in cov_list:
+            continue
 
-            if isinstance(cov_matrix, pd.DataFrame):  # Ensure it's a numpy array
-                cov_matrix = cov_matrix.values
+        # Generate the covariance matrix for the date in the loop
+        w_sub = weights_list.get(date)
 
-            weights_at_date = weights[weights["eom"] == date]
+        if w_sub is None or w_sub.empty:
+            continue
 
-            for portfolio_type in weights_at_date["type"].unique():
-                w = weights_at_date.loc[weights_at_date["type"] == portfolio_type, "w"].values.flatten()
+        sigma = create_cov(cov_list[date])
 
-                if len(w) == cov_matrix.shape[0]:  # Making sure weights match the covariance matrix size
-                    risk = np.dot(w.T, np.dot(cov_matrix, w))  # Portfolio variance
-                    risk_records.append({"type": portfolio_type, "eom": date, "pf_var": risk})
-                else:
-                    print(f"Warning: Size mismatch for weights and covariance matrix on {date} for {portfolio_type}")
+        if sigma is None or sigma.shape[0] == 0:
+            continue
 
+        # Loop through all portfolio types for this date
+        for portfolio_type in w_sub["type"].unique():
+            w = w_sub.loc[w_sub["type"] == portfolio_type, "w"].values.flatten()
+
+            if len(w) == sigma.shape[0]:  # Check if the sizes match
+                pf_var = np.dot(w.T, np.dot(sigma, w))  # Calculate variance
+                risk_records.append({"type": portfolio_type, "pf_var": pf_var, "eom": date})
+            else:
+                print(f"Warning: Size mismatch for {portfolio_type} on {date}")
+
+    # Return results as a DataFrame
     return pd.DataFrame(risk_records)
 
 
@@ -363,7 +378,7 @@ def compute_and_plot_portfolio_statistics_over_time(pfml, tpf, mp, static, facto
 
     # Merge risk and portfolio statistics
     pfs = pfs.copy()
-    pfs["eom"] = pfs["eom_ret"] + pd.DateOffset(months=-1) - pd.DateOffset(days=1)
+    pfs["eom"] = (pfs["eom_ret"] - pd.offsets.MonthEnd(1))
     merged_stats = pf_vars.merge(
         pfs[["type", "eom", "inv", "turnover"]],
         on=["type", "eom"],
@@ -372,12 +387,19 @@ def compute_and_plot_portfolio_statistics_over_time(pfml, tpf, mp, static, facto
     merged_stats = merged_stats[merged_stats["type"].isin(main_types)]
 
     # Compute additional statistics
-    merged_stats["e_sd"] = np.sqrt(merged_stats["pf_var"] * 252)
-    merged_stats_long = merged_stats.drop(columns=["pf_var"]).melt(
-        id_vars=["type", "eom"], var_name="stat", value_name="value"
-    )
+    # Pre-compute e_sd as a separate series to avoid modifying the original DataFrame
+    e_sd_series = np.sqrt(merged_stats["pf_var"].values * 252)
 
-    # Map statistic names to display-friendly labels
+    # Create sub-dataframes directly instead of melting
+    dfs = [
+        merged_stats[["type", "eom"]].assign(stat="e_sd", value=e_sd_series),
+        merged_stats[["type", "eom"]].assign(stat="inv", value=merged_stats["inv"]),
+        merged_stats[["type", "eom"]].assign(stat="turnover", value=merged_stats["turnover"])
+    ]
+
+    # Concatenate all at once
+    merged_stats_long = pd.concat(dfs, ignore_index=True)
+
     stat_name_map = {
         "e_sd": "Ex-ante Volatility",
         "turnover": "Turnover",
@@ -444,82 +466,105 @@ def compute_and_plot_correlation_matrix(pfs, main_types):
 
 
 # Apple vs. Xerox ----------------------------------------------------
-def plot_apple_vs_xerox(mp, pfml, static, tpf, factor_ml, mkt, pfs, liquid_id, illiquid_id, start_year=2015):
+def plot_apple_vs_xerox(mp, pfml, static, tpf, factor_ml, mkt,
+                        pfs, liquid_id, illiquid_id, start_year):
     """
-    Generates a plot comparing portfolio weights for Apple and Xerox stocks across portfolios.
+    Compare portfolio weights for a liquid and illiquid stock across different portfolios over time.
 
     Parameters:
-        mp (pd.DataFrame): Multiperiod-ML portfolio dataframe.
-        pfml (pd.DataFrame): Portfolio-ML portfolio dataframe.
-        static (pd.DataFrame): Static-ML portfolio dataframe.
-        tpf (pd.DataFrame): Tangency portfolio dataframe.
-        factor_ml (pd.DataFrame): Factor-ML portfolio dataframe.
-        mkt (pd.DataFrame): Market portfolio dataframe.
-        pfs (pd.DataFrame): Combined portfolio dataframe for additional data.
-        liquid_id (int): ID of the liquid stock (e.g., Johnson and Johnson).
-        illiquid_id (int): ID of the illiquid stock (e.g., Xerox).
-        start_year (int): Start year for filtering data.
+    - mp, pfml, static, tpf, factor_ml, mkt: Dictionaries containing DataFrames of portfolio weights.
+    - pfs: DataFrame of additional portfolio statistics.
+    - liquid_id, illiquid_id: Stock IDs for liquid (e.g., Apple) and illiquid (e.g., Xerox) stocks.
+    - start_year: Starting year for the plot.
+
+    Returns:
+    - None. Displays the weight comparison plot.
     """
-    # Filter positions for liquid and illiquid stocks from each portfolio
+
+    liquid_id = str(liquid_id)
+    illiquid_id = str(illiquid_id)
+
+    # Generate position_frames directly, checking if "w" exists before accessing
     position_frames = [
-        mp[(mp["id"] == liquid_id) | (mp["id"] == illiquid_id)].assign(type="Multiperiod-ML*"),
-        pfml[(pfml["id"] == liquid_id) | (pfml["id"] == illiquid_id)].assign(type="Portfolio-ML"),
-        static[(static["id"] == liquid_id) | (static["id"] == illiquid_id)].assign(type="Static-ML*"),
-        tpf[(tpf["id"] == liquid_id) | (tpf["id"] == illiquid_id)].assign(type="Markowitz-ML"),
-        factor_ml[(factor_ml["id"] == liquid_id) | (factor_ml["id"] == illiquid_id)].assign(type="Factor-ML"),
-        mkt[(mkt["id"] == liquid_id) | (mkt["id"] == illiquid_id)].assign(type="Market"),
+        mp["w"][mp["w"]["id"].isin([liquid_id, illiquid_id])].assign(type="Multiperiod-ML*") if "w" in mp else None,
+        pfml["w"][pfml["w"]["id"].isin([liquid_id, illiquid_id])].assign(type="Portfolio-ML") if "w" in pfml else None,
+        static["w"][static["w"]["id"].isin([liquid_id, illiquid_id])].assign(
+            type="Static-ML*") if "w" in static else None,
+        tpf["w"][tpf["w"]["id"].isin([liquid_id, illiquid_id])].assign(type="Markowitz-ML") if "w" in tpf else None,
+        factor_ml["w"][factor_ml["w"]["id"].isin([liquid_id, illiquid_id])].assign(
+            type="Factor-ML") if "w" in factor_ml else None,
+        mkt["w"][mkt["w"]["id"].isin([liquid_id, illiquid_id])].assign(type="Market") if "w" in mkt else None,
     ]
 
-    # Combine all positions into a single DataFrame
-    positions = pd.concat(position_frames, ignore_index=True)
+    # Remove None entries from the list and concatenate all DataFrames
+    positions = pd.concat([frame for frame in position_frames if frame is not None])
 
-    # Map stock IDs to readable names
+    # Define stock type names
     stock_type_map = {
-        14593: "Apple (liquid)",
-        27983: "Xerox (illiquid)",
-        93436: "Tesla",
-        91103: "Visa",
-        19561: "Boeing",
-        10107: "Microsoft",
-        22111: "Johnson and Johnson (liquid)",
-        55976: "Walmart (liquid)",
+        "14593": "Apple (liquid)",
+        "27983": "Xerox (illiquid)",
+        "93436": "Tesla",
+        "91103": "Visa",
+        "19561": "Boeing",
+        "10107": "Microsoft",
+        "22111": "Johnson and Johnson (liquid)",
+        "55976": "Walmart (liquid)"
     }
-
-    # Add stock type labels
-    positions["stock_type"] = positions["id"].map(stock_type_map).fillna(positions["id"].astype(str))
+    positions["stock_type"] = positions["id"].map(stock_type_map).fillna(positions["id"])
 
     # Filter data by year
     positions["eom"] = pd.to_datetime(positions["eom"])
     positions = positions[positions["eom"].dt.year >= start_year]
 
-    # Add weights normalization
-    pfs["eom"] = pd.to_datetime(pfs["eom_ret"]).dt.to_period("M").dt.to_timestamp() - pd.DateOffset(days=1)
+    # Make sure the eom in pfs is end-of-month
+    pfs["eom"] = pd.to_datetime(pfs["eom_ret"]) + pd.offsets.MonthEnd(0)
+
+    # Merge with portfolio stats
     positions = pd.merge(
         positions,
         pfs[["type", "eom", "inv"]],
         on=["type", "eom"],
         how="left",
     )
+
+    # Standardize weights per stock type
     positions["w_z"] = positions.groupby(["type", "id"])["w"].transform(lambda x: (x - x.mean()) / x.std())
 
-    # Plot portfolio weights over time
-    plt.figure(figsize=(10, 6))
-    for portfolio_type in positions["type"].unique():
+    # Ensure correct ordering for plot categories
+    positions["type"] = pd.Categorical(
+        positions["type"],
+        categories=["Multiperiod-ML*", "Portfolio-ML", "Static-ML*", "Markowitz-ML", "Factor-ML", "Market"],
+        ordered=True
+    )
+
+    # Plotting
+    plt.figure(figsize=(12, 8))
+    unique_types = positions["type"].cat.categories
+
+    for i, portfolio_type in enumerate(unique_types):
         subset = positions[positions["type"] == portfolio_type]
+
+        if subset.empty:
+            continue  # Skip if no data for this type
+
+        plt.subplot(2, 3, i + 1)
+
         for stock_type in subset["stock_type"].unique():
             stock_data = subset[subset["stock_type"] == stock_type]
             plt.plot(
                 stock_data["eom"],
                 stock_data["w"],
-                label=f"{portfolio_type} - {stock_type}",
+                label=f"{stock_type}",
                 alpha=0.8,
             )
-    plt.axhline(0, color="black", linestyle="--", linewidth=0.8)
-    plt.title("Portfolio Weights Over Time: Liquid vs. Illiquid Stocks")
-    plt.xlabel("End of Month")
-    plt.ylabel("Portfolio Weight")
-    plt.legend(loc="upper right", bbox_to_anchor=(1.4, 1), fontsize=8)
-    plt.grid(True, which="both", linestyle="--", linewidth=0.5)
+
+        plt.axhline(0, color="black", linestyle="--", linewidth=0.8)
+        plt.title(portfolio_type)
+        plt.xlabel("End of Month")
+        plt.ylabel("Portfolio Weight")
+        plt.legend(loc="best", fontsize=8)
+        plt.grid(True, which="both", linestyle="--", linewidth=0.5)
+
     plt.tight_layout()
     plt.show()
 
@@ -539,21 +584,34 @@ def load_model_hyperparameters(model_path, horizon_label):
     model = pd.read_pickle(model_path)
     processed_data = []
 
-    for entry in model:
-        pred = entry["pred"]
-        opt_hps = entry["opt_hps"]
-        data = (
-            pd.concat(
-                [pred.assign(eom_ret=pred["eom"] + pd.DateOffset(months=1) - pd.DateOffset(days=1)),
-                 opt_hps[["lambda", "p", "g"]]],
-                axis=1
-            )
-            .drop_duplicates()
-            .dropna(subset=["eom_ret"])
-        )
-        data["horizon"] = horizon_label
-        processed_data.append(data)
+    for entry in model.values():
+        # Ensure the entry is valid
+        if not isinstance(entry, dict) or "pred" not in entry or "opt_hps" not in entry:
+            continue
 
+        # Extract prediction data and hyperparameters
+        pred = entry["pred"].copy()
+        opt_hps = entry["opt_hps"]
+
+        # Create eom_ret as the last day of the following month
+        pred["eom_ret"] = pd.to_datetime(pred["eom"]) + pd.DateOffset(months=1)
+        pred["eom_ret"] = pred["eom_ret"] + pd.offsets.MonthEnd(0)
+
+        # Extract unique `eom_ret` values
+        unique_eom_ret = pred[["eom_ret"]].drop_duplicates().reset_index(drop=True)
+
+        # Add hyperparameters as columns to `unique_eom_ret`
+        unique_eom_ret["lambda"] = opt_hps["lambda"]
+        unique_eom_ret["p"] = opt_hps["p"]
+        unique_eom_ret["g"] = opt_hps["g"]
+
+        # Add horizon label
+        unique_eom_ret["horizon"] = horizon_label
+
+        # Append to the processed data list
+        processed_data.append(unique_eom_ret)
+
+    # Combine all processed entries into one DataFrame
     return pd.concat(processed_data, ignore_index=True)
 
 
@@ -568,51 +626,64 @@ def process_portfolio_tuning_data(mp, static, pfml, start_year):
         start_year (int): Start year for filtering tuning results.
 
     Returns:
-        pd.DataFrame: Processed tuning data.
+        pd.DataFrame: Processed and combined tuning data.
     """
-    # Filter Multiperiod-ML data
+    # Ensure columns are present in DataFrames before processing
+    required_columns_mp_static = {"rank", "eom_ret", "k", "g", "u"}
+    required_columns_pfml = {"eom_ret", "l", "p", "g"}
+
+    if not required_columns_mp_static.issubset(mp.columns) or not required_columns_mp_static.issubset(static.columns):
+        raise ValueError("mp or static DataFrames are missing required columns.")
+
+    if not required_columns_pfml.issubset(pfml.columns):
+        raise ValueError("pfml DataFrame is missing required columns.")
+
+    # ---- Process Multiperiod-ML Data ----
     mp_hps = mp[
         (mp["rank"] == 1) &
         (mp["eom_ret"].dt.year >= start_year) &
         (mp["eom_ret"].dt.month == 12)
     ][["eom_ret", "k", "g", "u"]].copy()
     mp_hps["type"] = "Multiperiod-ML*"
+    mp_hps["horizon"] = "Multiperiod-ML"  # Adding horizon label
+    mp_hps.rename(columns={"g": "eta"}, inplace=True)
 
-    # Filter Static-ML data
+    # ---- Process Static-ML Data ----
     static_hps = static[
         (static["rank"] == 1) &
         (static["eom_ret"].dt.year >= start_year) &
         (static["eom_ret"].dt.month == 12)
     ][["eom_ret", "k", "g", "u"]].copy()
     static_hps["type"] = "Static-ML*"
+    static_hps["horizon"] = "Static-ML"
+    static_hps.rename(columns={"g": "eta"}, inplace=True)
 
-    # Filter Portfolio-ML data and process lambda
+    # ---- Process Portfolio-ML Data ----
     pfml_hps = pfml[
         pfml["eom_ret"].dt.year >= start_year
     ][["eom_ret", "l", "p", "g"]].copy()
     pfml_hps["type"] = "Portfolio-ML"
     pfml_hps["log(lambda)"] = np.log(pfml_hps["l"])
-    pfml_hps = pfml_hps.drop(columns="l").rename(columns={"g": "eta"})
+    pfml_hps = pfml_hps.drop(columns="l")
+    pfml_hps.rename(columns={"g": "eta"}, inplace=True)
 
-    # Combine all hyperparameter data
-    combined_hps = pd.concat(
-        [
-            mp_hps.melt(id_vars=["type", "eom_ret"]),
-            static_hps.melt(id_vars=["type", "eom_ret"]),
-            pfml_hps.melt(id_vars=["type", "eom_ret"]),
-        ],
-        ignore_index=True
-    )
+    # ---- Reshape Data for Plotting ----
+    mp_long = mp_hps.melt(id_vars=["type", "eom_ret", "horizon"])
+    static_long = static_hps.melt(id_vars=["type", "eom_ret", "horizon"])
+    pfml_long = pfml_hps.melt(id_vars=["type", "eom_ret"])
 
-    # Create a descriptive column for combined hyperparameter names
-    combined_hps["comb_name"] = combined_hps["type"] + ": " + combined_hps["name"]
+    # ---- Combine All Results ----
+    combined_hps = pd.concat([mp_long, static_long, pfml_long], ignore_index=True)
+
+    # ---- Add Combination Names for Plotting ----
+    combined_hps["comb_name"] = combined_hps["type"] + ": " + combined_hps["variable"]
 
     return combined_hps
 
 
 def plot_hyperparameter_trends(data, colours_theme):
     """
-    Plot the trends for hyperparameters over time.
+    Plot the trends for hyperparameters over time in a 3x3 grid.
 
     Parameters:
         data (pd.DataFrame): Data containing hyperparameter trends.
@@ -621,21 +692,54 @@ def plot_hyperparameter_trends(data, colours_theme):
     Returns:
         None
     """
-    plt.figure(figsize=(10, 8))
+
+    # Define the plot grid (3 rows x 3 columns)
+    fig, axes = plt.subplots(3, 3, figsize=(15, 12), sharex=True)
+    fig.suptitle("Optimal Hyper-Parameters Over Time", fontsize=16, y=0.93)
+
+    # Create a dictionary to map each combination to a specific subplot
+    combination_mapping = {
+        "Return t+1: log(lambda)": (0, 0),
+        "Return t+1: p": (0, 1),
+        "Return t+1: eta": (0, 2),
+        "Return t+6: log(lambda)": (1, 0),
+        "Return t+6: p": (1, 1),
+        "Return t+6: eta": (1, 2),
+        "Return t+12: log(lambda)": (2, 0),
+        "Return t+12: p": (2, 1),
+        "Return t+12: eta": (2, 2)
+    }
+
+    # Plot each combination in its respective subplot
     for comb_name, group in data.groupby("comb_name"):
-        plt.scatter(group["eom_ret"], group["value"], alpha=0.75, color=colours_theme[0], label=comb_name)
-    plt.xlabel("End of Month")
-    plt.ylabel("Optimal Hyper-Parameter")
-    plt.legend(loc="upper left", bbox_to_anchor=(1, 1), title="Hyper-Parameter")
-    plt.grid(True, linestyle="--", linewidth=0.5)
-    plt.title("Optimal Hyper-Parameters Over Time")
+        if comb_name not in combination_mapping:
+            continue
+
+        row, col = combination_mapping[comb_name]
+        ax = axes[row, col]
+
+        # Plot the scatter plot for this particular combination
+        ax.scatter(group["eom_ret"], group["value"], alpha=0.75, color=colours_theme[0])
+
+        # Set titles and labels
+        ax.set_title(comb_name, fontsize=12)
+        ax.grid(True, linestyle="--", linewidth=0.5)
+
+        if col == 0:
+            ax.set_ylabel("Optimal Hyper-Parameter")
+
+        if row == 2:
+            ax.set_xlabel("End of Month")
+
+    # Adjust the layout
     plt.tight_layout()
+    plt.subplots_adjust(top=0.93)
     plt.show()
 
 
 def plot_portfolio_tuning_results(data):
     """
-    Plot portfolio tuning results over time.
+    Plot portfolio tuning results over time in a 3x3 grid.
 
     Parameters:
         data (pd.DataFrame): Data containing portfolio tuning results.
@@ -643,19 +747,51 @@ def plot_portfolio_tuning_results(data):
     Returns:
         None
     """
-    plt.figure(figsize=(10, 8))
+    # Define the plot grid (3 rows x 3 columns)
+    fig, axes = plt.subplots(3, 3, figsize=(15, 12), sharex=True)
+    fig.suptitle("Portfolio Tuning Results Over Time", fontsize=16, y=0.93)
+
+    # Create a dictionary to map each combination to a specific subplot
+    combination_mapping = {
+        "Multiperiod-ML*: k": (0, 0),
+        "Multiperiod-ML*: eta": (0, 1),
+        "Multiperiod-ML*: u": (0, 2),
+        "Static-ML*: k": (1, 0),
+        "Static-ML*: eta": (1, 1),
+        "Static-ML*: u": (1, 2),
+        "Portfolio-ML: log(lambda)": (2, 0),
+        "Portfolio-ML: p": (2, 1),
+        "Portfolio-ML: eta": (2, 2)
+    }
+
+    # Plot each combination in its respective subplot
     for comb_name, group in data.groupby("comb_name"):
-        plt.scatter(group["eom_ret"], group["value"], alpha=0.75, label=comb_name)
-    plt.xlabel("End of Month")
-    plt.ylabel("Optimal Hyper-Parameter")
-    plt.legend(loc="upper left", bbox_to_anchor=(1, 1), title="Tuning Type")
-    plt.grid(True, linestyle="--", linewidth=0.5)
-    plt.title("Portfolio Tuning Results Over Time")
+        if comb_name not in combination_mapping:
+            continue
+
+        row, col = combination_mapping[comb_name]
+        ax = axes[row, col]
+
+        # Plot the scatter plot for this particular combination
+        ax.scatter(group["eom_ret"], group["value"], alpha=0.75, color="steelblue")
+
+        # Set titles and labels
+        ax.set_title(comb_name, fontsize=12)
+        ax.grid(True, linestyle="--", linewidth=0.5)
+
+        if col == 0:
+            ax.set_ylabel("Optimal Hyper-Parameter")
+
+        if row == 2:
+            ax.set_xlabel("End of Month")
+
+    # Adjust layout
     plt.tight_layout()
+    plt.subplots_adjust(top=0.93)
     plt.show()
 
 
-def plot_optimal_hyperparameters(get_from_path_model, mp, static, pfml, colours_theme, start_year=1981):
+def plot_optimal_hyperparameters(model_folder, mp, static, pfml, colours_theme, start_year):
     """
     Main function to plot optimal hyperparameters and portfolio tuning results.
 
@@ -669,21 +805,33 @@ def plot_optimal_hyperparameters(get_from_path_model, mp, static, pfml, colours_
         None
     """
     # Load and process hyperparameters for each horizon
-    data_1 = load_model_hyperparameters(f"{get_from_path_model}/model_1.pkl", "Return t+1")
-    data_6 = load_model_hyperparameters(f"{get_from_path_model}/model_6.pkl", "Return t+6")
-    data_12 = load_model_hyperparameters(f"{get_from_path_model}/model_12.pkl", "Return t+12")
+    data_1 = load_model_hyperparameters(f"{model_folder}/model_1.pkl", "Return t+1")
+    data_6 = load_model_hyperparameters(f"{model_folder}/model_6.pkl", "Return t+6")
+    data_12 = load_model_hyperparameters(f"{model_folder}/model_12.pkl", "Return t+12")
 
     # Combine hyperparameter data
     combined_data = pd.concat([data_1, data_6, data_12], ignore_index=True)
     combined_data["log(lambda)"] = np.log(combined_data["lambda"])
     combined_data = combined_data.rename(columns={"g": "eta"})
+
+    # Reshape the DataFrame to a long format
     melted_data = combined_data.melt(
         id_vars=["horizon", "eom_ret"],
         value_vars=["log(lambda)", "p", "eta"],
         var_name="name",
         value_name="value"
     )
+
+    # Create 'comb_name' column
     melted_data["comb_name"] = melted_data["horizon"] + ": " + melted_data["name"]
+
+    # Reorder 'comb_name' levels as per R's factor(levels = c(...))
+    desired_order = [
+        "Return t+1: log(lambda)", "Return t+1: p", "Return t+1: eta",
+        "Return t+6: log(lambda)", "Return t+6: p", "Return t+6: eta",
+        "Return t+12: log(lambda)", "Return t+12: p", "Return t+12: eta"
+    ]
+    melted_data["comb_name"] = pd.Categorical(melted_data["comb_name"], categories=desired_order, ordered=True)
 
     # Plot hyperparameter trends
     plot_hyperparameter_trends(melted_data, colours_theme)
@@ -693,8 +841,8 @@ def plot_optimal_hyperparameters(get_from_path_model, mp, static, pfml, colours_
     plot_portfolio_tuning_results(tuning_data)
 
 
-# AR1 plot -------------------------------------------
-def compute_ar1_plot(chars, features, cluster_labels):
+# Plot AR ----------------------------
+def compute_ar1_plot(chars, features, cluster_labels, output_path):
     """
     Compute and plot AR1 (average monthly autocorrelation) for characteristics grouped by clusters.
 
@@ -708,7 +856,9 @@ def compute_ar1_plot(chars, features, cluster_labels):
     """
     # Sort by ID and EOM (end of month)
     chars = chars.sort_values(by=["id", "eom"]).copy()
-    chars["lag_ok"] = chars.groupby("id")["eom"].diff().dt.days.between(28, 31)
+    chars["lag_ok"] = (
+                chars["eom"] == (chars["prev_eom"] + pd.DateOffset(months=1)).replace(day=1) + pd.offsets.MonthEnd(0))
+
     ar1_results = []
 
     # Iterate over features to calculate AR1
@@ -720,8 +870,9 @@ def compute_ar1_plot(chars, features, cluster_labels):
         valid_subset = chars[
             chars["valid"] &
             chars["lag_ok"] &
-            ~chars["var"].isin([0.5, np.nan]) &
-            ~chars["var_l1"].isin([0.5, np.nan])
+            ~chars["var"].isin([0.5]) &
+            chars["var"].notna() &
+            chars["var_l1"].notna()
         ].copy()
 
         # Group by ID and ensure at least 60 observations
@@ -730,8 +881,8 @@ def compute_ar1_plot(chars, features, cluster_labels):
 
         # Calculate AR1 for each ID
         id_ar1 = valid_subset.groupby("id").apply(
-            lambda group: np.corrcoef(group["var"], group["var_l1"])[0, 1] if len(group) > 1 else 1
-        ).fillna(1).reset_index(name="ar1")
+            lambda group: np.corrcoef(group["var"], group["var_l1"])[0, 1] if len(group) > 1 else np.nan
+        ).dropna().reset_index(name="ar1")
 
         # Compute mean AR1 for the feature
         ar1_mean = id_ar1["ar1"].mean()
@@ -771,9 +922,16 @@ def compute_ar1_plot(chars, features, cluster_labels):
     ax.set_ylabel("")
     ax.legend(title="Theme", loc="upper right", frameon=True)
     plt.gca().invert_yaxis()
+
     plt.tight_layout()
+    plt.savefig(f"{output_path}/ar1_plot.png", dpi=300)  # Save as PNG with high resolution
+    plt.savefig(f"{output_path}/ar1_plot.pdf")  # Save as PDF (optional)
+
 
     return plt.gcf()
+
+
+
 
 
 # Features with sufficient coverage ------------------
