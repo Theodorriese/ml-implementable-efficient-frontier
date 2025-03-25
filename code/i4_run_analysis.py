@@ -5,7 +5,8 @@ from g_base_analysis import (
     load_base_case_portfolios, combine_portfolios, compute_portfolio_summary,
     compute_and_plot_performance_time_series, compute_probability_of_outperformance,
     compute_and_plot_portfolio_statistics_over_time, compute_and_plot_correlation_matrix,
-    plot_apple_vs_xerox, plot_optimal_hyperparameters, compute_ar1_plot
+    plot_apple_vs_xerox, plot_optimal_hyperparameters, compute_ar1_plot,
+    process_features_with_sufficient_coverage
 )
 from i1_Main import settings, pf_set, features, pf_order, pf_order_new, main_types, cluster_order
 
@@ -149,8 +150,8 @@ mkt = base_case["mkt"]
 #     illiquid_id=illiquid_id,
 #     start_year=start_year
 # )
-
-
+#
+#
 # # Optimal Hyper-parameters Plot
 # plot_optimal_hyperparameters(
 #     model_folder=model_folder,
@@ -168,5 +169,7 @@ compute_ar1_plot(
     cluster_labels=cluster_labels,
     output_path=output_path
 )
+
+data, coverage = process_features_with_sufficient_coverage(features_m, feat_excl, settings)
 
 print("Analysis completed successfully!")

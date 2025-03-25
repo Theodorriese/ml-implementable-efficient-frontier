@@ -856,8 +856,9 @@ def compute_ar1_plot(chars, features, cluster_labels, output_path):
     """
     # Sort by ID and EOM (end of month)
     chars = chars.sort_values(by=["id", "eom"]).copy()
-    chars["lag_ok"] = (
-                chars["eom"] == (chars["prev_eom"] + pd.DateOffset(months=1)).replace(day=1) + pd.offsets.MonthEnd(0))
+    chars["prev_eom"] = chars.groupby("id")["eom"].shift(1)
+    chars["lag_ok"] = (chars["eom"] == (chars["prev_eom"] + pd.DateOffset(months=1)).apply(
+        lambda x: x + pd.offsets.MonthEnd(0)))
 
     ar1_results = []
 
@@ -900,7 +901,7 @@ def compute_ar1_plot(chars, features, cluster_labels, output_path):
     )
 
     # Update cluster names for presentation
-    ar1_df["pretty_name"] = ar1_df["cluster"].str.replace("_", " ").str.replace("short term", "short-term").str.title()
+    ar1_df["pretty_name"] = ar1_df["cluster"]
     ar1_df["pretty_name"] = pd.Categorical(ar1_df["pretty_name"], categories=cluster_means, ordered=True)
 
     # Sort features within clusters
@@ -924,9 +925,7 @@ def compute_ar1_plot(chars, features, cluster_labels, output_path):
     plt.gca().invert_yaxis()
 
     plt.tight_layout()
-    plt.savefig(f"{output_path}/ar1_plot.png", dpi=300)  # Save as PNG with high resolution
-    plt.savefig(f"{output_path}/ar1_plot.pdf")  # Save as PDF (optional)
-
+    plt.savefig(f"{output_path}/ar1_plot.png", dpi=300)
 
     return plt.gcf()
 
