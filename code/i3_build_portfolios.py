@@ -4,6 +4,7 @@ import pandas as pd
 import openpyxl
 from datetime import datetime
 from b_prepare_data import load_cluster_labels, load_risk_free, load_daily_returns_pkl_USA
+from b_prepare_data import load_daily_returns_pkl_USA, load_daily_returns_pkl_EU
 from d_estimate_cov_matrix import prepare_cluster_data  # Covariance estimation
 from e_prepare_portfolio_data import run_prepare_portfolio_data  # Portfolio prep
 from f_feature_importance_base import run_feature_importance_base
@@ -67,12 +68,6 @@ print("\nStarting portfolio construction...")
 # -------------------- Step 1: Load Processed Data --------------------
 print("Step 1: Loading processed data...")
 
-# Load fitted models
-fitted_models_path = os.path.join(get_from_path_model, "fitted_models.pkl")
-if not os.path.exists(fitted_models_path):
-    raise FileNotFoundError(f"Fitted models file not found: {fitted_models_path}")
-fitted_models = pd.read_pickle(fitted_models_path)
-
 # Load preprocessed characteristics
 chars_path = os.path.join(data_path, "chars_processed.pkl")
 if not os.path.exists(chars_path):
@@ -102,13 +97,23 @@ print("Loaded cluster labels")
 risk_free = load_risk_free(data_path)
 print("Loaded risk-free rate data.")
 
-# Load daily return data
-daily_returns = load_daily_returns_pkl(data_path, chars, risk_free)
-print("Loaded daily return data.")
+# Load daily return data based on region setting
+if settings["region"] == "USA":
+    daily_returns = load_daily_returns_pkl_USA(data_path, chars, risk_free)
+    print("Loaded daily return data for USA.")
+else:
+    daily_returns = load_daily_returns_pkl_EU(data_path, chars, risk_free)
+    print("Loaded daily return data for EU.")
+
+# Load fitted models
+fitted_models_path = os.path.join(get_from_path_model, "fitted_models.pkl")
+if not os.path.exists(fitted_models_path):
+    raise FileNotFoundError(f"Fitted models file not found: {fitted_models_path}")
+fitted_models = pd.read_pickle(fitted_models_path)
 
 # -------------------- Step 2: Estimate Covariance Matrix --------------------
-# print("Step 2: Estimating covariance matrix...")
-#
+print("Step 2: Estimating covariance matrix...")
+
 # cov_results = prepare_cluster_data(
 #     chars=chars,
 #     cluster_labels=cluster_labels,
@@ -148,49 +153,23 @@ spec_risk = cov_results["spec_risk"]
 barra_cov = cov_results["barra_cov"]
 
 # -------------------- Step 3: Prepare Portfolio Data --------------------
-# print("Step 3: Preparing portfolio data...")
-#
-# # Run the portfolio data preparation function and extract its outputs
-# portfolio_data = run_prepare_portfolio_data(
-#     chars=chars,
-#     get_from_path_model=get_from_path_model,
-#     settings=settings,
-#     pf_set=pf_set,
-#     barra_cov=cov_results["barra_cov"]
-# )
-#
-# # Save additional processed portfolio data
-# pd.to_pickle(portfolio_data["chars"], os.path.join(output_path, "chars_with_predictions.pkl"))
-# pd.to_pickle(portfolio_data["lambda_list"], os.path.join(output_path, "lambda_list.pkl"))
-# pd.to_pickle(portfolio_data["dates"], os.path.join(output_path, "dates.pkl"))
-#
-# # Extract dates from portfolio_data
-# dates_m1, dates_m2, dates_oos, dates_hp, hp_years = (
-#     portfolio_data["dates"]["dates_m1"],
-#     portfolio_data["dates"]["dates_m2"],
-#     portfolio_data["dates"]["dates_oos"],
-#     portfolio_data["dates"]["dates_hp"],
-#     portfolio_data["dates"]["hp_years"]
-# )
+print("Step 3: Preparing portfolio data...")
 
-# Load the portfolio data
-chars_path = os.path.join(latest_folder, "chars_with_predictions.pkl")
-lambda_list_path = os.path.join(latest_folder, "lambda_list.pkl")
-dates_path = os.path.join(latest_folder, "dates.pkl")
+# Run the portfolio data preparation function and extract its outputs
+portfolio_data = run_prepare_portfolio_data(
+    chars=chars,
+    get_from_path_model=get_from_path_model,
+    settings=settings,
+    pf_set=pf_set,
+    barra_cov=cov_results["barra_cov"]
+)
 
-# Check existence
-for path in [chars_path, lambda_list_path, dates_path]:
-    if not os.path.exists(path):
-        raise FileNotFoundError(f"Required file not found: {path}")
+# Save additional processed portfolio data
+pd.to_pickle(portfolio_data["chars"], os.path.join(output_path, "chars_with_predictions.pkl"))
+pd.to_pickle(portfolio_data["lambda_list"], os.path.join(output_path, "lambda_list.pkl"))
+pd.to_pickle(portfolio_data["dates"], os.path.join(output_path, "dates.pkl"))
 
-# Load data
-portfolio_data = {
-    "chars": pd.read_pickle(chars_path),
-    "lambda_list": pd.read_pickle(lambda_list_path),
-    "dates": pd.read_pickle(dates_path)
-}
-
-# Extract dates
+# Extract dates from portfolio_data
 dates_m1, dates_m2, dates_oos, dates_hp, hp_years = (
     portfolio_data["dates"]["dates_m1"],
     portfolio_data["dates"]["dates_m2"],
@@ -199,7 +178,33 @@ dates_m1, dates_m2, dates_oos, dates_hp, hp_years = (
     portfolio_data["dates"]["hp_years"]
 )
 
-print("Loaded portfolio data from latest folder.")
+# # Load the portfolio data
+# chars_path = os.path.join(latest_folder, "chars_with_predictions.pkl")
+# lambda_list_path = os.path.join(latest_folder, "lambda_list.pkl")
+# dates_path = os.path.join(latest_folder, "dates.pkl")
+#
+# # Check existence
+# for path in [chars_path, lambda_list_path, dates_path]:
+#     if not os.path.exists(path):
+#         raise FileNotFoundError(f"Required file not found: {path}")
+#
+# # Load data
+# portfolio_data = {
+#     "chars": pd.read_pickle(chars_path),
+#     "lambda_list": pd.read_pickle(lambda_list_path),
+#     "dates": pd.read_pickle(dates_path)
+# }
+#
+# # Extract dates
+# dates_m1, dates_m2, dates_oos, dates_hp, hp_years = (
+#     portfolio_data["dates"]["dates_m1"],
+#     portfolio_data["dates"]["dates_m2"],
+#     portfolio_data["dates"]["dates_oos"],
+#     portfolio_data["dates"]["dates_hp"],
+#     portfolio_data["dates"]["hp_years"]
+# )
+#
+# print("Loaded portfolio data from latest folder.")
 
 # -------------------------- Step 4: Run Base Case ------------------------------
 if config_params["update_base"]:

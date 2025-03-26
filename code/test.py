@@ -1,39 +1,40 @@
 import pandas as pd
-import pickle
 import os
 
-# Specify the path where your .pkl file is stored
-output_path = "C:\Master\Data\Generated\Portfolios\demo"  # Replace with your actual path
 
-# Load the Portfolio-ML results
-portfolio_ml_file = os.path.join(output_path, "portfolio-ml.pkl")
+def load_and_filter(file_path, gvkey_value):
+    """
+    Load a CSV file and filter rows where 'gvkey' matches a specific value.
 
-# Load the portfolio-ml.pkl file
-try:
-    pfml_df = pd.read_pickle(portfolio_ml_file)
-    print("Loaded 'portfolio-ml.pkl' successfully.")
-except Exception as e:
-    print(f"Error loading 'portfolio-ml.pkl': {e}")
+    Args:
+        file_path (str): The path to the CSV file.
+        gvkey_value (int): The gvkey value to filter.
 
-# Display the first few rows of the dataframe to inspect its structure
-print("\nPreview of the 'portfolio-ml.pkl' content:")
-print(pfml_df.head())
+    Returns:
+        pd.DataFrame: Filtered DataFrame.
+    """
+    # Load the CSV file
+    df = pd.read_csv(file_path)
 
-# Check the type of the loaded data to confirm what was saved
-print(f"\nData type of loaded object: {type(pfml_df)}")
+    # Filter rows where 'gvkey' matches the specified value
+    filtered_df = df[df['gvkey'] == gvkey_value]
 
-# If it's a DataFrame, show some basic statistics
-if isinstance(pfml_df, pd.DataFrame):
-    print("\nBasic statistics of the DataFrame:")
-    print(pfml_df.describe())
+    return filtered_df
 
-# If you also want to check the 'hps.pkl' file
-hps_file = os.path.join(output_path, "hps.pkl")
 
-try:
-    with open(hps_file, 'rb') as file:
-        hps_data = pickle.load(file)
-    print("\nLoaded 'hps.pkl' successfully.")
-    print(f"Keys in 'hps.pkl': {list(hps_data.keys())}")
-except Exception as e:
-    print(f"Error loading 'hps.pkl': {e}")
+# Path to your 'eu.csv' file
+file_path = "C:/Master/eu.csv"
+
+# gvkey to filter
+gvkey_value = 212354
+
+# Load and filter the file
+filtered_data = load_and_filter(file_path, gvkey_value)
+
+# Print the first few rows of the filtered data
+print(filtered_data.head())
+
+# Optionally, save to a new CSV file
+output_path = "C:/Master/filtered_eu.csv"
+filtered_data.to_csv(output_path, index=False)
+print(f"Filtered data saved to {output_path}")

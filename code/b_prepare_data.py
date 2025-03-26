@@ -65,7 +65,7 @@ def load_market_data(settings):
 
     # Filter based on the region setting
     if region == "EU":
-        market_data = market[market["excntry"] == "GER"]
+        market_data = market[market["excntry"] == "DEU"]
     elif region == "USA":
         market_data = market[market["excntry"] == "USA"]
     else:
@@ -263,8 +263,6 @@ def load_monthly_data_EU(data_path, settings, risk_free):
     return data_ret
 
 
-
-
 # Prepare data - stock characteristics
 def preprocess_chars(data_path, features, settings, data_ret_ld1, wealth):
     """
@@ -298,8 +296,6 @@ def preprocess_chars(data_path, features, settings, data_ret_ld1, wealth):
     chars["dolvol"] = chars["dolvol_126d"]
     chars["lambda"] = 2 / chars["dolvol"] * settings["pi"]
     chars["rvol_m"] = chars["rvol_252d"] * np.sqrt(21)
-
-    chars["eom"] = pd.to_datetime(chars["eom"])
 
     # Convert columns to datetime for proper merging
     chars["eom"] = pd.to_datetime(chars["eom"])
@@ -573,139 +569,6 @@ def valid_summary(chars):
           f"and {market_cap_percentage:.2f}% of the market cap")
 
 
-
-# Function to load and preprocess daily returns
-def load_daily_returns_USA(data_path, chars, risk_free):
-    """
-    Load and preprocess daily returns data.
-
-    Parameters:
-        data_path (str): Path to the dataset directory.
-        chars (pd.DataFrame): Processed characteristics data with valid stocks.
-        risk_free (pd.DataFrame): DataFrame containing risk-free rates with columns ['eom_m', 'rf'].
-
-    Returns:
-        pd.DataFrame: Preprocessed daily returns data with calculated excess returns.
-    """
-    # Load daily returns data
-    daily = pd.read_csv(
-        os.path.join(data_path, "usa_dsf.csv"),
-        usecols=["PERMNO", "date", "RET"]
-    )
-
-    # Rename columns for consistency
-    daily.rename(columns={"PERMNO": "id", "RET": "ret"}, inplace=True)
-
-    # Filter for valid data (non-NA returns and IDs <= 99999)
-    daily = daily[daily["ret"].notna() & daily["id"].le(99999)]
-    valid_ids = chars.loc[chars["valid"], "id"].unique()  # Get valid stock IDs from `chars`
-    daily = daily[daily["id"].isin(valid_ids)]
-
-    # Convert `date` to datetime
-    daily["date"] = pd.to_datetime(daily["date"], format="%d/%m/%Y")
-
-    # Prepare `risk_free` data for merging
-    risk_free.rename(columns={"eom_m": "date"}, inplace=True)
-    risk_free["date"] = pd.to_datetime(risk_free["date"], format="%Y-%m-%d")
-    risk_free["month"] = risk_free["date"].dt.to_period("M")
-
-    # Calculate daily risk-free rate
-    risk_free["days_in_month"] = risk_free["date"].dt.daysinmonth  # Number of days in each month
-    risk_free["rf_daily"] = risk_free["rf"] / risk_free["days_in_month"]  # Convert to daily rate
-
-    # Map monthly risk-free rates to daily data
-    daily["month"] = daily["date"].dt.to_period("M")
-    daily = daily.merge(risk_free[["month", "rf_daily"]], on="month", how="left")
-    daily.drop(columns=["month"], inplace=True)  # Clean up temporary column
-
-    # Ensure `ret` is numeric
-    daily["ret"] = pd.to_numeric(daily["ret"], errors="coerce")
-
-    # Calculate excess return
-    daily["ret_exc"] = daily["ret"] - daily["rf_daily"]
-
-    # Add `eom` column (end-of-month)
-    daily["eom"] = daily["date"] + pd.offsets.MonthEnd(0)
-
-    # Optional: Drop unnecessary columns
-    daily.drop(columns=["rf_daily"], inplace=True)
-
-    return daily
-
-
-# Function to load and preprocess daily returns for EU
-def load_daily_returns_EU(data_path, chars, risk_free):
-    """
-    Load and preprocess daily returns data for EU region.
-
-    Parameters:
-        data_path (str): Path to the dataset directory.
-        chars (pd.DataFrame): Processed characteristics data with valid stocks.
-        risk_free (pd.DataFrame): DataFrame containing risk-free rates with columns ['eom_m', 'rf'].
-
-    Returns:
-        pd.DataFrame: Preprocessed daily returns data with calculated excess returns.
-    """
-    # Load daily returns data (EU)
-    daily = pd.read_csv(
-        os.path.join(data_path, "eu_dsf.csv"),
-        usecols=["gvkey", "datadate", "PRCCD", "AJEXDI", "TRFD"]
-    )
-
-    # Rename columns for consistency
-    daily.rename(columns={"datadate": "date", "gvkey": "id"}, inplace=True)
-
-    # Filter for valid data (non-NA prices and valid IDs from chars)
-    daily = daily[daily["PRCCD"].notna() & daily["AJEXDI"].notna() & daily["TRFD"].notna()]
-    valid_ids = chars.loc[chars["valid"], "id"].unique()  # Get valid stock IDs from `chars`
-    daily = daily[daily["id"].isin(valid_ids)]
-
-    # Convert `date` to datetime
-    daily["date"] = pd.to_datetime(daily["date"], format="%d/%m/%Y")
-
-    # Sort values by 'id' and 'date' for proper return calculation
-    daily = daily.sort_values(by=["id", "date"])
-
-    # Calculate Returns (RET) using the given formula
-    daily["RET"] = (
-            (((daily["PRCCD"] / daily["AJEXDI"]) * daily["TRFD"]) /
-             ((daily.groupby("id")["PRCCD"].shift(1) /
-               daily.groupby("id")["AJEXDI"].shift(1)) *
-              daily.groupby("id")["TRFD"].shift(1))) - 1
-    )
-
-    # Drop rows where RET could not be calculated
-    daily.dropna(subset=["RET"], inplace=True)
-
-    # Prepare `risk_free` data for merging
-    risk_free.rename(columns={"eom_m": "date"}, inplace=True)
-    risk_free["date"] = pd.to_datetime(risk_free["date"], format="%Y-%m-%d")
-    risk_free["month"] = risk_free["date"].dt.to_period("M")
-
-    # Calculate daily risk-free rate
-    risk_free["days_in_month"] = risk_free["date"].dt.daysinmonth
-    risk_free["rf_daily"] = risk_free["rf"] / risk_free["days_in_month"]
-
-    # Map monthly risk-free rates to daily data
-    daily["month"] = daily["date"].dt.to_period("M")
-    daily = daily.merge(risk_free[["month", "rf_daily"]], on="month", how="left")
-    daily.drop(columns=["month"], inplace=True)  # Clean up temporary column
-
-    # Ensure `RET` is numeric
-    daily["RET"] = pd.to_numeric(daily["RET"], errors="coerce")
-
-    # Calculate excess return
-    daily["ret_exc"] = daily["RET"] - daily["rf_daily"]
-
-    # Add `eom` column (end-of-month)
-    daily["eom"] = daily["date"] + pd.offsets.MonthEnd(0)
-
-    # Drop unnecessary columns
-    daily.drop(columns=["rf_daily", "PRCCD", "AJEXDI", "TRFD"], inplace=True)
-
-    return daily
-
-
 # Function to load and preprocess daily returns data for US from a CSV file
 def load_daily_returns_pkl_USA(data_path, chars, risk_free):
     """
@@ -779,7 +642,8 @@ def load_daily_returns_pkl_EU(data_path, chars, risk_free):
     daily = pd.read_csv(os.path.join(data_path, "eu_dsf.csv"))
 
     # Rename columns for consistency
-    daily.rename(columns={"gvkey": "id", "datadate": "date"}, inplace=True)
+    daily.rename(columns={"gvkey": "id", "datadate": "date", "prccd": "PRCCD",
+                          "ajexdi": "AJEXDI", "trfd": "TRFD"}, inplace=True)
 
     # Filter for valid data (non-NA prices and valid IDs from chars)
     daily = daily[daily["PRCCD"].notna() & daily["AJEXDI"].notna() & daily["TRFD"].notna()]
@@ -794,10 +658,10 @@ def load_daily_returns_pkl_EU(data_path, chars, risk_free):
 
     # Calculate Returns (RET) using the given formula
     daily["RET"] = (
-            (((daily["PRCCD"] / daily["AJEXDI"]) * daily["TRFD"]) /
-             ((daily.groupby("id")["PRCCD"].shift(1) /
-               daily.groupby("id")["AJEXDI"].shift(1)) *
-              daily.groupby("id")["TRFD"].shift(1))) - 1
+        (((daily["PRCCD"] / daily["AJEXDI"]) * daily["TRFD"]) /
+         ((daily.groupby("id")["PRCCD"].shift(1) /
+           daily.groupby("id")["AJEXDI"].shift(1)) *
+          daily.groupby("id")["TRFD"].shift(1))) - 1
     )
 
     # Drop rows where RET could not be calculated
@@ -830,3 +694,4 @@ def load_daily_returns_pkl_EU(data_path, chars, risk_free):
     daily.drop(columns=["rf_daily", "PRCCD", "AJEXDI", "TRFD"], inplace=True)
 
     return daily
+
