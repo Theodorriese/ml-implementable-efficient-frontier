@@ -23,7 +23,7 @@ from c_fit_models import fit_models
 
 # -------------------- Config Parameters and Search grid (Manually Set) --------------------
 config_params = {
-    "size_screen": "perc_low50_high100_min40",  # Adjusted to min 40 from 50
+    "size_screen": "perc_low50_high100_min50",
     "wealth": 1e10,
     "gamma_rel": 10,
     "industry_cov": True,
@@ -61,75 +61,75 @@ def prepare_and_fit_models(settings, pf_set, features, output_path):
         tuple: Processed characteristics dataframe, trained models.
     """
     # -------------------- Step 1: Data Preparation --------------------
-    # print("Step 1: Loading risk-free rate data...")
-    # risk_free = load_risk_free(settings["data_path"])
-    #
-    # print("Step 2: Loading market data...")
-    # market_data = load_market_data(settings)
-    #
-    # print("Step 3: Computing wealth function...")
-    # wealth = wealth_func(
-    #     wealth_end=pf_set["wealth"],
-    #     end=settings["screens"]["end"],
-    #     market=market_data,
-    #     risk_free=risk_free
-    # )
-    #
-    # wealth.to_pickle(os.path.join(settings["data_path"], "wealth_processed.pkl"))
-    #
-    # print("Step 4: Loading monthly return data...")
-    # if settings["region"] == "USA":
-    #     data_ret = load_monthly_data_USA(
-    #         settings["data_path"],
-    #         settings=settings,
-    #         risk_free=risk_free
-    #     )
-    # else:
-    #     data_ret = load_monthly_data_EU(
-    #         settings["data_path"],
-    #         settings=settings,
-    #         risk_free=risk_free
-    #     )
-    #
-    # print("Step 5: Preprocessing characteristics...")
-    # chars = preprocess_chars(
-    #     settings["data_path"],
-    #     features=features,
-    #     settings=settings,
-    #     data_ret_ld1=data_ret,
-    #     wealth=wealth
-    # )
-    #
-    # print("Step 6: Filtering characteristics by date...")
-    # chars, n_start, me_start = filter_chars(chars, settings)
-    #
-    # print("Step 7: Screening features...")
-    # chars = feature_screen(chars, features, settings, n_start, me_start, run_sub=False)
-    #
-    # print("Step 8: Standardizing features...")
-    # chars = standardize_features(chars, features, settings)
-    #
-    # print("Step 9: Imputing missing feature values...")
-    # chars = impute_features(chars, features, settings)
-    #
-    # print("Step 10: Classifying industries...")
-    # chars = classify_industry(chars)
-    #
-    # print("Step 11: Validating observations...")
-    # chars = validate_observations(chars, pf_set)
-    #
-    # print("Step 12: Applying size screen...")
-    # chars = apply_size_screen(chars, settings)
-    #
-    # print("Step 13: Applying addition and deletion rules...")
-    # chars = apply_addition_deletion_rule(chars, settings)
-    #
-    # data_ret.to_pickle(os.path.join(settings["data_path"], "data_ret_processed.pkl"))
-    # chars.to_pickle(os.path.join(settings["data_path"], "chars_processed.pkl"))
-    #
-    # print("Step 14: Showing investable universe and summary...")
-    # show_investable_universe(chars)
-    # valid_summary(chars)
+    print("Step 1: Loading risk-free rate data...")
+    risk_free = load_risk_free(settings["data_path"])
+
+    print("Step 2: Loading market data...")
+    market_data = load_market_data(settings)
+
+    print("Step 3: Computing wealth function...")
+    wealth = wealth_func(
+        wealth_end=pf_set["wealth"],
+        end=settings["screens"]["end"],
+        market=market_data,
+        risk_free=risk_free
+    )
+
+    wealth.to_pickle(os.path.join(settings["data_path"], "wealth_processed.pkl"))
+
+    print("Step 4: Loading monthly return data...")
+    if settings["region"] == "USA":
+        data_ret = load_monthly_data_USA(
+            settings["data_path"],
+            settings=settings,
+            risk_free=risk_free
+        )
+    else:
+        data_ret = load_monthly_data_EU(
+            settings["data_path"],
+            settings=settings,
+            risk_free=risk_free
+        )
+
+    print("Step 5: Preprocessing characteristics...")
+    chars = preprocess_chars(
+        settings["data_path"],
+        features=features,
+        settings=settings,
+        data_ret_ld1=data_ret,
+        wealth=wealth
+    )
+
+    print("Step 6: Filtering characteristics by date...")
+    chars, n_start, me_start = filter_chars(chars, settings)
+
+    print("Step 7: Screening features...")
+    chars = feature_screen(chars, features, settings, n_start, me_start, run_sub=False)
+
+    print("Step 8: Standardizing features...")
+    chars = standardize_features(chars, features, settings)
+
+    print("Step 9: Imputing missing feature values...")
+    chars = impute_features(chars, features, settings)
+
+    print("Step 10: Classifying industries...")
+    chars = classify_industry(chars)
+
+    print("Step 11: Validating observations...")
+    chars = validate_observations(chars, pf_set)
+
+    print("Step 12: Applying size screen...")
+    chars = apply_size_screen(chars, settings)
+
+    print("Step 13: Applying addition and deletion rules...")
+    chars = apply_addition_deletion_rule(chars, settings)
+
+    data_ret.to_pickle(os.path.join(settings["data_path"], "data_ret_processed.pkl"))
+    chars.to_pickle(os.path.join(settings["data_path"], "chars_processed.pkl"))
+
+    print("Step 14: Showing investable universe and summary...")
+    show_investable_universe(chars)
+    valid_summary(chars)
 
     ########################################################################
 
@@ -137,18 +137,18 @@ def prepare_and_fit_models(settings, pf_set, features, output_path):
 
     # To just load them
     print("Loading monthly return data and characteristics data...")
-    # data_ret = pd.read_csv(os.path.join(settings["data_path"], "data_ret_processed.csv"))
-    # chars = pd.read_csv(os.path.join(settings["data_path"], "chars_processed.csv"))
-
-    data_ret_path = os.path.join(settings["data_path"], "data_ret_processed.pkl")
-    data_ret = pd.read_pickle(data_ret_path)
-
-    chars_path = os.path.join(settings["data_path"], "chars_processed.pkl")
-    chars = pd.read_pickle(chars_path)
-
-    data_ret["eom"] = pd.to_datetime(data_ret["eom"])
-    data_ret["eom_m"] = pd.to_datetime(data_ret["eom_m"])
-    chars["eom"] = pd.to_datetime(chars["eom"])
+    # # data_ret = pd.read_csv(os.path.join(settings["data_path"], "data_ret_processed.csv"))
+    # # chars = pd.read_csv(os.path.join(settings["data_path"], "chars_processed.csv"))
+    #
+    # data_ret_path = os.path.join(settings["data_path"], "data_ret_processed.pkl")
+    # data_ret = pd.read_pickle(data_ret_path)
+    #
+    # chars_path = os.path.join(settings["data_path"], "chars_processed.pkl")
+    # chars = pd.read_pickle(chars_path)
+    #
+    # data_ret["eom"] = pd.to_datetime(data_ret["eom"])
+    # data_ret["eom_m"] = pd.to_datetime(data_ret["eom_m"])
+    # chars["eom"] = pd.to_datetime(chars["eom"])
 
     # To fit them
     print("Step 15: Fitting return prediction models...")

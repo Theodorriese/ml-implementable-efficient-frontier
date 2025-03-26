@@ -212,29 +212,38 @@ def load_monthly_data_EU(data_path, settings, risk_free):
     # Load and preprocess monthly data with correct columns
     monthly_data = pd.read_csv(
         os.path.join(data_path, "world_ret_monthly.csv"),
-        usecols=["gvkey", "datadate", "ISIN", "prccm", "ajexm", "ajpm"]
+        usecols=["gvkey", "datadate", "ISIN", "prccm", "ajexm", "ajpm", "iid"]
     )
+
     # Rename columns for consistency
     monthly_data.rename(columns={"datadate": "eom", "gvkey": "id", "ISIN": "EXCHCD"}, inplace=True)
     monthly_data.dropna(subset=["EXCHCD"], inplace=True)
-    monthly_data = monthly_data[~monthly_data["id"].isin(monthly_data[monthly_data["prccm"].isna()]["id"].unique())]
 
     # Generate end-of-month date ('eom') using the consistent method
     monthly_data["eom"] = pd.to_datetime(monthly_data["eom"], format="%d/%m/%Y", dayfirst=True)
     monthly_data["eom_m"] = monthly_data["eom"] + pd.offsets.MonthEnd(0)  # Align with risk-free
 
-    # Filter EXCHCD (which is now ISIN) if needed
+    # Remove IDs with missing `prccm` values
+    monthly_data = monthly_data[~monthly_data["id"].isin(monthly_data[monthly_data["prccm"].isna()]["id"].unique())]
+
+    # Filter EXCHCD if needed
     monthly_data["EXCHCD"] = monthly_data["EXCHCD"].fillna(0).astype(str)
+
+    # Sort data by 'id', 'eom', and 'iid' to keep the lowest iid
+    monthly_data.sort_values(by=["id", "eom", "iid"], inplace=True)
+
+    # Keep only the lowest `iid` per 'id' and 'eom'
+    monthly_data = monthly_data.drop_duplicates(subset=["id", "eom"], keep="first")
 
     # Sort data by 'id' and 'eom' to ensure the calculation is correct
     monthly_data = monthly_data.sort_values(by=["id", "eom"])
 
     # Calculate RET (returns) using the formula provided
     monthly_data["RET"] = (
-        (((monthly_data["prccm"] / monthly_data["ajexm"]) * monthly_data["ajpm"]) /
-         ((monthly_data.groupby("id")["prccm"].shift(1) /
-           monthly_data.groupby("id")["ajexm"].shift(1)) *
-          monthly_data.groupby("id")["ajpm"].shift(1))) - 1
+            (((monthly_data["prccm"] / monthly_data["ajexm"]) * monthly_data["ajpm"]) /
+             ((monthly_data.groupby("id")["prccm"].shift(1) /
+               monthly_data.groupby("id")["ajexm"].shift(1)) *
+              monthly_data.groupby("id")["ajpm"].shift(1))) - 1
     )
 
     # Drop rows where RET could not be calculated

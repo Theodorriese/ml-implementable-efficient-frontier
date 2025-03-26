@@ -46,11 +46,15 @@ import pandas as pd
 ############### EU ###############
 # Define the data folder and file paths
 data_folder = r"C:\Master"
-csv_file = os.path.join(data_folder, "eu_dsf.csv")
-pkl_file = os.path.join(data_folder, "eu_dsf.pkl")
+# csv_file = os.path.join(data_folder, "eu_dsf.csv")
+# pkl_file = os.path.join(data_folder, "eu_dsf.pkl")
+
+csv_file = os.path.join(data_folder, "eu.csv")
+pkl_file = os.path.join(data_folder, "eu.pkl")
+
 
 # Define the chunk size for reading
-chunk_size = 10 ** 6
+chunk_size = 10 ** 5
 
 # Initialize an empty list to store chunks
 chunks = []
@@ -61,7 +65,7 @@ try:
     # Read the CSV file in chunks
     for i, chunk in enumerate(pd.read_csv(csv_file, chunksize=chunk_size, low_memory=False)):
         # Process each chunk: convert `date` to datetime
-        chunk["date"] = pd.to_datetime(chunk["datadate"], format="%d/%m/%Y", errors="coerce")
+        chunk["date"] = pd.to_datetime(chunk["date"], format="%d/%m/%Y", errors="coerce")
 
         # Drop rows with invalid or missing values in `RET` or `date`
         chunk = chunk.dropna(subset=["date"])
