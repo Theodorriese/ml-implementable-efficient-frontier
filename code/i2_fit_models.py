@@ -4,7 +4,8 @@ from i1_Main import settings, pf_set, features
 from b_prepare_data import (
     load_risk_free,
     load_market_data,
-    load_monthly_data,
+    load_monthly_data_USA,
+    load_monthly_data_EU,
     wealth_func,
     preprocess_chars,
     filter_chars,
@@ -64,7 +65,7 @@ def prepare_and_fit_models(settings, pf_set, features, output_path):
     risk_free = load_risk_free(settings["data_path"])
 
     print("Step 2: Loading market data...")
-    market_data = load_market_data(settings["data_path"])
+    market_data = load_market_data(settings)
 
     print("Step 3: Computing wealth function...")
     wealth = wealth_func(
@@ -77,11 +78,18 @@ def prepare_and_fit_models(settings, pf_set, features, output_path):
     wealth.to_pickle(os.path.join(settings["data_path"], "wealth_processed.pkl"))
 
     print("Step 4: Loading monthly return data...")
-    data_ret = load_monthly_data(
-        settings["data_path"],
-        settings=settings,
-        risk_free=risk_free
-    )
+    if settings["region"] == "USA":
+        data_ret = load_monthly_data_USA(
+            settings["data_path"],
+            settings=settings,
+            risk_free=risk_free
+        )
+    else:
+        data_ret = load_monthly_data_EU(
+            settings["data_path"],
+            settings=settings,
+            risk_free=risk_free
+        )
 
     print("Step 5: Preprocessing characteristics...")
     chars = preprocess_chars(

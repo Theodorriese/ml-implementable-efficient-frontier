@@ -7,7 +7,7 @@ data_folder = r"C:\Master"
 files_to_convert = {
     "chars_processed.csv": None,
     "data_ret_processed.csv": None,
-    "ff3_m.csv": {"skiprows": 3, "usecols": ["yyyymm", "RF"], "sep": ","},  # Specific options for this file
+    "ff3_m.csv": {"skiprows": 3, "usecols": ["yyyymm", "RF"], "sep": ","},
 }
 
 # Convert each file to Pickle

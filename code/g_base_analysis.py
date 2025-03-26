@@ -934,20 +934,20 @@ def compute_ar1_plot(chars, features, cluster_labels, output_path):
 
 
 # Features with sufficient coverage ------------------
-def process_features_with_sufficient_coverage(features_m, feat_excl, settings):
+def process_features_with_sufficient_coverage(features, feat_excl, settings):
     """
     Processes the dataset by filtering and computing features with sufficient coverage.
 
     Parameters:
-        features_m (list): List of primary features.
+        features (list): List of primary features.
         feat_excl (list): List of excluded features.
         settings (dict): Dictionary containing screen settings.
 
     Returns:
         pd.DataFrame: Filtered dataset.
     """
-    # Combine features_m and feat_excl
-    features_all = list(set(features_m + feat_excl))
+    # Combine features and feat_excl
+    features_all = list(set(features + feat_excl))
 
     # Define the necessary IDs and columns to load
     ids = [

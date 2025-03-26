@@ -8,7 +8,8 @@ from g_base_analysis import (
     plot_apple_vs_xerox, plot_optimal_hyperparameters, compute_ar1_plot,
     process_features_with_sufficient_coverage
 )
-from i1_Main import settings, pf_set, features, pf_order, pf_order_new, main_types, cluster_order
+from i1_Main import (settings, pf_set, features, pf_order, pf_order_new, main_types,
+                     cluster_order, feat_excl)
 
 
 # -------------------- CONFIGURATION --------------------
@@ -77,8 +78,6 @@ bm_pfs = base_case["bm_pfs"]
 tpf = base_case["tpf"]
 factor_ml = base_case["factor_ml"]
 mkt = base_case["mkt"]
-
-
 
 
 # # Combine portfolios
@@ -170,6 +169,6 @@ compute_ar1_plot(
     output_path=output_path
 )
 
-data, coverage = process_features_with_sufficient_coverage(features_m, feat_excl, settings)
+data, coverage = process_features_with_sufficient_coverage(features, feat_excl, settings)
 
 print("Analysis completed successfully!")

@@ -1,22 +1,7 @@
 import numpy as np
 import pandas as pd
-from matplotlib.cm import get_cmap
 
-
-# -------------------- Output Dictionary --------------------
-output = {}
-
-# -------------------- Layout Settings --------------------
-# Define the color theme, combining manual colors and a predefined Matplotlib colormap
-colormap = get_cmap("Dark2")  # Retrieve the colormap
-colours_theme = [
-    "#0C6291", "#A63446",  # Custom colors
-    *[colormap(i) for i in range(colormap.N)],  # Add colors from "Dark2" colormap
-    "darkslategrey", "blue", "red", "purple",
-    "yellow", "aquamarine", "grey", "salmon",
-    "antiquewhite", "chartreuse"
-]
-
+# ------------------ Portfolios and clusters ------------------
 pf_order = [
     "Portfolio-ML", "Multiperiod-ML", "Multiperiod-ML*",
     "Static-ML", "Static-ML*", "Market", "1/N",
@@ -43,15 +28,10 @@ cluster_order = [
 
 txt_size = 10
 
-# -------------------- Figure Paths --------------------
-output_path_fig = "Figures"
-format = "pdf"
-fig_h = 3.2
-fig_w = 6.5
-
 # -------------------- Setup --------------------
 # Data settings dictionary
 settings = {
+    "region": "EU",
     "data_path": "C:\Master",
     "parallel": True,
     "seed_no": 1,
@@ -70,8 +50,8 @@ settings = {
     "addition_n": 12,  # Need to be valid for the past n months to be included in investment universe
     "deletion_n": 12,  # Exclude from universe after N periods where the stock is non-valid
     "screens": {
-        "start": pd.Timestamp("2010-01-01"),  # First full year of data
-        "end": pd.Timestamp("2020-12-31"),  # Last full year of data
+        "start": pd.Timestamp("2010-01-01"),
+        "end": pd.Timestamp("2020-12-31"),
         "feat_pct": 0.5,
         "nyse_stocks": True
     },
@@ -126,10 +106,6 @@ settings = {
         "n_pfs": 10
     }
 }
-
-
-# Set random seed
-np.random.seed(settings["seed_no"])
 
 # -------------------- Portfolio Settings --------------------
 pf_set = {
