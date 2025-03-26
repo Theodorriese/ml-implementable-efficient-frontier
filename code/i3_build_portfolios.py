@@ -201,50 +201,50 @@ dates_m1, dates_m2, dates_oos, dates_hp, hp_years = (
 
 print("Loaded portfolio data from latest folder.")
 
-# # -------------------------- Step 4: Run Base Case ------------------------------
-# if config_params["update_base"]:
-#     print("Running Base Case...")
-#
-#     run_f_base_case(
-#         chars=portfolio_data["chars"],
-#         barra_cov=barra_cov,
-#         wealth=wealth,
-#         dates_oos=dates_oos,
-#         pf_set=pf_set,
-#         settings=settings,
-#         config_params=config_params,
-#         lambda_list=portfolio_data["lambda_list"],
-#         risk_free=risk_free,
-#         features=features,
-#         dates_m2=dates_m2,
-#         dates_hp=dates_hp,
-#         hp_years=hp_years,
-#         output_path=output_path
-#     )
-#
-#
-# # ----------------- Step 5: Run the feature importance scripts -----------------
-# # -------------------- Feature Importance - Base Case --------------------
-# if config_params.get('update_fi_base', True):
-#     print("Running Feature Importance Base Case...")
-#
-#     run_feature_importance_base(
-#         chars=portfolio_data['chars'],
-#         er_models=fitted_models,
-#         cluster_labels=cluster_labels,
-#         barra_cov=barra_cov,
-#         settings=settings,
-#         pf_set=pf_set,
-#         tpf_cf_wealth=wealth,
-#         wealth=wealth,
-#         risk_free=risk_free,
-#         lambda_list=portfolio_data['lambda_list'],
-#         features=features,
-#         dates_oos=dates_oos,
-#         output_path=output_path
-#     )
-#
-#
+# -------------------------- Step 4: Run Base Case ------------------------------
+if config_params["update_base"]:
+    print("Running Base Case...")
+
+    run_f_base_case(
+        chars=portfolio_data["chars"],
+        barra_cov=barra_cov,
+        wealth=wealth,
+        dates_oos=dates_oos,
+        pf_set=pf_set,
+        settings=settings,
+        config_params=config_params,
+        lambda_list=portfolio_data["lambda_list"],
+        risk_free=risk_free,
+        features=features,
+        dates_m2=dates_m2,
+        dates_hp=dates_hp,
+        hp_years=hp_years,
+        output_path=output_path
+    )
+
+
+# ----------------- Step 5: Run the feature importance scripts -----------------
+# -------------------- Feature Importance - Base Case --------------------
+if config_params.get('update_fi_base', True):
+    print("Running Feature Importance Base Case...")
+
+    run_feature_importance_base(
+        chars=portfolio_data['chars'],
+        er_models=fitted_models,
+        cluster_labels=cluster_labels,
+        barra_cov=barra_cov,
+        settings=settings,
+        pf_set=pf_set,
+        tpf_cf_wealth=wealth,
+        wealth=wealth,
+        risk_free=risk_free,
+        lambda_list=portfolio_data['lambda_list'],
+        features=features,
+        dates_oos=dates_oos,
+        output_path=output_path
+    )
+
+
 # -------------------- Feature Importance - IEF Case --------------------
 if config_params.get('update_fi_ief', True):
     print("Running Feature Importance IEF Case...")
@@ -262,19 +262,20 @@ if config_params.get('update_fi_ief', True):
         cluster_labels=cluster_labels
     )
 
-# # ---------------- Feature importance - Expected return models ---------------- #
-#
-# if config_params.get('update_cf', True):
-#     print("Running Counterfactual Estimation...")
-#
-#     run_feature_importance_ret(
-#         chars=portfolio_data['chars'],
-#         cluster_labels=cluster_labels,
-#         features=features,
-#         settings=settings,
-#         output_path=output_path
-#     )
-#
+# ---------------- Feature importance - Expected return models ---------------- #
+
+if config_params.get('update_cf', True):
+    print("Running Counterfactual Estimation...")
+
+    run_feature_importance_ret(
+        chars=portfolio_data['chars'],
+        cluster_labels=cluster_labels,
+        features=features,
+        settings=settings,
+        output_path=output_path,
+        model_folder=get_from_path_model
+    )
+
 
 # -------------------- Finalization --------------------
 print(f"Portfolio construction script completed")
