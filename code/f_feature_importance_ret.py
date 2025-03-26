@@ -5,7 +5,7 @@ import pickle
 from tqdm import tqdm
 
 
-def run_counterfactuals(chars, cluster_labels, features, settings, output_path):
+def run_feature_importance_ret(chars, cluster_labels, features, settings, output_path):
     """
     Estimate counterfactual predictions.
 

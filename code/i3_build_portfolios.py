@@ -7,14 +7,13 @@ from b_prepare_data import load_cluster_labels, load_risk_free, load_daily_retur
 from d_estimate_cov_matrix import prepare_cluster_data  # Covariance estimation
 from e_prepare_portfolio_data import run_prepare_portfolio_data  # Portfolio prep
 from f_feature_importance_base import run_feature_importance_base
-from f_feature_importance_ret import run_counterfactuals
-from f_feature_importance_IEF import run_feature_importance_IEF
+from f_feature_importance_IEF import run_feature_importance_ief
+from f_feature_importance_ret import run_feature_importance_ret
 from f_base_case import run_f_base_case
 from i1_Main import settings, pf_set, features
 
 
 # -------------------- CONFIGURATION --------------------
-
 config_params = {
     "size_screen": "perc_low50_high100_min40",
     "wealth": pf_set["wealth"],
@@ -108,8 +107,8 @@ daily_returns = load_daily_returns_pkl(data_path, chars, risk_free)
 print("Loaded daily return data.")
 
 # -------------------- Step 2: Estimate Covariance Matrix --------------------
-print("Step 2: Estimating covariance matrix...")
-
+# print("Step 2: Estimating covariance matrix...")
+#
 # cov_results = prepare_cluster_data(
 #     chars=chars,
 #     cluster_labels=cluster_labels,
@@ -149,8 +148,8 @@ spec_risk = cov_results["spec_risk"]
 barra_cov = cov_results["barra_cov"]
 
 # -------------------- Step 3: Prepare Portfolio Data --------------------
-print("Step 3: Preparing portfolio data...")
-
+# print("Step 3: Preparing portfolio data...")
+#
 # # Run the portfolio data preparation function and extract its outputs
 # portfolio_data = run_prepare_portfolio_data(
 #     chars=chars,
@@ -244,12 +243,13 @@ print("Loaded portfolio data from latest folder.")
 #         dates_oos=dates_oos,
 #         output_path=output_path
 #     )
-
+#
+#
 # -------------------- Feature Importance - IEF Case --------------------
 if config_params.get('update_fi_ief', True):
     print("Running Feature Importance IEF Case...")
 
-    run_feature_importance_IEF(
+    run_feature_importance_ief(
         chars=portfolio_data['chars'],
         barra_cov=barra_cov,
         wealth=wealth,
@@ -267,7 +267,7 @@ if config_params.get('update_fi_ief', True):
 # if config_params.get('update_cf', True):
 #     print("Running Counterfactual Estimation...")
 #
-#     run_counterfactuals(
+#     run_feature_importance_ret(
 #         chars=portfolio_data['chars'],
 #         cluster_labels=cluster_labels,
 #         features=features,

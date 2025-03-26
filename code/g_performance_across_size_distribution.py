@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+
 # Download files --------------------------
 def process_size_folder(size_category, size_folders, size_path):
     """
@@ -83,6 +84,7 @@ def download_and_process_files():
 
     return pf_by_size
 
+
 # Performance -----------------------------------------------
 def calculate_performance_summary(pf_by_size, pf_order, gamma_rel):
     """
@@ -134,8 +136,6 @@ def calculate_performance_summary(pf_by_size, pf_order, gamma_rel):
 
 
 # Plots -----------------------------------
-
-
 def plot_realized_utility_by_size(pf_summary_size, colours_theme):
     """
     Plot realized utility by portfolio type and size.

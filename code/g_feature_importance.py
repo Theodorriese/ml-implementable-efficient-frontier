@@ -300,6 +300,7 @@ def plot_counterfactual_ef_without_tc(output_path, colours_theme):
     plt.tight_layout()
     plt.show()
 
+
 # Feature importance for return predictions models --------------------------------
 def plot_feature_importance_for_return_predictions(output_path, colours_theme):
     """
