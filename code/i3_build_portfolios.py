@@ -16,7 +16,7 @@ from i1_Main import settings, pf_set, features
 
 # -------------------- CONFIGURATION --------------------
 config_params = {
-    "size_screen": "perc_low50_high100_min40",
+    "size_screen": "perc_low50_high100_min50",
     "wealth": pf_set["wealth"],
     "gamma_rel": pf_set["gamma_rel"],
     "industry_cov": settings["cov_set"]["industries"],
@@ -43,20 +43,8 @@ data_path = r"C:\Master"
 portfolios_dir = r"C:\Master\Data\Generated\Portfolios"
 get_from_path_model = os.path.join(data_path, "Outputs")
 
-# all_portfolios_dir = sorted(
-#     [f for f in glob.glob(os.path.join(portfolios_dir, "*")) if os.path.isdir(f)],
-#     key=os.path.getmtime,
-#     reverse=True
-# )
-# latest_folder = all_portfolios_dir[0]
 latest_folder = r"C:\Master\Data\Generated\Portfolios\demo"
 output_path = r"C:\Master\Data\Generated\Portfolios\demo"
-
-# # Create unique output folder in C:\Master\Data\Generated\Portfolios
-# timestamp = datetime.now().strftime("%Y%m%d-%H%M")
-# output_path = os.path.join(data_path, "Data", "Generated", "Portfolios",
-#                            f"{timestamp}_WEALTH{pf_set['wealth']}_GAMMA{pf_set['gamma_rel']}_SIZE{config_params['size_screen']}_IND{config_params['industry_cov']}")
-# os.makedirs(output_path, exist_ok=True)
 
 # Save config for reproducibility
 pd.to_pickle(settings, os.path.join(output_path, "settings.pkl"))
@@ -268,7 +256,6 @@ if config_params.get('update_fi_ief', True):
     )
 
 # ---------------- Feature importance - Expected return models ---------------- #
-
 if config_params.get('update_cf', True):
     print("Running Counterfactual Estimation...")
 
