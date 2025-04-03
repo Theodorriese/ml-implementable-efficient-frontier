@@ -118,8 +118,6 @@ def rff_hp_search(data, feat, p_vec, g_vec, l_vec, seed):
     Returns:
         dict: Dictionary containing the fitted model, predictions, hyperparameter search results, weights, and optimal hyperparameters.
     """
-    # Initialize progress tracker
-
     np.random.seed(seed)
     val_errors = []
     optimal_rff_train = None  # Placeholder for the optimal RFF train set

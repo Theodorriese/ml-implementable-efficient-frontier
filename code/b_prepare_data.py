@@ -197,6 +197,13 @@ def load_monthly_data_USA(data_path, settings, risk_free):
     return data_ret
 
 
+def flag_extreme_ret(group):
+    lower = group["RET"].quantile(0.001)
+    upper = group["RET"].quantile(0.999)
+    group["extreme_ret"] = (group["RET"] < lower) | (group["RET"] > upper)
+    return group
+
+
 def load_monthly_data_EU(data_path, settings, risk_free):
     """
     Load, clean, and prepare monthly data for return calculations (EU version).
@@ -248,6 +255,15 @@ def load_monthly_data_EU(data_path, settings, risk_free):
 
     # Drop rows where RET could not be calculated
     monthly_data.dropna(subset=["RET"], inplace=True)
+
+    monthly_data = monthly_data.groupby("eom", group_keys=False).apply(flag_extreme_ret)
+
+    # Remove ALL rows for stocks (id) with any extreme return
+    bad_ids = monthly_data.loc[monthly_data["extreme_ret"], "id"].unique()
+    monthly_data = monthly_data[~monthly_data["id"].isin(bad_ids)]
+
+    # Drop helper column
+    monthly_data.drop(columns=["extreme_ret"], inplace=True)
 
     # Merge risk-free rate BEFORE long_horizon_ret so it can be used for excess return calculation
     monthly_data = monthly_data.merge(risk_free, on="eom_m", how="left")

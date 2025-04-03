@@ -1,6 +1,5 @@
 import pandas as pd
 from pathlib import Path
-import time
 from a_return_prediction_functions import rff_hp_search, data_split
 
 
@@ -34,7 +33,6 @@ def fit_models(search_grid, data_ret, chars, settings, features, output_path):
 
         data_pred = pd.merge(pred_y, chars[chars["valid"]], left_on=["id", "eom_m"], right_on=["id", "eom"],
                              how="right")
-
         print(f"Processing horizons: {h}")
 
         # Define validation endpoints and test increment
