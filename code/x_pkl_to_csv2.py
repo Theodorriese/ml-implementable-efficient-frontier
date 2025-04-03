@@ -31,7 +31,7 @@ def save_obj_to_csv(obj, output_path_base, key_path=""):
 
 # --------- Configuration ---------
 file_name = "model_1.pkl"
-input_folder = r"C:\Master\ml-implementable-efficient-frontier\code\Outputs"
+input_folder = r"C:\Master\Outputs"
 output_folder = os.path.join(input_folder, "csv")  # Put all CSVs in /Outputs/csv
 os.makedirs(output_folder, exist_ok=True)
 

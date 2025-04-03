@@ -136,7 +136,7 @@ def prepare_and_fit_models(settings, pf_set, features, output_path):
     # -------------------- Step 2: Model Fitting --------------------
 
     # To just load them
-    print("Loading monthly return data and characteristics data...")
+    # print("Loading monthly return data and characteristics data...")
     # # data_ret = pd.read_csv(os.path.join(settings["data_path"], "data_ret_processed.csv"))
     # # chars = pd.read_csv(os.path.join(settings["data_path"], "chars_processed.csv"))
     #
