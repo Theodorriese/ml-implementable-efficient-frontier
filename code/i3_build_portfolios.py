@@ -85,13 +85,17 @@ print("Loaded cluster labels")
 risk_free = load_risk_free(data_path)
 print("Loaded risk-free rate data.")
 
-# Load daily return data based on region setting
 if settings["region"] == "USA":
-    daily_returns = load_daily_returns_pkl_USA(data_path, chars, risk_free)
+    daily_returns = load_daily_returns_pkl_USA(settings["data_path"], chars, risk_free)
     print("Loaded daily return data for USA.")
 else:
-    daily_returns = load_daily_returns_pkl_EU(data_path, chars, risk_free)
+    daily_returns = load_daily_returns_pkl_EU(settings["data_path"], chars, risk_free)
     print("Loaded daily return data for EU.")
+
+
+# # Load daily returns
+# daily_returns = pd.read_pickle(os.path.join(data_path, "daily_returns.pkl"))
+# print(f"Loaded daily return data from pickle for region: {settings['region']}")
 
 # Load fitted models
 fitted_models_path = os.path.join(get_from_path_model, "fitted_models.pkl")

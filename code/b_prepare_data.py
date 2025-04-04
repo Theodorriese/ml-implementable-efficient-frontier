@@ -663,60 +663,71 @@ def load_daily_returns_pkl_EU(data_path, chars, risk_free):
     Returns:
         pd.DataFrame: Preprocessed daily returns data with calculated excess returns.
     """
-    # Load daily returns data from CSV file
+
+    # Load daily returns data
     daily = pd.read_csv(os.path.join(data_path, "eu_dsf.csv"))
 
     # Rename columns for consistency
-    daily.rename(columns={"gvkey": "id", "datadate": "date", "prccd": "PRCCD",
-                          "ajexdi": "AJEXDI", "trfd": "TRFD"}, inplace=True)
+    daily.rename(columns={
+        "gvkey": "id", "datadate": "date", "prccd": "PRCCD",
+        "ajexdi": "AJEXDI", "trfd": "TRFD"
+    }, inplace=True)
 
-    # Filter for valid data (non-NA prices and valid IDs from chars)
+    # Filter for valid price & adjustment data
     daily = daily[daily["PRCCD"].notna() & daily["AJEXDI"].notna() & daily["TRFD"].notna()]
+
+    # Filter to only valid IDs from characteristics
     valid_ids = chars.loc[chars["valid"], "id"].unique()
     daily = daily[daily["id"].isin(valid_ids)]
 
-    # Convert `date` to datetime
+    # Convert date
     daily['date'] = pd.to_datetime(daily['date'], errors='coerce', dayfirst=True)
 
-    # Sort data by 'id' and 'date' for proper return calculation
-    daily = daily.sort_values(by=["id", "date"])
+    # Keep lowest iid per ISIN-date combo
+    daily = daily[~daily["ISIN"].isna()]
+    daily.sort_values(by=["ISIN", "date", "iid"], inplace=True)
+    daily = daily.drop_duplicates(subset=["ISIN", "date"], keep="first")
 
-    # Calculate Returns (RET) using the given formula
+    # Sort for return calc
+    daily.sort_values(by=["id", "date"], inplace=True)
+
+    # Calculate daily total return
     daily["RET"] = (
         (((daily["PRCCD"] / daily["AJEXDI"]) * daily["TRFD"]) /
-         ((daily.groupby("id")["PRCCD"].shift(1) /
-           daily.groupby("id")["AJEXDI"].shift(1)) *
+         ((daily.groupby("id")["PRCCD"].shift(1) / daily.groupby("id")["AJEXDI"].shift(1)) *
           daily.groupby("id")["TRFD"].shift(1))) - 1
     )
 
-    # Drop rows where RET could not be calculated
     daily.dropna(subset=["RET"], inplace=True)
 
-    # Prepare `risk_free` data for merging
-    risk_free.rename(columns={"eom_m": "date"}, inplace=True)
-    risk_free["date"] = pd.to_datetime(risk_free["date"], format="%Y-%m-%d")
-    risk_free["month"] = risk_free["date"].dt.to_period("M")
+    # Flag and remove extreme stocks
+    daily = daily.groupby("date", group_keys=False).apply(flag_extreme_ret)
+    bad_ids = daily.loc[daily["extreme_ret"], "id"].unique()
+    daily = daily[~daily["id"].isin(bad_ids)]
+    daily.drop(columns=["extreme_ret"], inplace=True)
 
-    # Calculate daily risk-free rate
-    risk_free["days_in_month"] = risk_free["date"].dt.daysinmonth  # Number of days in each month
-    risk_free["rf_daily"] = risk_free["rf"] / risk_free["days_in_month"]  # Convert to daily rate
+    # Merge risk-free daily return
+    rf_temp = risk_free.rename(columns={"eom_m": "date"}).copy()
+    rf_temp["date"] = pd.to_datetime(rf_temp["date"])
+    rf_temp["days_in_month"] = rf_temp["date"].dt.daysinmonth
+    rf_temp["rf_daily"] = rf_temp["rf"] / rf_temp["days_in_month"]
+    rf_temp["month"] = rf_temp["date"].dt.to_period("M")
 
-    # Map monthly risk-free rates to daily data
+    # Merge monthly RF rate to daily data by month
     daily["month"] = daily["date"].dt.to_period("M")
-    daily = daily.merge(risk_free[["month", "rf_daily"]], on="month", how="left")
-    daily.drop(columns=["month"], inplace=True)  # Clean up temporary column
-
-    # Ensure `RET` is numeric
-    daily["RET"] = pd.to_numeric(daily["RET"], errors="coerce")
+    daily = daily.merge(rf_temp[["month", "rf_daily"]], on="month", how="left")
+    daily.drop(columns=["month"], inplace=True)
 
     # Calculate excess return
+    daily["RET"] = pd.to_numeric(daily["RET"], errors="coerce")
     daily["ret_exc"] = daily["RET"] - daily["rf_daily"]
 
-    # Add `eom` column (end-of-month)
+    # Add end-of-month
     daily["eom"] = daily["date"] + pd.offsets.MonthEnd(0)
 
-    # Drop unnecessary columns
+    # Drop columns you no longer need
     daily.drop(columns=["rf_daily", "PRCCD", "AJEXDI", "TRFD"], inplace=True)
 
     return daily
+
 

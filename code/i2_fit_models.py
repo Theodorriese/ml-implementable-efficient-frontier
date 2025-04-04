@@ -18,6 +18,8 @@ from b_prepare_data import (
     apply_addition_deletion_rule,
     show_investable_universe,
     valid_summary,
+    load_daily_returns_pkl_USA,
+    load_daily_returns_pkl_EU
 )
 from c_fit_models import fit_models
 
@@ -131,27 +133,38 @@ def prepare_and_fit_models(settings, pf_set, features, output_path):
     show_investable_universe(chars)
     valid_summary(chars)
 
+    print("Step 15: Loading daily return data...")
+    # Compute daily return data based on region setting
+    if settings["region"] == "USA":
+        daily_returns = load_daily_returns_pkl_USA(settings["data_path"], chars, risk_free)
+        print("Loaded daily return data for USA.")
+    else:
+        daily_returns = load_daily_returns_pkl_EU(settings["data_path"], chars, risk_free)
+        print("Loaded daily return data for EU.")
+
+    daily_returns.to_pickle(os.path.join(settings["data_path"], "daily_returns.pkl"))
+
     ########################################################################
 
     # -------------------- Step 2: Model Fitting --------------------
 
     # To just load them
-    # print("Loading monthly return data and characteristics data...")
-    # # data_ret = pd.read_csv(os.path.join(settings["data_path"], "data_ret_processed.csv"))
-    # # chars = pd.read_csv(os.path.join(settings["data_path"], "chars_processed.csv"))
-    #
-    # data_ret_path = os.path.join(settings["data_path"], "data_ret_processed.pkl")
-    # data_ret = pd.read_pickle(data_ret_path)
-    #
-    # chars_path = os.path.join(settings["data_path"], "chars_processed.pkl")
-    # chars = pd.read_pickle(chars_path)
-    #
-    # data_ret["eom"] = pd.to_datetime(data_ret["eom"])
-    # data_ret["eom_m"] = pd.to_datetime(data_ret["eom_m"])
-    # chars["eom"] = pd.to_datetime(chars["eom"])
+    print("Loading monthly return data and characteristics data...")
+    # data_ret = pd.read_csv(os.path.join(settings["data_path"], "data_ret_processed.csv"))
+    # chars = pd.read_csv(os.path.join(settings["data_path"], "chars_processed.csv"))
+
+    data_ret_path = os.path.join(settings["data_path"], "data_ret_processed.pkl")
+    data_ret = pd.read_pickle(data_ret_path)
+
+    chars_path = os.path.join(settings["data_path"], "chars_processed.pkl")
+    chars = pd.read_pickle(chars_path)
+
+    data_ret["eom"] = pd.to_datetime(data_ret["eom"])
+    data_ret["eom_m"] = pd.to_datetime(data_ret["eom_m"])
+    chars["eom"] = pd.to_datetime(chars["eom"])
 
     # To fit them
-    print("Step 15: Fitting return prediction models...")
+    print("Step 16: Fitting return prediction models...")
     models = fit_models(
         search_grid=search_grid,
         data_ret=data_ret,

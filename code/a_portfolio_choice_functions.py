@@ -1219,7 +1219,7 @@ def pfml_hp_reals_fun(pfml_input, hp_coef, p_vec, l_vec, hp_years, orig_feat, fe
 
     Parameters:
         pfml_input (dict): Input containing 'reals' with realizations and denominators.
-        hp_coef (dict): Hyperparameter coefficients from `pfml_search_coef`.
+        hp_coef (dict): Hyperparameter coefficients from.
         p_vec (list): List of numbers of random Fourier features (RFF) to evaluate.
         l_vec (list): List of regularization parameters (lambdas) to evaluate.
         hp_years (list): List of hyperparameter evaluation years.

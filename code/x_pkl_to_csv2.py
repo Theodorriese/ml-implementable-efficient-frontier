@@ -30,8 +30,8 @@ def save_obj_to_csv(obj, output_path_base, key_path=""):
         print(f"Skipped unsupported type: {type(obj)} at {key_path}")
 
 # --------- Configuration ---------
-file_name = "model_1.pkl"
-input_folder = r"C:\Master\Outputs"
+file_name = "portfolio-ml.pkl"
+input_folder = r"C:\Master\Data\Generated\Portfolios\demo"
 output_folder = os.path.join(input_folder, "csv")  # Put all CSVs in /Outputs/csv
 os.makedirs(output_folder, exist_ok=True)
 
