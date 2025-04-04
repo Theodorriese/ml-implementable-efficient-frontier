@@ -163,7 +163,7 @@ def prepare_cluster_data(chars, cluster_labels, daily, settings, features):
     for d in tqdm(calc_dates, desc="Stock-level covariances"):
         # Step 1: Extract stock-level characteristics
         char_data = cluster_data_m[cluster_data_m["eom"] == d].copy()
-        char_data = char_data.merge(spec_risk, on=["id", "eom_ret"], how="left")  # Corrected merge
+        char_data = char_data.merge(spec_risk, on=["id", "eom_ret"], how="left")
 
         # Step 2: Impute missing residual volatility (res_vol)
         grp_med = char_data.groupby(["size_grp", "eom"])["res_vol"].transform("median")

@@ -35,20 +35,20 @@ pf_set["wealth"] = config_params["wealth"]
 pf_set["gamma_rel"] = config_params["gamma_rel"]
 
 # # -------------------- DEFINE PATHS (local) --------------------
-# data_path = r"C:\Master"
-# portfolios_dir = r"C:\Master\Data\Generated\Portfolios"
-# get_from_path_model = os.path.join(data_path, "Outputs")
-
-# latest_folder = r"C:\Master\Data\Generated\Portfolios\demo"
-# output_path = r"C:\Master\Data\Generated\Portfolios\demo"
-
-# -------------------- DEFINE PATHS --------------------
-data_path = "/work/frontier_ml/data"
-portfolios_dir = "/work/frontier_ml/data/Portfolios"
+data_path = r"C:\Master"
+portfolios_dir = r"C:\Master\Data\Generated\Portfolios"
 get_from_path_model = os.path.join(data_path, "Outputs")
 
-latest_folder = "/work/frontier_ml/data/Portfolios/demo"
-output_path = "/work/frontier_ml/data/Portfolios/demo"
+latest_folder = r"C:\Master\Data\Generated\Portfolios\demo"
+output_path = r"C:\Master\Data\Generated\Portfolios\demo"
+
+# -------------------- DEFINE PATHS --------------------
+# data_path = "/work/frontier_ml/data"
+# portfolios_dir = "/work/frontier_ml/data/Portfolios"
+# get_from_path_model = os.path.join(data_path, "Outputs")
+#
+# latest_folder = "/work/frontier_ml/data/Portfolios/demo"
+# output_path = "/work/frontier_ml/data/Portfolios/demo"
 
 # Save config for reproducibility
 pd.to_pickle(settings, os.path.join(output_path, "settings.pkl"))
@@ -100,8 +100,8 @@ if not os.path.exists(fitted_models_path):
 fitted_models = pd.read_pickle(fitted_models_path)
 
 # -------------------- Step 2: Estimate Covariance Matrix --------------------
-# print("Step 2: Estimating covariance matrix...")
-#
+print("Step 2: Estimating covariance matrix...")
+
 # cov_results = prepare_cluster_data(
 #     chars=chars,
 #     cluster_labels=cluster_labels,
@@ -141,8 +141,8 @@ spec_risk = cov_results["spec_risk"]
 barra_cov = cov_results["barra_cov"]
 
 # -------------------- Step 3: Prepare Portfolio Data --------------------
-# print("Step 3: Preparing portfolio data...")
-#
+print("Step 3: Preparing portfolio data...")
+
 # # Run the portfolio data preparation function and extract its outputs
 # portfolio_data = run_prepare_portfolio_data(
 #     chars=chars,

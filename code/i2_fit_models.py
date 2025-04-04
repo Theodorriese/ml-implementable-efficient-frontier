@@ -137,10 +137,10 @@ def prepare_and_fit_models(settings, pf_set, features, output_path):
     # Compute daily return data based on region setting
     if settings["region"] == "USA":
         daily_returns = load_daily_returns_pkl_USA(settings["data_path"], chars, risk_free)
-        print("Loaded daily return data for USA.")
+        print("Computed daily return data for USA.")
     else:
         daily_returns = load_daily_returns_pkl_EU(settings["data_path"], chars, risk_free)
-        print("Loaded daily return data for EU.")
+        print("Computed daily return data for EU.")
 
     daily_returns.to_pickle(os.path.join(settings["data_path"], "daily_returns.pkl"))
 
@@ -149,19 +149,19 @@ def prepare_and_fit_models(settings, pf_set, features, output_path):
     # -------------------- Step 2: Model Fitting --------------------
 
     # To just load them
-    print("Loading monthly return data and characteristics data...")
-    # data_ret = pd.read_csv(os.path.join(settings["data_path"], "data_ret_processed.csv"))
-    # chars = pd.read_csv(os.path.join(settings["data_path"], "chars_processed.csv"))
-
-    data_ret_path = os.path.join(settings["data_path"], "data_ret_processed.pkl")
-    data_ret = pd.read_pickle(data_ret_path)
-
-    chars_path = os.path.join(settings["data_path"], "chars_processed.pkl")
-    chars = pd.read_pickle(chars_path)
-
-    data_ret["eom"] = pd.to_datetime(data_ret["eom"])
-    data_ret["eom_m"] = pd.to_datetime(data_ret["eom_m"])
-    chars["eom"] = pd.to_datetime(chars["eom"])
+    # print("Loading monthly return data and characteristics data...")
+    # # data_ret = pd.read_csv(os.path.join(settings["data_path"], "data_ret_processed.csv"))
+    # # chars = pd.read_csv(os.path.join(settings["data_path"], "chars_processed.csv"))
+    #
+    # data_ret_path = os.path.join(settings["data_path"], "data_ret_processed.pkl")
+    # data_ret = pd.read_pickle(data_ret_path)
+    #
+    # chars_path = os.path.join(settings["data_path"], "chars_processed.pkl")
+    # chars = pd.read_pickle(chars_path)
+    #
+    # data_ret["eom"] = pd.to_datetime(data_ret["eom"])
+    # data_ret["eom_m"] = pd.to_datetime(data_ret["eom_m"])
+    # chars["eom"] = pd.to_datetime(chars["eom"])
 
     # To fit them
     print("Step 16: Fitting return prediction models...")

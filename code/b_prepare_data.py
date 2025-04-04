@@ -42,7 +42,9 @@ def load_risk_free(data_path):
     risk_free["eom_m"] = (pd.to_datetime(risk_free["yyyymm"].astype(str) + "01", format="%Y%m%d")
                           + pd.offsets.MonthEnd(0))
 
-    return risk_free[["eom_m", "rf"]]
+    risk_free["date"] = risk_free["eom_m"]
+
+    return risk_free[["eom_m", "rf", "date"]]
 
 
 # Function to load and preprocess market data
@@ -223,64 +225,54 @@ def load_monthly_data_EU(data_path, settings, risk_free):
     )
 
     # Rename columns for consistency
-    monthly_data.rename(columns={"datadate": "eom", "gvkey": "id", "ISIN": "EXCHCD"}, inplace=True)
-    monthly_data.dropna(subset=["EXCHCD"], inplace=True)
+    monthly_data.rename(columns={"datadate": "eom", "gvkey": "id"}, inplace=True)
+    monthly_data.dropna(subset=["ISIN"], inplace=True)
 
-    # Generate end-of-month date ('eom') using the consistent method
+    # Convert dates
     monthly_data["eom"] = pd.to_datetime(monthly_data["eom"], format="%d/%m/%Y", dayfirst=True)
-    monthly_data["eom_m"] = monthly_data["eom"] + pd.offsets.MonthEnd(0)  # Align with risk-free
+    monthly_data["eom_m"] = monthly_data["eom"] + pd.offsets.MonthEnd(0)
 
-    # Remove IDs with missing `prccm` values
-    monthly_data = monthly_data[~monthly_data["id"].isin(monthly_data[monthly_data["prccm"].isna()]["id"].unique())]
+    # Remove rows with missing `prccm`
+    monthly_data = monthly_data[~monthly_data["id"].isin(
+        monthly_data[monthly_data["prccm"].isna()]["id"].unique())]
 
-    # Filter EXCHCD if needed
-    monthly_data["EXCHCD"] = monthly_data["EXCHCD"].fillna(0).astype(str)
+    # Deduplicate ISINs: keep lowest iid per ISIN and date
+    monthly_data.sort_values(by=["ISIN", "eom", "iid"], inplace=True)
+    monthly_data = monthly_data.drop_duplicates(subset=["ISIN", "eom"], keep="first")
 
-    # Sort data by 'id', 'eom', and 'iid' to keep the lowest iid
-    monthly_data.sort_values(by=["id", "eom", "iid"], inplace=True)
-
-    # Keep only the lowest `iid` per 'id' and 'eom'
-    monthly_data = monthly_data.drop_duplicates(subset=["id", "eom"], keep="first")
-
-    # Sort data by 'id' and 'eom' to ensure the calculation is correct
+    # Sort by 'id' and 'eom'
     monthly_data = monthly_data.sort_values(by=["id", "eom"])
 
-    # Calculate RET (returns) using the formula provided
+    # Calculate RET (returns)
     monthly_data["RET"] = (
-            (((monthly_data["prccm"] / monthly_data["ajexm"]) * monthly_data["ajpm"]) /
-             ((monthly_data.groupby("id")["prccm"].shift(1) /
-               monthly_data.groupby("id")["ajexm"].shift(1)) *
-              monthly_data.groupby("id")["ajpm"].shift(1))) - 1
+        (((monthly_data["prccm"] / monthly_data["ajexm"]) * monthly_data["ajpm"]) /
+         ((monthly_data.groupby("id")["prccm"].shift(1) / monthly_data.groupby("id")["ajexm"].shift(1)) *
+          monthly_data.groupby("id")["ajpm"].shift(1))) - 1
     )
 
     # Drop rows where RET could not be calculated
     monthly_data.dropna(subset=["RET"], inplace=True)
 
+    # Remove extreme returns
     monthly_data = monthly_data.groupby("eom", group_keys=False).apply(flag_extreme_ret)
-
-    # Remove ALL rows for stocks (id) with any extreme return
     bad_ids = monthly_data.loc[monthly_data["extreme_ret"], "id"].unique()
     monthly_data = monthly_data[~monthly_data["id"].isin(bad_ids)]
-
-    # Drop helper column
     monthly_data.drop(columns=["extreme_ret"], inplace=True)
 
-    # Merge risk-free rate BEFORE long_horizon_ret so it can be used for excess return calculation
+    # Merge risk-free rate
     monthly_data = monthly_data.merge(risk_free, on="eom_m", how="left")
-    monthly_data["ret_exc"] = monthly_data["RET"] - monthly_data["rf"]  # Compute excess return
+    monthly_data["ret_exc"] = monthly_data["RET"] - monthly_data["rf"]
 
-    # Compute long-horizon returns using the new excess return column
+    # Long-horizon returns
     data_ret = long_horizon_ret(monthly_data, h=settings["pf"]["hps"]["m1"]["K"], impute="zero")
 
-    # Add `tr_ld1` (total return) by combining `ret_ld1` with `rf`
+    # Add total return and shift
     data_ret = data_ret.merge(risk_free, on="eom_m", how="left")
     data_ret["tr_ld1"] = data_ret["ret_ld1"] + data_ret["rf"]
     data_ret.drop(columns=["rf"], inplace=True)
-
-    # Add total return at T-1 by shifting `tr_ld1` backwards
     data_ret["tr_ld0"] = data_ret.groupby("id")["tr_ld1"].shift(1)
 
-    # Final formatting to match USA output
+    # Final formatting
     column_order = ["eom", "eom_m"] + [col for col in data_ret.columns if col not in ["eom", "eom_m"]]
     data_ret = data_ret[column_order]
     data_ret[["eom_m", "eom"]] = data_ret[["eom_m", "eom"]].apply(pd.to_datetime)
@@ -681,12 +673,12 @@ def load_daily_returns_pkl_EU(data_path, chars, risk_free):
     daily = daily[daily["id"].isin(valid_ids)]
 
     # Convert date
-    daily['date'] = pd.to_datetime(daily['date'], errors='coerce', dayfirst=True)
+    daily["date"] = pd.to_datetime(daily["date"], errors="coerce", dayfirst=True)
 
-    # Keep lowest iid per ISIN-date combo
+    # Keep only one ISIN per (id, date) with lowest iid
     daily = daily[~daily["ISIN"].isna()]
-    daily.sort_values(by=["ISIN", "date", "iid"], inplace=True)
-    daily = daily.drop_duplicates(subset=["ISIN", "date"], keep="first")
+    daily.sort_values(by=["id", "date", "iid"], inplace=True)
+    daily = daily.drop_duplicates(subset=["id", "date"], keep="first")
 
     # Sort for return calc
     daily.sort_values(by=["id", "date"], inplace=True)
@@ -706,9 +698,9 @@ def load_daily_returns_pkl_EU(data_path, chars, risk_free):
     daily = daily[~daily["id"].isin(bad_ids)]
     daily.drop(columns=["extreme_ret"], inplace=True)
 
-    # Merge risk-free daily return
-    rf_temp = risk_free.rename(columns={"eom_m": "date"}).copy()
-    rf_temp["date"] = pd.to_datetime(rf_temp["date"])
+    # Create a copy of risk-free to safely manipulate
+    rf_temp = risk_free.copy()
+    rf_temp["date"] = pd.to_datetime(rf_temp["eom_m"])
     rf_temp["days_in_month"] = rf_temp["date"].dt.daysinmonth
     rf_temp["rf_daily"] = rf_temp["rf"] / rf_temp["days_in_month"]
     rf_temp["month"] = rf_temp["date"].dt.to_period("M")
@@ -729,5 +721,7 @@ def load_daily_returns_pkl_EU(data_path, chars, risk_free):
     daily.drop(columns=["rf_daily", "PRCCD", "AJEXDI", "TRFD"], inplace=True)
 
     return daily
+
+
 
 
