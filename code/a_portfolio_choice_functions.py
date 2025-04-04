@@ -6,8 +6,10 @@ from tqdm import tqdm
 from scipy.linalg import sqrtm, pinv
 from itertools import product
 from collections import defaultdict
+from joblib import Parallel, delayed
 from a_general_functions import create_cov, create_lambda, sigma_gam_adj, initial_weights_new, pf_ts_fun
 from a_return_prediction_functions import rff
+from multiprocessing import cpu_count
 
 
 def m_func(w, mu, rf, sigma_gam, gam, lambda_mat, iterations):
@@ -482,7 +484,7 @@ def mv_implement(data, cov_list, wealth, dates):
     data_split = {
         date: sub_df.copy() for date, sub_df in data[
             (data['valid'] == True) & (data['eom'].isin(dates))
-        ][['id', 'eom', 'me']].groupby('eom')
+            ][['id', 'eom', 'me']].groupby('eom')
     }
 
     mv_opt = []
@@ -613,7 +615,8 @@ def static_val_fun(data, dates, cov_list, lambda_list, wealth, cov_type,
         lambda_mat *= k
 
         # Extract weights and ensure pred_ld1 contains zeros for missing predictions
-        pred_ld1 = static_weights.loc[static_weights['eom'] == d, 'pred_ld1'].fillna(0).values.reshape(-1, 1)  # Replace NaN with 0
+        pred_ld1 = static_weights.loc[static_weights['eom'] == d, 'pred_ld1'].fillna(0).values.reshape(-1,
+                                                                                                       1)  # Replace NaN with 0
         static_weights.loc[static_weights['eom'] == d, 'w_start'] = static_weights.loc[
             static_weights['eom'] == d, 'w_start'].fillna(0)  # Replace NaN with 0 for w_start
         w_start = static_weights.loc[static_weights['eom'] == d, 'w_start'].values.reshape(-1, 1)
@@ -745,9 +748,9 @@ def static_implement(data_tc, cov_list, lambda_list,
     validation = validation.sort_values(by=['hp_no', 'eom_ret'])
     validation['cum_var'] = validation.groupby('hp_no')['r'].transform(lambda x: x.expanding().var())
     validation['cum_obj'] = (validation.groupby('hp_no')
-                                      .apply(lambda df: (df['r'] - df['tc'] - 0.5*df['cum_var']*gamma_rel)
-                                                      .expanding().mean())
-                                      .reset_index(level=0, drop=True))
+                             .apply(lambda df: (df['r'] - df['tc'] - 0.5 * df['cum_var'] * gamma_rel)
+                                    .expanding().mean())
+                             .reset_index(level=0, drop=True))
     validation['rank'] = validation.groupby('eom_ret')['cum_obj'].rank(ascending=False)
 
     # Find the best hyperparameters (example: pick 12th month & rank==1)
@@ -778,7 +781,7 @@ def static_implement(data_tc, cov_list, lambda_list,
 
 def scale_constant(df):
     """Scale a Series or array so that the sum of squares equals 1, unless it's all zero."""
-    s = np.sum(df**2)
+    s = np.sum(df ** 2)
     return df * np.sqrt(1.0 / s) if s != 0 else df
 
 
@@ -807,32 +810,16 @@ def pfml_input_fun(data_tc, cov_list, lambda_list, gamma_rel, wealth, mu, dates,
                    risk_free, features, rff_feat, seed, p_max, g, add_orig, iter_, balanced):
     """
     Prepares inputs for Portfolio-ML computations.
+    (Optimized to run Step 4 in parallel using joblib.)
 
     Parameters:
-        data_tc (pd.DataFrame): Data with columns: 'id', 'eom', 'valid', 'ret_ld1', 'tr_ld0', 'mu_ld0', plus features.
-        cov_list (dict): Covariance matrices keyed by dates.
-        lambda_list (dict): Lambda matrices keyed by dates.
-        gamma_rel (float): Relative risk aversion parameter.
-        wealth (pd.DataFrame): Contains ['eom', 'wealth'].
-        mu (float): Expected return parameter.
-        dates (list): Dates (as pd.Timestamp or convertible) for computation.
-        lb (int): Lookback window (in months).
-        scale (bool): Whether to scale features by volatility.
-        risk_free (pd.DataFrame): Contains ['date', 'rf'].
-        features (list): Feature column names.
-        rff_feat (bool): Whether to use Random Fourier Features.
-        seed (int): Random seed for RFF.
-        p_max (int): Maximum number of RFF features.
-        g (float): Gaussian kernel width for RFF.
-        add_orig (bool): Include original features along with RFF.
-        iter_ (int): Number of iterations for weight computation (for m_func).
-        balanced (bool): Whether to perform balanced panel transformations.
+      ... [same as before]
 
     Returns:
         dict: Dictionary containing:
-            - "reals": Realizations (r_tilde, denom, risk, tc) keyed by date.
+            - "reals": Realizations keyed by date.
             - "signal_t": Signal matrices keyed by date.
-            - "rff_w": Random Fourier feature weights (if rff_feat True).
+            - "rff_w": RFF weights if rff_feat True.
     """
     # Convert dates to Timestamps.
     dates = [pd.to_datetime(d) for d in dates]
@@ -862,9 +849,9 @@ def pfml_input_fun(data_tc, cov_list, lambda_list, gamma_rel, wealth, mu, dates,
     data['eom'] = pd.to_datetime(data['eom'])
     feat_cons = feat_new + ['constant']
 
-    # --- Step 2. Add volatility scales if requested (use full data) ---
+    # --- Step 2. Add volatility scales if requested ---
     if scale:
-        start_lb = (min(dates) + pd.DateOffset(days=1)) - pd.DateOffset(months=lb+1)
+        start_lb = (min(dates) + pd.DateOffset(days=1)) - pd.DateOffset(months=lb + 1)
         end_lb = max(dates) + pd.DateOffset(days=1)
         dates_lb = pd.date_range(start=start_lb, end=end_lb, freq='M')
         scales_list = []
@@ -877,16 +864,12 @@ def pfml_input_fun(data_tc, cov_list, lambda_list, gamma_rel, wealth, mu, dates,
                     scales_list.append(pd.DataFrame({'id': sigma_temp.index, 'eom': d_, 'vol_scale': diag_vol}))
         if scales_list:
             scales_df = pd.concat(scales_list, ignore_index=True)
-
             chunk_size = 100000
             chunked_data = []
-
             for i in range(0, len(data), chunk_size):
                 data_chunk = data.iloc[i:i + chunk_size]
                 merged_chunk = data_chunk.merge(scales_df, on=['id', 'eom'], how='left')
                 chunked_data.append(merged_chunk)
-
-            # Combine all chunks back into one DataFrame
             data = pd.concat(chunked_data, ignore_index=True)
             data['vol_scale'] = data.groupby('eom')['vol_scale'].transform(lambda x: x.fillna(x.median(skipna=True)))
 
@@ -896,23 +879,20 @@ def pfml_input_fun(data_tc, cov_list, lambda_list, gamma_rel, wealth, mu, dates,
             data[col] = data.groupby('eom')[col].transform(lambda x: x - x.mean())
         data['constant'] = 1
         for col in feat_cons:
-            data[col] = data.groupby('eom')[col].transform(
-                lambda x: x * np.sqrt(1 / (np.sum(x ** 2) + 1e-10)))  # Avoid div by 0
+            data[col] = data.groupby('eom')[col].transform(lambda x: x * np.sqrt(1 / (np.sum(x ** 2) + 1e-10)))
 
-    # --- Step 4. Loop over each date to compute signals and realizations ---
-    inputs = {}
-    for d in tqdm(dates, desc="Step 4. Computing signals and realizations"):
+    # --- Step 4. Parallel processing for each date ---
+    def process_date(d):
+        # Optional progress print for every 10th year (as before)
         if d.year % 10 == 0 and d.month == 1:
             print(f"--> PF-ML inputs: {d}")
 
-        # Use only valid data for the current date (data_ret)
-        data_ret = data[(data['valid'] == True) & (data['eom'] == d)]
-        data_ret = data_ret.sort_values('id')
-        ids = data_ret['id'].values
-        r = data_ret['ret_ld1'].values
-        # n = len(ids)
+        # Use only valid data for current date
+        data_ret_d = data[(data['valid'] == True) & (data['eom'] == d)].sort_values('id')
+        ids = data_ret_d['id'].values
+        r = data_ret_d['ret_ld1'].values
 
-        # Compute sigma, lambda, etc. based solely on data_ret ids.
+        # Compute sigma, lambda, etc. based on data_ret_d ids.
         w = wealth.loc[wealth['eom'] == d, 'wealth'].iloc[0]
         sigma_data = cov_list.get(d, {})
         sigma = create_cov(sigma_data, ids=ids) if sigma_data is not None else None
@@ -920,87 +900,59 @@ def pfml_input_fun(data_tc, cov_list, lambda_list, gamma_rel, wealth, mu, dates,
         lambda_mat = create_lambda(lambda_data, ids=ids) if lambda_data is not None else None
         rf = risk_free.loc[risk_free['date'] == d, 'rf'].iloc[0]
 
-        # Compute m once for the current date (using data_ret ids)
+        # Compute m for current date using data_ret_d
         m = m_func(w=w, mu=mu, rf=rf,
                    sigma_gam=sigma * gamma_rel if sigma is not None else None,
                    gam=gamma_rel, lambda_mat=lambda_mat, iterations=iter_)
-        m_ids = data_ret['id'].values
+        m_ids = data_ret_d['id'].values
 
-        # Build lookback data (data_sub) using valid stocks (data_ret IDs)
+        # Build lookback data for valid stocks (data_ret_d IDs)
         start_date = (d.replace(day=1) - pd.DateOffset(months=lb)) - pd.DateOffset(days=1)
-        data_sub = data[(data['id'].isin(ids)) & (data['eom'] >= start_date) & (data['eom'] <= d) & (data['valid'] == True)].copy()
+        data_sub = data[
+            (data['id'].isin(ids)) & (data['eom'] >= start_date) & (data['eom'] <= d) & (data['valid'] == True)].copy()
         if not balanced:
             data_sub[feat_new] = data_sub.groupby('eom')[feat_new].transform(lambda x: x - x.mean())
             data_sub['constant'] = 1
             data_sub[feat_cons] = data_sub.groupby('eom')[feat_cons].transform(scale_constant)
-
         data_sub = data_sub.sort_values(['eom', 'id'], ascending=[False, True])
         groups = {grp: sub.sort_values('id') for grp, sub in data_sub.groupby('eom')}
 
-        # Build signals: for each group (by eom), extract the matrix of features.
+        # Build signals: for each group (by eom)
         signals = {}
         for grp_date, sub in groups.items():
-            sub = sub.sort_values('id')  # Ensure sorted order
-
-            # Check if vol_scale is completely NaN
+            sub = sub.sort_values('id')
             if scale and sub['vol_scale'].isna().all():
                 print(f"Skipping {grp_date}: All vol_scale values are NaN.")
-                continue  # Skip this group
-
-            # Extract feature matrix s
+                continue
             s = sub[feat_cons].values
-
-            # Scale if required
             if scale:
                 vol = sub['vol_scale'].values
                 s = np.diag(1.0 / vol) @ s
-
-            # Create a DataFrame indexed by 'id' for alignment
             s_df = pd.DataFrame(s, index=sub['id'], columns=feat_cons)
-
-            # Ensure s aligns with all stocks in m_ids (fill missing stocks with zeros)
             full_s = pd.DataFrame(0.0, index=m_ids, columns=feat_cons, dtype=np.float64)
-            full_s.loc[s_df.index] = s_df  # Replace only available stocks
-
-            # Convert back to numpy and store
+            full_s.loc[s_df.index] = s_df
             signals[grp_date] = full_s.values
 
-        # Build weighting matrices
+        # Build weighting matrices (gtm)
         gtm = {}
         for grp_date, sub in groups.items():
-            # Compute gt for the current group (sub)
-            sub = sub.sort_values('id')  # Ensure IDs are sorted consistently
+            sub = sub.sort_values('id')
             tr = sub['tr_ld0'].values
             mu_ld = sub['mu_ld0'].values
             gt_series = pd.Series((1.0 + tr) / (1.0 + mu_ld), index=sub['id'].values)
-
-            # Replace NaNs with 1.0 to neutralize missing values
             gt_series.fillna(1.0, inplace=True)
-
-            # Ensure gt aligns with all stocks in m
-            full_gt = gt_series.reindex(m_ids, fill_value=1.0)  # Align with m_ids, fill missing with 1.0
-
-            # Convert to numpy array and compute gtm
+            full_gt = gt_series.reindex(m_ids, fill_value=1.0)
             gtm[grp_date] = m @ np.diag(full_gt.values)
 
-        # ---------------------------------------------------------------------
-        #
-        # Block 2
-        #
-        # ---------------------------------------------------------------------
-
-        # Aggregation of the gtm matrices
+        # Aggregate weighting matrices over lookback period
         sorted_dates = sorted(gtm.keys())
         gtm_agg = {sorted_dates[0]: np.eye(gtm[sorted_dates[0]].shape[0])}
         gtm_agg_l1 = {sorted_dates[0]: np.eye(gtm[sorted_dates[0]].shape[0])}
-
-        # Aggregate over lookback period
         for i in range(1, min(lb + 1, len(sorted_dates))):
             prev_date, curr_date = sorted_dates[i - 1], sorted_dates[i]
             gtm_agg[curr_date] = gtm_agg[prev_date] @ gtm[prev_date]
             gtm_agg_l1[curr_date] = gtm_agg_l1[prev_date] @ gtm[curr_date]
 
-        # Weighted signals (omega) and lagged omega
         omega = 0
         const = 0
         omega_l1 = 0
@@ -1008,13 +960,10 @@ def pfml_input_fun(data_tc, cov_list, lambda_list, gamma_rel, wealth, mu, dates,
         for i in range(lb + 1):
             d_new = (d - pd.DateOffset(months=i)).to_period('M').to_timestamp('M')
             d_new_l1 = (d - pd.DateOffset(months=i + 1)).to_period('M').to_timestamp('M')
-
             s = signals.get(d_new, None)
             s_l1 = signals.get(d_new_l1, None)
-
-            gtm_d_new = gtm_agg.get(d_new, np.eye(len(s)))
-            gtm_d_new_l1 = gtm_agg_l1.get(d_new_l1, np.eye(len(s)))
-
+            gtm_d_new = gtm_agg.get(d_new, np.eye(len(s)) if s is not None else np.eye(len(m_ids)))
+            gtm_d_new_l1 = gtm_agg_l1.get(d_new_l1, np.eye(len(s)) if s is not None else np.eye(len(m_ids)))
             if s is not None and s_l1 is not None:
                 omega += gtm_d_new @ s
                 const += gtm_d_new
@@ -1023,35 +972,16 @@ def pfml_input_fun(data_tc, cov_list, lambda_list, gamma_rel, wealth, mu, dates,
 
         omega = np.linalg.pinv(const) @ omega
         omega_l1 = np.linalg.pinv(const_l1) @ omega_l1
-        # omega_v2 = np.linalg.solve(const, omega)
-        # omega_l1_v2 = np.linalg.solve(const_l1, omega_l1)
-
-        # if np.linalg.cond(const) < 1e10:
-        #     omega_v3 = np.linalg.solve(const, omega)
-        #     omega_l1_v3 = np.linalg.solve(const_l1, omega_l1)
-        # else:
-        #     omega_v3 = np.linalg.pinv(const) @ omega
-        #     omega_l1_v3 = np.linalg.pinv(const_l1) @ omega_l1
 
         # Compute current period's gt diagonal
-        # Filter `data_sub` to only include rows for date `d`
         data_sub_d = data_sub[data_sub['eom'] == d].sort_values('id')
-
-        # Ensure the index matches `m_ids`
         tr_series = pd.Series((1.0 + data_sub_d['tr_ld0'].values), index=data_sub_d['id'])
         mu_series = pd.Series((1.0 + data_sub_d['mu_ld0'].values), index=data_sub_d['id'])
-
-        # Reindex using m_ids to align with all stocks (fill missing with 1.0 to keep neutral impact)
         tr_aligned = tr_series.reindex(m_ids, fill_value=1.0)
         mu_aligned = mu_series.reindex(m_ids, fill_value=1.0)
-
-        # Compute gt_diag only for aligned ids
         gt_diag = np.diag(tr_aligned.values / mu_aligned.values)
-
-        # Now `gt_diag` is properly aligned with `m_ids`
         omega_chg = omega - gt_diag @ omega_l1
 
-        # Realizations
         r_tilde = pd.Series(np.dot(omega.T, r), index=feat_cons)
         risk_val = gamma_rel * np.dot(omega.T, np.dot(sigma, omega))
         tc = w * np.dot(np.dot(omega_chg.T, lambda_mat), omega_chg)
@@ -1060,8 +990,6 @@ def pfml_input_fun(data_tc, cov_list, lambda_list, gamma_rel, wealth, mu, dates,
         denom_df = pd.DataFrame(denom, index=feat_cons, columns=feat_cons)
         risk_df = pd.DataFrame(risk_val, index=feat_cons, columns=feat_cons)
         tc_df = pd.DataFrame(tc, index=feat_cons, columns=feat_cons)
-
-        # Ensure correct indexing
         reals = {
             "r_tilde": r_tilde,
             "denom": denom_df.loc[feat_cons, feat_cons],
@@ -1073,11 +1001,16 @@ def pfml_input_fun(data_tc, cov_list, lambda_list, gamma_rel, wealth, mu, dates,
                                 index=m_ids,
                                 columns=feat_cons)
 
-        # Output
-        inputs[d] = {
-            "reals": reals,
-            "signal_t": signal_t
-        }
+        return d, {"reals": reals, "signal_t": signal_t}
+
+    # Run the per-date computation in parallel
+    num_cores = max(1, int(cpu_count() * 0.5))
+    print(f"🔧 Using all available CPU cores: {num_cores}")
+    results = Parallel(n_jobs=num_cores)(
+        delayed(process_date)(d) for d in tqdm(dates, desc="Step 4. Computing signals and realizations")
+    )
+
+    inputs = {d: res for d, res in results}
 
     return {
         "reals": {str(d): inputs[d]["reals"] for d in inputs},
@@ -1219,7 +1152,7 @@ def pfml_hp_reals_fun(pfml_input, hp_coef, p_vec, l_vec, hp_years, orig_feat, fe
 
     Parameters:
         pfml_input (dict): Input containing 'reals' with realizations and denominators.
-        hp_coef (dict): Hyperparameter coefficients from.
+        hp_coef (dict): Hyperparameter coefficients from `pfml_search_coef`.
         p_vec (list): List of numbers of random Fourier features (RFF) to evaluate.
         l_vec (list): List of regularization parameters (lambdas) to evaluate.
         hp_years (list): List of hyperparameter evaluation years.
@@ -1303,7 +1236,7 @@ def pfml_aims_fun(pfml_input, validation, data_tc, hp_coef, dates_oos, orig_feat
     # Filter the best hyperparameters for each year
     opt_hps = validation[
         (validation['eom_ret'].dt.month == 12) & (validation['rank'] == 1)
-    ].assign(hp_end=validation['eom_ret'].dt.year)[['hp_end', 'l', 'p']]
+        ].assign(hp_end=validation['eom_ret'].dt.year)[['hp_end', 'l', 'p']]
 
     aim_pfs_list = {}
 
@@ -1378,7 +1311,7 @@ def pfml_w(data: pd.DataFrame, dates: list, cov_list: dict, lambda_list: dict, g
         aim_list = []
         for d in dates:
             d_str = str(pd.Timestamp(d))
-            data_d = data.loc[data['eom'] == pd.Timestamp(d), ['id','eom']].copy()
+            data_d = data.loc[data['eom'] == pd.Timestamp(d), ['id', 'eom']].copy()
             if (signal_t is not None) and (d_str in signal_t):
                 s = signal_t[d_str]
             else:
@@ -1458,15 +1391,15 @@ def pfml_w(data: pd.DataFrame, dates: list, cov_list: dict, lambda_list: dict, g
         # Merge aims with the existing weights for this date
         aims['id'] = aims['id'].astype(str)
         fa_weights['id'] = fa_weights['id'].astype(str)
-        w_cur = aims.loc[aims['eom'] == cur_date, ['id','eom','w_aim']].merge(
+        w_cur = aims.loc[aims['eom'] == cur_date, ['id', 'eom', 'w_aim']].merge(
             fa_weights.loc[fa_weights['eom'] == cur_date],
-            on=['id','eom'], how='left'
+            on=['id', 'eom'], how='left'
         )
 
         # w_opt = m * w_start + (I - m) * w_aim
         w_cur['w_opt'] = (
-            (m @ w_cur['w_start'].fillna(0).values) +
-            ((iden - m) @ w_cur['w_aim'].values)
+                (m @ w_cur['w_start'].fillna(0).values) +
+                ((iden - m) @ w_cur['w_aim'].values)
         )
 
         # Save the optimized weight for the current month
@@ -1479,7 +1412,7 @@ def pfml_w(data: pd.DataFrame, dates: list, cov_list: dict, lambda_list: dict, g
         if idx + 1 < len(dates):
             next_date = pd.Timestamp(dates[idx + 1])
             w_cur['w_start_next'] = (
-                w_cur['w_opt'] * (1 + w_cur['tr_ld1']) / (1 + w_cur['mu_ld1'])
+                    w_cur['w_opt'] * (1 + w_cur['tr_ld1']) / (1 + w_cur['mu_ld1'])
             ).fillna(0)
 
             # Assign w_start for next_date
@@ -1602,7 +1535,7 @@ def pfml_implement(data_tc, cov_list, lambda_list, risk_free, features, wealth, 
     best_hps["rank"] = best_hps.groupby("eom_ret")["cum_obj"].rank(ascending=False)
     best_hps = best_hps[
         (best_hps["rank"] == 1) & (best_hps["eom_ret"].dt.month == 12)
-    ]
+        ]
 
     # 3. Build aim portfolios for OOS dates
     best_hps_list = []
@@ -1795,10 +1728,10 @@ def mp_aim_fun(preds, sigma_gam, lambda_, m, w, K):
 
     # Final scaling operation
     aim_pf_rescaled = (
-        np.linalg.inv(iden - m) @
-        np.linalg.inv(iden - m_gbar) @ np.linalg.inv(iden - m_gbar) @
-        np.linalg.inv(iden - m_gbar_pow @ m_gbar) @
-        aim_pf
+            np.linalg.inv(iden - m) @
+            np.linalg.inv(iden - m_gbar) @ np.linalg.inv(iden - m_gbar) @
+            np.linalg.inv(iden - m_gbar_pow @ m_gbar) @
+            aim_pf
     )
 
     return aim_pf_rescaled
@@ -1925,6 +1858,52 @@ def mp_val_fun(
         return w_list
 
 
+# ------------------------- Helper Function -------------------------
+def mp_multiprocessing_helper(k, g, idx, data_rel, dates_hp, cov_list, lambda_list, wealth, rf, mu,
+                              gamma_rel, cov_type, iter_, K, u_vec, data_tc, save_dir, verbose=True):
+    """
+    Process one hyperparameter combination (k, g) for multiperiod-ML validation.
+    This function is called in parallel.
+
+    Returns a list of results (one per u in u_vec).
+    """
+    print(f"Processing hyperparameters {idx}: k={k}, g={g}")
+    # Run the hyperparameter validation function (assumed to be defined elsewhere)
+    mp_w_list = mp_val_fun(
+        data=data_rel,
+        dates=pd.DatetimeIndex(dates_hp),
+        cov_list=cov_list,
+        lambda_list=lambda_list,
+        wealth=wealth,
+        risk_free=rf,
+        mu=mu,
+        gamma_rel=gamma_rel,
+        cov_type=cov_type,
+        iter_=iter_,
+        K=K,
+        k=k,
+        g=g,
+        u_vec=u_vec,
+        hps=None,
+        verbose=verbose
+    )
+    result_list = []
+    for u in u_vec:
+        pf_ts = pf_ts_fun(mp_w_list[str(u)], data_tc, wealth)
+        pf_ts['k'] = k
+        pf_ts['g'] = g
+        pf_ts['u'] = u
+        result_list.append(pf_ts)
+
+    # Save partial results for this hyperparameter combination
+    partial_save_path = os.path.join(save_dir, f'validation_results_{idx}_k{k}_g{g}.pkl')
+    with open(partial_save_path, 'wb') as f:
+        pickle.dump(result_list, f)
+
+    return result_list
+
+
+# ---------------------- Main Function ----------------------
 def mp_implement(data_tc, cov_list, lambda_list, rf,
                  wealth, gamma_rel,
                  dates_oos, dates_hp, k_vec, u_vec, g_vec, cov_type, K,
@@ -1949,7 +1928,7 @@ def mp_implement(data_tc, cov_list, lambda_list, rf,
         iter_ (int): Number of iterations for optimization.
         validation (pd.DataFrame, optional): Precomputed validation results.
         seed (int, optional): Random seed for reproducibility.
-        mu (float, optional): Drift parameter (required for `mp_val_fun`).
+        mu (float, optional): Drift parameter (required for mp_val_fun).
 
     Returns:
         dict: Dictionary containing:
@@ -1958,64 +1937,39 @@ def mp_implement(data_tc, cov_list, lambda_list, rf,
             - "w": Final portfolio weights.
             - "pf": Final portfolio performance.
     """
-
-    # Set random seed if provided
     if seed is not None:
         np.random.seed(seed)
 
-    # Generate all hyperparameter combinations
-    mp_hps = pd.DataFrame(product(k_vec, g_vec), columns=['k', 'g'])
+    # Generate hyperparameter combinations using product
+    mp_hps = pd.DataFrame(list(product(k_vec, g_vec)), columns=['k', 'g'])
 
-    # Extract relevant data for the hyperparameter tuning period
+    # Extract relevant data for hyperparameter tuning
     pred_columns = [f"pred_ld{i}" for i in range(1, K + 1)]
     data_rel = data_tc[
         (data_tc['eom'].isin(dates_hp)) & (data_tc['valid'])
         ][['id', 'eom', 'me', 'tr_ld1'] + pred_columns].sort_values(['id', 'eom'])
 
-    save_dir = r'C:\Master\validation_results'
+    # Define directory to save validation results
+    save_dir = r'/work/frontier_ml/validation_results'
     os.makedirs(save_dir, exist_ok=True)
 
-    # Validation: Compute if not provided
+    # Compute validation if not provided, in parallel
     if validation is None:
-        validation_results = []
-        for i, (k, g) in enumerate(mp_hps.itertuples(index=False), 1):
-            print(f"Processing hyperparameters {i}/{len(mp_hps)}: k={k}, g={g}")
+        total_cores = cpu_count()
+        num_cores = max(1, int(total_cores * 0.75))
+        print(f"Using {num_cores} CPU cores for hyperparameter validation.")
 
-            mp_w_list = mp_val_fun(
-                data=data_rel,
-                dates=pd.DatetimeIndex(dates_hp),
-                cov_list=cov_list,
-                lambda_list=lambda_list,
-                wealth=wealth,
-                risk_free=rf,
-                mu=mu,
-                gamma_rel=gamma_rel,
-                cov_type=cov_type,
-                iter_=iter_,
-                K=K,
-                k=k,
-                g=g,
-                u_vec=u_vec,
-                hps=None,
-                verbose=True
-            )
+        parallel_results = Parallel(n_jobs=num_cores)(
+            delayed(mp_multiprocessing_helper)(
+                k, g, i + 1, data_rel, dates_hp, cov_list, lambda_list,
+                wealth, rf, mu, gamma_rel, cov_type, iter_, K, u_vec,
+                data_tc, save_dir, verbose=True
+            ) for i, (k, g) in enumerate(mp_hps.itertuples(index=False))
+        )
 
-            for u in u_vec:
-                pf_ts = pf_ts_fun(mp_w_list[str(u)], data_tc, wealth)
-                pf_ts['k'] = k
-                pf_ts['g'] = g
-                pf_ts['u'] = u
-                validation_results.append(pf_ts)
-
-            # Save partial results for each loop iteration
-            partial_save_path = os.path.join(save_dir, f'validation_results_{i}_k{k}_g{g}.pkl')
-            with open(partial_save_path, 'wb') as f:
-                pickle.dump(validation_results, f)
-
-        # Concatenate all results
+        # Flatten nested results
+        validation_results = [res for sublist in parallel_results for res in sublist]
         validation = pd.concat(validation_results, ignore_index=True)
-
-        # Save final combined validation results
         final_save_path = os.path.join(save_dir, 'final_validation_results.pkl')
         with open(final_save_path, 'wb') as f:
             pickle.dump(validation, f)
@@ -2026,14 +1980,12 @@ def mp_implement(data_tc, cov_list, lambda_list, rf,
         lambda x: (x - validation['tc'] - 0.5 * validation['cum_var'] * gamma_rel).expanding().mean())
     validation['rank'] = validation.groupby('eom_ret')['cum_obj'].rank(ascending=False)
 
-    # Display validation results
     print("Validation Results:")
     print(validation)
 
-    # Select optimal hyperparameters
+    # Select optimal hyperparameters (e.g., rank==1 for December end-of-month)
     optimal_hps = validation.query("rank == 1 and eom_ret.dt.month == 12").sort_values('eom_ret')
 
-    # Implement the final portfolio for out-of-sample dates
     print("Implementing final portfolio...")
     data_rel_oos = data_tc[
         (data_tc['eom'].isin(dates_oos)) & (data_tc['valid'])
@@ -2057,12 +2009,9 @@ def mp_implement(data_tc, cov_list, lambda_list, rf,
     portfolio_performance = pf_ts_fun(final_weights, data_tc, wealth)
     portfolio_performance['type'] = "Multiperiod-ML*"
 
-    # Return results
     return {
         "hps": validation,
         "best_hps": optimal_hps,
         "w": final_weights,
         "pf": portfolio_performance
     }
-
-

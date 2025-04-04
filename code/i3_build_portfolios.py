@@ -1,12 +1,8 @@
 import os
-import glob
 import pandas as pd
-import openpyxl
-from datetime import datetime
 from b_prepare_data import load_cluster_labels, load_risk_free, load_daily_returns_pkl_USA
-from b_prepare_data import load_daily_returns_pkl_USA, load_daily_returns_pkl_EU
-from d_estimate_cov_matrix import prepare_cluster_data  # Covariance estimation
-from e_prepare_portfolio_data import run_prepare_portfolio_data  # Portfolio prep
+from d_estimate_cov_matrix import prepare_cluster_data
+from e_prepare_portfolio_data import run_prepare_portfolio_data
 from f_feature_importance_base import run_feature_importance_base
 from f_feature_importance_IEF import run_feature_importance_ief
 from f_feature_importance_ret import run_feature_importance_ret
@@ -38,13 +34,21 @@ settings["cov_set"]["industries"] = config_params["industry_cov"]
 pf_set["wealth"] = config_params["wealth"]
 pf_set["gamma_rel"] = config_params["gamma_rel"]
 
+# # -------------------- DEFINE PATHS (local) --------------------
+# data_path = r"C:\Master"
+# portfolios_dir = r"C:\Master\Data\Generated\Portfolios"
+# get_from_path_model = os.path.join(data_path, "Outputs")
+
+# latest_folder = r"C:\Master\Data\Generated\Portfolios\demo"
+# output_path = r"C:\Master\Data\Generated\Portfolios\demo"
+
 # -------------------- DEFINE PATHS --------------------
-data_path = r"C:\Master"
-portfolios_dir = r"C:\Master\Data\Generated\Portfolios"
+data_path = "/work/frontier_ml/data"
+portfolios_dir = "/work/frontier_ml/data/Portfolios"
 get_from_path_model = os.path.join(data_path, "Outputs")
 
-latest_folder = r"C:\Master\Data\Generated\Portfolios\demo"
-output_path = r"C:\Master\Data\Generated\Portfolios\demo"
+latest_folder = "/work/frontier_ml/data/Portfolios/demo"
+output_path = "/work/frontier_ml/data/Portfolios/demo"
 
 # Save config for reproducibility
 pd.to_pickle(settings, os.path.join(output_path, "settings.pkl"))
@@ -85,17 +89,9 @@ print("Loaded cluster labels")
 risk_free = load_risk_free(data_path)
 print("Loaded risk-free rate data.")
 
-if settings["region"] == "USA":
-    daily_returns = load_daily_returns_pkl_USA(settings["data_path"], chars, risk_free)
-    print("Loaded daily return data for USA.")
-else:
-    daily_returns = load_daily_returns_pkl_EU(settings["data_path"], chars, risk_free)
-    print("Loaded daily return data for EU.")
-
-
-# # Load daily returns
-# daily_returns = pd.read_pickle(os.path.join(data_path, "daily_returns.pkl"))
-# print(f"Loaded daily return data from pickle for region: {settings['region']}")
+# Load daily returns
+daily_returns = pd.read_pickle(os.path.join(data_path, "daily_returns.pkl"))
+print(f"Loaded daily return data from pickle for region: {settings['region']}")
 
 # Load fitted models
 fitted_models_path = os.path.join(get_from_path_model, "fitted_models.pkl")
@@ -145,8 +141,8 @@ spec_risk = cov_results["spec_risk"]
 barra_cov = cov_results["barra_cov"]
 
 # -------------------- Step 3: Prepare Portfolio Data --------------------
-print("Step 3: Preparing portfolio data...")
-
+# print("Step 3: Preparing portfolio data...")
+#
 # # Run the portfolio data preparation function and extract its outputs
 # portfolio_data = run_prepare_portfolio_data(
 #     chars=chars,

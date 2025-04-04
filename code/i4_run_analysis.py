@@ -12,12 +12,19 @@ from i1_Main import (settings, pf_set, features, pf_order, pf_order_new, main_ty
                      cluster_order, feat_excl)
 
 
+# # -------------------- CONFIGURATION (local) --------------------
+# data_path = r"C:\Master"
+# base_path = r"C:\Master\Data\Generated\Portfolios"
+# output_path = r"C:\Master\Data\Generated\Analysis"
+# latest_folder = r"C:\Master\Data\Generated\Portfolios\demo"
+# model_folder = r"C:\Master\Outputs"
+
 # -------------------- CONFIGURATION --------------------
-data_path = r"C:\Master"
-base_path = r"C:\Master\Data\Generated\Portfolios"
-output_path = r"C:\Master\Data\Generated\Analysis"
-latest_folder = r"C:\Master\Data\Generated\Portfolios\demo"
-model_folder = r"C:\Master\Outputs"
+data_path = "/work/frontier_ml/data"
+base_path = "/work/frontier_ml/data/Portfolios"
+output_path = "/work/frontier_ml/data/Analysis_EU"
+latest_folder = "/work/frontier_ml/data/Portfolios/demo"
+model_folder = "/work/frontier_ml/Outputs"
 
 if not os.path.exists(output_path):
     os.makedirs(output_path)
@@ -80,15 +87,15 @@ factor_ml = base_case["factor_ml"]
 mkt = base_case["mkt"]
 
 
-# # Combine portfolios
-# pfs = combine_portfolios(mp, pfml, static, bm_pfs, pf_order, gamma_rel)
-#
-# # 2) Compute portfolio summary
-# pf_summary, filtered_pfs = compute_portfolio_summary(pfs, main_types, pf_order_new, gamma_rel)
-# pf_summary.to_csv(os.path.join(output_path, "portfolio_summary.csv"), index=False)
-#
-#
-#
+# Combine portfolios
+pfs = combine_portfolios(mp, pfml, static, bm_pfs, pf_order, gamma_rel)
+
+# 2) Compute portfolio summary
+pf_summary, filtered_pfs = compute_portfolio_summary(pfs, main_types, pf_order_new, gamma_rel)
+pf_summary.to_csv(os.path.join(output_path, "portfolio_summary.csv"), index=False)
+
+
+
 # # -------------------- 1) PERFORMANCE TIME SERIES --------------------
 # print("Computing and plotting performance time series...")
 #
@@ -162,13 +169,13 @@ mkt = base_case["mkt"]
 # )
 
 
-compute_ar1_plot(
-    chars=chars,
-    features=features,
-    cluster_labels=cluster_labels,
-    output_path=output_path
-)
-
-data, coverage = process_features_with_sufficient_coverage(features, feat_excl, settings)
+# compute_ar1_plot(
+#     chars=chars,
+#     features=features,
+#     cluster_labels=cluster_labels,
+#     output_path=output_path
+# )
+#
+# data, coverage = process_features_with_sufficient_coverage(features, feat_excl, settings)
 
 print("Analysis completed successfully!")
