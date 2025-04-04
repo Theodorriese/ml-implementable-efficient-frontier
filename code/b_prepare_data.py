@@ -218,13 +218,13 @@ def load_monthly_data_EU(data_path, settings, risk_free):
     Returns:
         pd.DataFrame: Cleaned and processed dataframe with long-horizon returns and total returns.
     """
-    # Load and preprocess monthly data with correct columns
+    # Load and preprocess monthly data
     monthly_data = pd.read_csv(
         os.path.join(data_path, "world_ret_monthly.csv"),
         usecols=["gvkey", "datadate", "ISIN", "prccm", "ajexm", "ajpm", "iid"]
     )
 
-    # Rename columns for consistency
+    # Rename columns
     monthly_data.rename(columns={"datadate": "eom", "gvkey": "id"}, inplace=True)
     monthly_data.dropna(subset=["ISIN"], inplace=True)
 
@@ -234,14 +234,17 @@ def load_monthly_data_EU(data_path, settings, risk_free):
 
     # Remove rows with missing `prccm`
     monthly_data = monthly_data[~monthly_data["id"].isin(
-        monthly_data[monthly_data["prccm"].isna()]["id"].unique())]
+        monthly_data[monthly_data["prccm"].isna()]["id"].unique()
+    )]
 
-    # Deduplicate ISINs: keep lowest iid per ISIN and date
+    # Deduplicate: keep lowest iid per ISIN-date first, then per id-date
     monthly_data.sort_values(by=["ISIN", "eom", "iid"], inplace=True)
     monthly_data = monthly_data.drop_duplicates(subset=["ISIN", "eom"], keep="first")
+    monthly_data.sort_values(by=["id", "eom", "iid"], inplace=True)
+    monthly_data = monthly_data.drop_duplicates(subset=["id", "eom"], keep="first")
 
-    # Sort by 'id' and 'eom'
-    monthly_data = monthly_data.sort_values(by=["id", "eom"])
+    # Final sort before calculation
+    monthly_data.sort_values(by=["id", "eom"], inplace=True)
 
     # Calculate RET (returns)
     monthly_data["RET"] = (
@@ -250,10 +253,9 @@ def load_monthly_data_EU(data_path, settings, risk_free):
           monthly_data.groupby("id")["ajpm"].shift(1))) - 1
     )
 
-    # Drop rows where RET could not be calculated
     monthly_data.dropna(subset=["RET"], inplace=True)
 
-    # Remove extreme returns
+    # Remove extreme return stocks
     monthly_data = monthly_data.groupby("eom", group_keys=False).apply(flag_extreme_ret)
     bad_ids = monthly_data.loc[monthly_data["extreme_ret"], "id"].unique()
     monthly_data = monthly_data[~monthly_data["id"].isin(bad_ids)]
@@ -266,11 +268,11 @@ def load_monthly_data_EU(data_path, settings, risk_free):
     # Long-horizon returns
     data_ret = long_horizon_ret(monthly_data, h=settings["pf"]["hps"]["m1"]["K"], impute="zero")
 
-    # Add total return and shift
+    # Total return calc
     data_ret = data_ret.merge(risk_free, on="eom_m", how="left")
     data_ret["tr_ld1"] = data_ret["ret_ld1"] + data_ret["rf"]
-    data_ret.drop(columns=["rf"], inplace=True)
     data_ret["tr_ld0"] = data_ret.groupby("id")["tr_ld1"].shift(1)
+    data_ret.drop(columns=["rf"], inplace=True)
 
     # Final formatting
     column_order = ["eom", "eom_m"] + [col for col in data_ret.columns if col not in ["eom", "eom_m"]]
@@ -278,6 +280,7 @@ def load_monthly_data_EU(data_path, settings, risk_free):
     data_ret[["eom_m", "eom"]] = data_ret[["eom_m", "eom"]].apply(pd.to_datetime)
 
     return data_ret
+
 
 
 # Prepare data - stock characteristics
