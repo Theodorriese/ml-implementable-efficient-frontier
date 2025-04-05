@@ -4,8 +4,8 @@ import pandas as pd
 
 # Define the directory and file paths
 output_path = r"C:\Users\theod\OneDrive\Skrivebord"
-pkl_path = os.path.join(output_path, "portfolio-ml.pkl")
-csv_path = os.path.join(output_path, "portfolio_ml_weights.csv")
+pkl_path = os.path.join(output_path, "static-ml.pkl")
+csv_path = os.path.join(output_path, "static_ml_weights.csv")
 
 
 # Load the portfolio-ML results from the pickle file

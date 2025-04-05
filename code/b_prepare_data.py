@@ -66,10 +66,8 @@ def load_market_data(settings):
     market["eom"] = pd.to_datetime(market["eom"])
 
     # Filter based on the region setting
-    # if region == "EU":
-    #     market_data = market[market["excntry"] == "DEU"]
     if region == "EU":
-        market_data = market[market["excntry"].isin(["FRA", "SPA", "ITA", "DEU", "NLD"])]
+        market_data = market[market["excntry"] == "DEU"]
     elif region == "USA":
         market_data = market[market["excntry"] == "USA"]
     else:
@@ -250,9 +248,9 @@ def load_monthly_data_EU(data_path, settings, risk_free):
 
     # Calculate RET (returns)
     monthly_data["RET"] = (
-        (((monthly_data["prccm"] / monthly_data["ajexm"]) * monthly_data["ajpm"]) /
-         ((monthly_data.groupby("id")["prccm"].shift(1) / monthly_data.groupby("id")["ajexm"].shift(1)) *
-          monthly_data.groupby("id")["ajpm"].shift(1))) - 1
+            (((monthly_data["prccm"] / monthly_data["ajexm"]) * monthly_data["ajpm"]) /
+             ((monthly_data.groupby("id")["prccm"].shift(1) / monthly_data.groupby("id")["ajexm"].shift(1)) *
+              monthly_data.groupby("id")["ajpm"].shift(1))) - 1
     )
 
     monthly_data.dropna(subset=["RET"], inplace=True)
@@ -284,16 +282,6 @@ def load_monthly_data_EU(data_path, settings, risk_free):
     return data_ret
 
 
-def merge_in_chunks(left_df, right_df, on, chunk_size=100000):
-    chunks = []
-    for start in range(0, len(left_df), chunk_size):
-        end = start + chunk_size
-        chunk = left_df.iloc[start:end]
-        merged_chunk = chunk.merge(right_df, on=on, how="left")
-        chunks.append(merged_chunk)
-    return pd.concat(chunks, ignore_index=True)
-
-
 # Prepare data - stock characteristics
 def preprocess_chars(data_path, features, settings, data_ret_ld1, wealth):
     """
@@ -315,7 +303,8 @@ def preprocess_chars(data_path, features, settings, data_ret_ld1, wealth):
     """
     # Choose the correct file and columns based on region
     if settings["region"] == "USA":
-        cols_to_use = ["id", "eom", "sic", "ff49", "size_grp", "me", "crsp_exchcd", "rvol_252d", "dolvol_126d"] + features
+        cols_to_use = ["id", "eom", "sic", "ff49", "size_grp", "me", "crsp_exchcd", "rvol_252d",
+                       "dolvol_126d"] + features
         chars = pd.read_csv(os.path.join(data_path, "usa.csv"), usecols=cols_to_use)
         chars = chars[chars["id"] <= 99999]  # Filter only CRSP observations
     else:  # EU Case
@@ -343,16 +332,14 @@ def preprocess_chars(data_path, features, settings, data_ret_ld1, wealth):
     wealth_temp["eom"] = (wealth_temp["eom"] + pd.DateOffset(months=1)).apply(lambda x: x + pd.offsets.MonthEnd(0))
 
     # Merge mu_ld1 as mu_ld0 into chars
-    wealth_merge = wealth_temp[["eom", "mu_ld1"]].rename(columns={"mu_ld1": "mu_ld0"})
-    chars = merge_in_chunks(chars, wealth_merge, on="eom")
+    chars = chars.merge(wealth_temp[["eom", "mu_ld1"]].rename(columns={"mu_ld1": "mu_ld0"}), on="eom", how="left")
 
     return chars
 
 
 # Date screen
 def filter_chars(chars, settings):
-    
-    chars = chars[(chars["eom"] >= settings["screens"]["start"]) & 
+    chars = chars[(chars["eom"] >= settings["screens"]["start"]) &
                   (chars["eom"] <= settings["screens"]["end"])]
 
     # Monitor screen impact
@@ -467,7 +454,7 @@ def classify_industry(chars):
             chars["sic"].between(100, 999) | chars["sic"].between(2000, 2399) |
             chars["sic"].between(2700, 2749) | chars["sic"].between(2770, 2799) |
             chars["sic"].between(3100, 3199) | chars["sic"].between(3940, 3989),
-            
+
             chars["sic"].between(2500, 2519) | chars["sic"].between(3630, 3659) |
             chars["sic"].between(3710, 3711) | chars["sic"].between(3714, 3714) |
             chars["sic"].between(3716, 3716) | chars["sic"].between(3750, 3751) |
@@ -497,7 +484,7 @@ def classify_industry(chars):
             chars["sic"].between(6000, 6999)
         ],
         [
-            "NoDur", "Durbl", "Manuf", "Enrgy", "Chems", "BusEq", 
+            "NoDur", "Durbl", "Manuf", "Enrgy", "Chems", "BusEq",
             "Telcm", "Utils", "Shops", "Hlth", "Money"
         ],
         default="Other"
@@ -510,19 +497,19 @@ def classify_industry(chars):
 def validate_observations(chars, pf_set):
     """
     Check which observations are valid for portfolio-ML.
-    
+
     Parameters:
         chars (pd.DataFrame): The dataset containing stock data.
         pf_set (dict): Dictionary containing portfolio settings, including `lb_hor`.
-    
+
     Returns:
         pd.DataFrame: Updated dataset with a `valid_data` column.
     """
     chars = chars.sort_values(by=["id", "eom"])  # Ensure ordering
-    chars["valid_data"] = True # Initialize valid_data column
+    chars["valid_data"] = True  # Initialize valid_data column
     # Compute lookback period
     lb = pf_set["lb_hor"] + 1  # Plus 1 to align with last signal of previous portfolio
-    chars["eom_lag"] = chars.groupby("id")["eom"].shift(lb) # Compute lagged `eom`
+    chars["eom_lag"] = chars.groupby("id")["eom"].shift(lb)  # Compute lagged `eom`
 
     # Compute the difference in months between `eom_lag` and `eom`
     chars["month_diff"] = ((chars["eom"] - chars["eom_lag"]) / pd.Timedelta(days=30)).round().astype("Int64")
@@ -578,6 +565,9 @@ def show_investable_universe(chars):
     """
     investable_counts = chars[chars["valid"] == True].groupby("eom").size()
 
+    print("\nInvestable stock counts over time:\n")
+    print(investable_counts)
+
     plt.figure(figsize=(10, 5))
     plt.scatter(investable_counts.index, investable_counts.values, alpha=0.7)
     plt.axhline(y=0, color='black', linestyle='dashed')
@@ -601,10 +591,9 @@ def valid_summary(chars):
           f"and {market_cap_percentage:.2f}% of the market cap")
 
 
-# Function to load and preprocess daily returns data for US from a CSV file
 def load_daily_returns_USA(data_path, chars, risk_free):
     """
-    Load and preprocess daily returns data from a pickle file.
+    Load and preprocess daily returns data for the US region from a CSV file.
 
     Parameters:
         data_path (str): Path to the dataset directory.
@@ -614,44 +603,45 @@ def load_daily_returns_USA(data_path, chars, risk_free):
     Returns:
         pd.DataFrame: Preprocessed daily returns data with calculated excess returns.
     """
-    # Load daily returns data from a CSV file #CHANGED FROM PKL
+
+    # Load daily returns data
     daily = pd.read_csv(os.path.join(data_path, "usa_dsf.csv"))
 
     # Rename columns for consistency
-    daily.rename(columns={"PERMNO": "id", "RET": "ret"}, inplace=True)
+    daily.rename(columns={"PERMNO": "id", "RET": "RET"}, inplace=True)
 
-    # Filter for valid data (non-NA returns and IDs <= 99999)
-    daily = daily[daily["ret"].notna() & daily["id"].le(99999)]
+    # Filter for valid returns and IDs
+    daily = daily[daily["RET"].notna() & daily["id"].le(99999)]
+
+    # Filter to only valid IDs from characteristics
     valid_ids = chars.loc[chars["valid"], "id"].unique()
     daily = daily[daily["id"].isin(valid_ids)]
 
-    # Convert `date` to datetime
-    daily['date'] = pd.to_datetime(daily['date'], errors='coerce', dayfirst=True)
+    # Convert date
+    daily["date"] = pd.to_datetime(daily["date"], errors="coerce", dayfirst=True)
 
-    # Prepare `risk_free` data for merging
-    risk_free.rename(columns={"eom_m": "date"}, inplace=True)
-    risk_free["date"] = pd.to_datetime(risk_free["date"], format="%Y-%m-%d")
-    risk_free["month"] = risk_free["date"].dt.to_period("M")
+    # Create a copy of risk-free to safely manipulate
+    rf_temp = risk_free.copy()
+    rf_temp["date"] = pd.to_datetime(rf_temp["eom_m"])
+    rf_temp["days_in_month"] = rf_temp["date"].dt.daysinmonth
+    rf_temp["rf_daily"] = rf_temp["rf"] / rf_temp["days_in_month"]
+    rf_temp["month"] = rf_temp["date"].dt.to_period("M")
 
-    # Calculate daily risk-free rate
-    risk_free["days_in_month"] = risk_free["date"].dt.daysinmonth  # Number of days in each month
-    risk_free["rf_daily"] = risk_free["rf"] / risk_free["days_in_month"]  # Convert to daily rate
-
-    # Map monthly risk-free rates to daily data
+    # Merge monthly RF rate to daily data by month
     daily["month"] = daily["date"].dt.to_period("M")
-    daily = daily.merge(risk_free[["month", "rf_daily"]], on="month", how="left")
-    daily.drop(columns=["month"], inplace=True)  # Clean up temporary column
+    daily = daily.merge(rf_temp[["month", "rf_daily"]], on="month", how="left")
+    daily.drop(columns=["month"], inplace=True)
 
-    # Ensure `ret` is numeric
-    daily["ret"] = pd.to_numeric(daily["ret"], errors="coerce")
+    # Ensure `RET` is numeric
+    daily["RET"] = pd.to_numeric(daily["RET"], errors="coerce")
 
     # Calculate excess return
-    daily["ret_exc"] = daily["ret"] - daily["rf_daily"]
+    daily["ret_exc"] = daily["RET"] - daily["rf_daily"]
 
-    # Add `eom` column (end-of-month)
+    # Add end-of-month
     daily["eom"] = daily["date"] + pd.offsets.MonthEnd(0)
 
-    # Optional: Drop unnecessary columns
+    # Drop unused columns
     daily.drop(columns=["rf_daily"], inplace=True)
 
     return daily
@@ -671,7 +661,7 @@ def load_daily_returns_pkl_EU(data_path, chars, risk_free):
         pd.DataFrame: Preprocessed daily returns data with calculated excess returns.
     """
 
-    # Load daily returns data from a CSV file #CHANGED FROM PKL
+    # Load daily returns data
     daily = pd.read_csv(os.path.join(data_path, "eu_dsf.csv"))
 
     # Rename columns for consistency
@@ -700,9 +690,9 @@ def load_daily_returns_pkl_EU(data_path, chars, risk_free):
 
     # Calculate daily total return
     daily["RET"] = (
-        (((daily["PRCCD"] / daily["AJEXDI"]) * daily["TRFD"]) /
-         ((daily.groupby("id")["PRCCD"].shift(1) / daily.groupby("id")["AJEXDI"].shift(1)) *
-          daily.groupby("id")["TRFD"].shift(1))) - 1
+            (((daily["PRCCD"] / daily["AJEXDI"]) * daily["TRFD"]) /
+             ((daily.groupby("id")["PRCCD"].shift(1) / daily.groupby("id")["AJEXDI"].shift(1)) *
+              daily.groupby("id")["TRFD"].shift(1))) - 1
     )
 
     daily.dropna(subset=["RET"], inplace=True)

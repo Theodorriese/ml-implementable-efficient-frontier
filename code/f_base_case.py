@@ -3,7 +3,8 @@ import pickle
 import os
 from a_portfolio_choice_functions import (tpf_implement, factor_ml_implement, mkt_implement,
                                           ew_implement, rw_implement, mv_implement, static_implement,
-                                          pfml_implement, mp_implement, mp_implement_multi_process)
+                                          pfml_implement, mp_implement, mp_implement_multi_process,
+                                          mv_implement_multip, static_implement_multip)
 
 
 def benchmark_portfolios(chars, barra_cov, wealth, dates_oos, pf_set, settings, output_path):
@@ -19,6 +20,16 @@ def benchmark_portfolios(chars, barra_cov, wealth, dates_oos, pf_set, settings, 
         settings (dict): Configuration settings.
         output_path (str): Path to save the output.
     """
+
+    # base_path = "/work/frontier_ml/data/Portfolios/demo"
+
+    # # Load previously saved portfolios
+    # tpf = pd.read_pickle(os.path.join(base_path, "tpf.pkl"))
+    # factor_ml = pd.read_pickle(os.path.join(base_path, "factor_ml.pkl"))
+    # mkt = pd.read_pickle(os.path.join(base_path, "mkt.pkl"))
+    # ew = pd.read_pickle(os.path.join(base_path, "ew.pkl"))
+    # rw = pd.read_pickle(os.path.join(base_path, "rw.pkl"))
+
     print("Generating Markowitz-ML Portfolio...")
     tpf = tpf_implement(chars, cov_list=barra_cov, wealth=wealth, dates=dates_oos, gam=pf_set["gamma_rel"])
     pd.to_pickle(tpf, os.path.join(output_path, "tpf.pkl"))
@@ -40,8 +51,27 @@ def benchmark_portfolios(chars, barra_cov, wealth, dates_oos, pf_set, settings, 
     pd.to_pickle(rw, os.path.join(output_path, "rw.pkl"))
 
     print("Generating Minimum Variance Portfolio...")
-    mv = mv_implement(chars, cov_list=barra_cov, dates=dates_oos, wealth=wealth)
+
+    if settings["multi_process"]:
+        print("Using multiprocessing for Minimum Variance...")
+        mv = mv_implement_multip(
+            data=chars,
+            cov_list=barra_cov,
+            wealth=wealth,
+            dates=dates_oos,
+            n_jobs=-1
+        )
+    else:
+        print("Using single-core implementation for Minimum Variance...")
+        mv = mv_implement(
+            data=chars,
+            cov_list=barra_cov,
+            wealth=wealth,
+            dates=dates_oos
+        )
+
     pd.to_pickle(mv, os.path.join(output_path, "mv.pkl"))
+
 
     # Filter out any None values to avoid errors
     portfolio_results = [tpf, factor_ml, ew, mkt, rw, mv]
@@ -77,20 +107,44 @@ def static_ml(chars, barra_cov, lambda_list, wealth, pf_set, settings, dates_oos
         output_path (str): Path to save the output.
     """
     print("Implementing Static-ML...")
-    static = static_implement(chars,
-                              cov_list=barra_cov,
-                              lambda_list=lambda_list,
-                              wealth=wealth,
-                              gamma_rel=pf_set["gamma_rel"],
-                              dates_oos=dates_oos,
-                              dates_hp=dates_hp,
-                              k_vec=settings["pf"]["hps"]["static"]["k"],
-                              u_vec=settings["pf"]["hps"]["static"]["u"],
-                              g_vec=settings["pf"]["hps"]["static"]["g"],
-                              cov_type=settings["pf"]["hps"]["cov_type"],
-                              validation=None)
 
-    # Save the entire dictionary as a pickle file
+    if settings.get("multi_process", False):
+        print("Using multiprocessing for Static-ML...")
+        static = static_implement_multip(
+            data_tc=chars,
+            cov_list=barra_cov,
+            lambda_list=lambda_list,
+            wealth=wealth,
+            gamma_rel=pf_set["gamma_rel"],
+            dates_oos=dates_oos,
+            dates_hp=dates_hp,
+            k_vec=settings["pf"]["hps"]["static"]["k"],
+            u_vec=settings["pf"]["hps"]["static"]["u"],
+            g_vec=settings["pf"]["hps"]["static"]["g"],
+            cov_type=settings["pf"]["hps"]["cov_type"],
+            validation=None,
+            seed=None,
+            n_jobs=-1
+        )
+    else:
+        print("Using single-core implementation for Static-ML...")
+        static = static_implement(
+            data_tc=chars,
+            cov_list=barra_cov,
+            lambda_list=lambda_list,
+            wealth=wealth,
+            gamma_rel=pf_set["gamma_rel"],
+            dates_oos=dates_oos,
+            dates_hp=dates_hp,
+            k_vec=settings["pf"]["hps"]["static"]["k"],
+            u_vec=settings["pf"]["hps"]["static"]["u"],
+            g_vec=settings["pf"]["hps"]["static"]["g"],
+            cov_type=settings["pf"]["hps"]["cov_type"],
+            validation=None,
+            seed=None
+        )
+
+    # Save the output
     with open(f"{output_path}/static-ml.pkl", 'wb') as file:
         pickle.dump(static, file)
 
@@ -118,7 +172,7 @@ def portfolio_ml(chars, barra_cov, lambda_list, features, risk_free, wealth, pf_
 
     ###############################################################################
     # BE AWARE OF THIS
-    iter = 10
+    iter = 50
     ###############################################################################
 
     pfml = pfml_implement(chars, cov_list=barra_cov, lambda_list=lambda_list, features=features, risk_free=risk_free,
@@ -171,7 +225,7 @@ def multiperiod_ml(config_params, chars, barra_cov, lambda_list, risk_free, weal
                 g_vec=settings["pf"]["hps"]["m1"]["g"],
                 cov_type=settings["pf"]["hps"]["cov_type"],
                 validation=None,
-                iter_=10,
+                iter_=50,
                 K=settings["pf"]["hps"]["m1"]["K"]
             )
         else:
@@ -191,7 +245,7 @@ def multiperiod_ml(config_params, chars, barra_cov, lambda_list, risk_free, weal
                 g_vec=settings["pf"]["hps"]["m1"]["g"],
                 cov_type=settings["pf"]["hps"]["cov_type"],
                 validation=None,
-                iter_=10,
+                iter_=50,
                 K=settings["pf"]["hps"]["m1"]["K"]
             )
 
@@ -233,5 +287,5 @@ def run_f_base_case(chars, barra_cov, wealth, dates_oos, pf_set, settings, confi
                  dates_oos, hp_years, output_path)
 
     # Run Multiperiod-ML
-    # multiperiod_ml(config_params, chars, barra_cov, lambda_list, risk_free, wealth, pf_set, settings,
-    #                dates_oos, dates_hp, output_path)
+    multiperiod_ml(config_params, chars, barra_cov, lambda_list, risk_free, wealth, pf_set, settings,
+                   dates_oos, dates_hp, output_path)

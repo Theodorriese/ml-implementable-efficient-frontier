@@ -123,14 +123,12 @@ def rff_hp_search(data, feat, p_vec, g_vec, l_vec, seed):
     optimal_rff_train = None  # Placeholder for the optimal RFF train set
 
     for g_idx, g in enumerate(g_vec):
-        print(f"Processing g: {g:.2f} ({g_idx + 1} out of {len(g_vec)})")
 
         # Create random features in training and validation sets
         rff_train = rff(data['train'][feat].values, p=max(p_vec), g=g)
         rff_val = rff(data['val'][feat].values, W=rff_train['W'])
 
         for p_idx, p in enumerate(p_vec):
-            print(f"--> Processing p: {p} ({p_idx + 1} out of {len(p_vec)})")
 
             # Prepare features
             X_train = (p ** -0.5) * np.hstack([rff_train['X_cos'][:, :p // 2], rff_train['X_sin'][:, :p // 2]])

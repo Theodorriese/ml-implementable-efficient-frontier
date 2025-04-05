@@ -132,14 +132,7 @@ def prepare_and_fit_models(settings, pf_set, features, output_path):
     print("Step 13: Applying addition and deletion rules...")
     chars = apply_addition_deletion_rule(chars, settings)
 
-    data_ret.to_pickle(os.path.join(settings["data_path"], "data_ret_processed.pkl"))
-    chars.to_pickle(os.path.join(settings["data_path"], "chars_processed.pkl"))
-
-    print("Step 14: Showing investable universe and summary...")
-    show_investable_universe(chars)
-    valid_summary(chars)
-
-    print("Step 15: Loading daily return data...")
+    print("Step 14: Loading daily return data...")
     # Compute daily return data based on region setting
     if settings["region"] == "USA":
         daily_returns = load_daily_returns_USA(settings["data_path"], chars, risk_free)
@@ -148,7 +141,21 @@ def prepare_and_fit_models(settings, pf_set, features, output_path):
         daily_returns = load_daily_returns_pkl_EU(settings["data_path"], chars, risk_free)
         print("Computed daily return data for EU.")
 
+    # # Cut
+    # keep_ids = pd.Series(data_ret["id"].unique()).sort_values().reset_index(drop=True)
+    # keep_ids = keep_ids[::6]
+    # data_ret = data_ret[data_ret["id"].isin(keep_ids)]
+    # chars = chars[chars["id"].isin(keep_ids)]
+    # daily_returns = daily_returns[daily_returns["id"].isin(keep_ids)]
+
+    data_ret.to_pickle(os.path.join(settings["data_path"], "data_ret_processed.pkl"))
+    chars.to_pickle(os.path.join(settings["data_path"], "chars_processed.pkl"))
     daily_returns.to_pickle(os.path.join(settings["data_path"], "daily_returns.pkl"))
+
+
+    print("Step 15: Showing investable universe and summary...")
+    show_investable_universe(chars)
+    valid_summary(chars)
 
     ########################################################################
 
@@ -183,11 +190,10 @@ def prepare_and_fit_models(settings, pf_set, features, output_path):
     print("Data preparation and model fitting complete.")
     return chars, models
 
-
 # Main Runner
 if __name__ == "__main__":
     # -------------------- Configuration and Paths --------------------
-    output_dir = "Outputs"
+    output_dir = os.path.join(settings["data_path"], "Outputs")
     os.makedirs(output_dir, exist_ok=True)
 
     print("Starting build portfolio script...")
