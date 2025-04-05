@@ -18,10 +18,16 @@ from b_prepare_data import (
     apply_addition_deletion_rule,
     show_investable_universe,
     valid_summary,
-    load_daily_returns_pkl_USA,
+    load_daily_returns_USA,
     load_daily_returns_pkl_EU
 )
-from c_fit_models import fit_models
+
+# Conditional import of fit_models based on multiprocessing setting
+if settings.get("multi_process", False):
+    from c_fit_models_multip import fit_models
+else:
+    from c_fit_models import fit_models
+
 
 # -------------------- Config Parameters and Search grid (Manually Set) --------------------
 config_params = {
@@ -136,7 +142,7 @@ def prepare_and_fit_models(settings, pf_set, features, output_path):
     print("Step 15: Loading daily return data...")
     # Compute daily return data based on region setting
     if settings["region"] == "USA":
-        daily_returns = load_daily_returns_pkl_USA(settings["data_path"], chars, risk_free)
+        daily_returns = load_daily_returns_USA(settings["data_path"], chars, risk_free)
         print("Computed daily return data for USA.")
     else:
         daily_returns = load_daily_returns_pkl_EU(settings["data_path"], chars, risk_free)

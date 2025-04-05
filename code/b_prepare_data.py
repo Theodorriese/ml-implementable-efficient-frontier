@@ -66,8 +66,10 @@ def load_market_data(settings):
     market["eom"] = pd.to_datetime(market["eom"])
 
     # Filter based on the region setting
+    # if region == "EU":
+    #     market_data = market[market["excntry"] == "DEU"]
     if region == "EU":
-        market_data = market[market["excntry"] == "DEU"]
+        market_data = market[market["excntry"].isin(["FRA", "SPA", "ITA", "DEU", "NLD"])]
     elif region == "USA":
         market_data = market[market["excntry"] == "USA"]
     else:
@@ -282,6 +284,15 @@ def load_monthly_data_EU(data_path, settings, risk_free):
     return data_ret
 
 
+def merge_in_chunks(left_df, right_df, on, chunk_size=100000):
+    chunks = []
+    for start in range(0, len(left_df), chunk_size):
+        end = start + chunk_size
+        chunk = left_df.iloc[start:end]
+        merged_chunk = chunk.merge(right_df, on=on, how="left")
+        chunks.append(merged_chunk)
+    return pd.concat(chunks, ignore_index=True)
+
 
 # Prepare data - stock characteristics
 def preprocess_chars(data_path, features, settings, data_ret_ld1, wealth):
@@ -332,7 +343,8 @@ def preprocess_chars(data_path, features, settings, data_ret_ld1, wealth):
     wealth_temp["eom"] = (wealth_temp["eom"] + pd.DateOffset(months=1)).apply(lambda x: x + pd.offsets.MonthEnd(0))
 
     # Merge mu_ld1 as mu_ld0 into chars
-    chars = chars.merge(wealth_temp[["eom", "mu_ld1"]].rename(columns={"mu_ld1": "mu_ld0"}), on="eom", how="left")
+    wealth_merge = wealth_temp[["eom", "mu_ld1"]].rename(columns={"mu_ld1": "mu_ld0"})
+    chars = merge_in_chunks(chars, wealth_merge, on="eom")
 
     return chars
 
@@ -590,7 +602,7 @@ def valid_summary(chars):
 
 
 # Function to load and preprocess daily returns data for US from a CSV file
-def load_daily_returns_pkl_USA(data_path, chars, risk_free):
+def load_daily_returns_USA(data_path, chars, risk_free):
     """
     Load and preprocess daily returns data from a pickle file.
 
@@ -659,7 +671,7 @@ def load_daily_returns_pkl_EU(data_path, chars, risk_free):
         pd.DataFrame: Preprocessed daily returns data with calculated excess returns.
     """
 
-    # Load daily returns data
+    # Load daily returns data from a CSV file #CHANGED FROM PKL
     daily = pd.read_csv(os.path.join(data_path, "eu_dsf.csv"))
 
     # Rename columns for consistency

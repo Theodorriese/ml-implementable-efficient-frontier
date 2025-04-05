@@ -31,20 +31,20 @@ txt_size = 10
 # -------------------- Setup --------------------
 # Data settings dictionary
 settings = {
-    "region": "EU",
-    "multi_process": True,
+    "region": "USA",
+    "multi_process": False,
     "data_path": "C:\Master",
     # "data_path": "/work/frontier_ml/",
     "parallel": True,
     "seed_no": 1,
     "months": False,
     "split": {
-        "train_end": pd.Timestamp("2017-12-31"),
-        "test_end": pd.Timestamp("2020-12-31"),
-        "val_years": 1,
+        "train_end": pd.Timestamp("2017-12-31"), # reduced
+        "test_end": pd.Timestamp("2020-12-31"), # reduced
+        "val_years": 1, # reduced
         "model_update_freq": "yearly",
-        "train_lookback": 5,
-        "retrain_lookback": 5
+        "train_lookback": 5, # reduced
+        "retrain_lookback": 5 # reduced
     },
     "feat_prank": True,
     "ret_impute": "zero",
@@ -52,22 +52,24 @@ settings = {
     "addition_n": 12,
     "deletion_n": 12,
     "screens": {
-        "start": pd.Timestamp("2010-01-01"),
-        "end": pd.Timestamp("2020-12-31"),
+        "start": pd.Timestamp("2010-01-01"), # reduced
+        "end": pd.Timestamp("2020-12-31"), # reduced
         "feat_pct": 0.5,
         "nyse_stocks": True
     },
     "pi": 0.1,
     "rff": {
-        "p_vec": [2 ** i for i in range(1, 3)], # obs
+        # "p_vec": [2 ** i for i in range(1, 3)], # smaller
+        "p_vec": [2 ** i for i in range(1, 6)],
+        # "p_vec": [2 ** i for i in range(1, 10)],  # original
         "g_vec": np.exp(np.arange(-3, -1)),
         "l_vec": np.concatenate(([0], np.exp(np.linspace(-10, 10, 100))))
     },
     "pf": {
         "dates": {
-            "start_year": 2018,
-            "end_yr": 2020,
-            "split_years": 1
+            "start_year": 2018, # reduced
+            "end_yr": 2020, # reduced
+            "split_years": 1 # reduced
         },
         "hps": {
             "cov_type": "cov_add",
@@ -85,7 +87,7 @@ settings = {
         }
     },
     "pf_ml": {
-        "g_vec": np.exp(np.arange(-3, -1)), # obs
+        "g_vec": np.exp(np.arange(-3, -1)),
         "p_vec": [2**i for i in range(6, 10)],
         "l_vec": np.concatenate(([0], np.exp(np.linspace(-10, 10, 100)))),
         "orig_feat": False,
@@ -97,7 +99,7 @@ settings = {
     },
     "cov_set": {
         "industries": True,
-        "obs": 252 * 2, # obs
+        "obs": 252 * 2, # reduced
         "hl_cor": 252 * 3 / 2,
         "hl_var": 252 / 2,
         "hl_stock_var": 252 / 2,
@@ -160,5 +162,3 @@ feat_excl = [
 
 # Exclude features with insufficient coverage
 features = [feat for feat in features if feat not in feat_excl]
-
-print("Setup complete!")
