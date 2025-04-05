@@ -32,7 +32,9 @@ txt_size = 10
 # Data settings dictionary
 settings = {
     "region": "EU",
+    "multi_process": True,
     "data_path": "C:\Master",
+    # "data_path": "/work/frontier_ml/",
     "parallel": True,
     "seed_no": 1,
     "months": False,
@@ -45,10 +47,10 @@ settings = {
         "retrain_lookback": 5
     },
     "feat_prank": True,
-    "ret_impute": "zero",  # Impute missing returns
+    "ret_impute": "zero",
     "feat_impute": True,
-    "addition_n": 12,  # Need to be valid for the past n months to be included in investment universe
-    "deletion_n": 12,  # Exclude from universe after N periods where the stock is non-valid
+    "addition_n": 12,
+    "deletion_n": 12,
     "screens": {
         "start": pd.Timestamp("2010-01-01"),
         "end": pd.Timestamp("2020-12-31"),
@@ -57,7 +59,7 @@ settings = {
     },
     "pi": 0.1,
     "rff": {
-        "p_vec": [2 ** i for i in range(1, 3)], #fix
+        "p_vec": [2 ** i for i in range(1, 3)], # obs
         "g_vec": np.exp(np.arange(-3, -1)),
         "l_vec": np.concatenate(([0], np.exp(np.linspace(-10, 10, 100))))
     },
@@ -83,7 +85,7 @@ settings = {
         }
     },
     "pf_ml": {
-        "g_vec": np.exp(np.arange(-3, -1)),
+        "g_vec": np.exp(np.arange(-3, -1)), # obs
         "p_vec": [2**i for i in range(6, 10)],
         "l_vec": np.concatenate(([0], np.exp(np.linspace(-10, 10, 100)))),
         "orig_feat": False,
@@ -111,7 +113,7 @@ settings = {
 pf_set = {
     "wealth": 1e10,
     "gamma_rel": 10,
-    "mu": 0.007,  # Expected monthly portfolio growth
+    "mu": 0.007,
     "lb_hor": 11
 }
 
