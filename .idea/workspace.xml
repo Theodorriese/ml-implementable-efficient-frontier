@@ -5,16 +5,28 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="001ad656-4e1d-41a9-98d4-c3629915c329" name="Changes" comment="Push">
+      <change afterPath="$PROJECT_DIR$/code/check_models.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/code/Outputs/fitted_models.pkl" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/code/Outputs/model_1.pkl" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/code/Outputs/model_10.pkl" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/code/Outputs/model_11.pkl" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/code/Outputs/model_12.pkl" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/code/Outputs/model_2.pkl" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/code/Outputs/model_3.pkl" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/code/Outputs/model_4.pkl" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/code/Outputs/model_5.pkl" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/code/Outputs/model_6.pkl" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/code/Outputs/model_7.pkl" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/code/Outputs/model_8.pkl" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/code/Outputs/model_9.pkl" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/code/Outputs/model_full.pkl" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/code/a_portfolio_choice_functions.py" beforeDir="false" afterPath="$PROJECT_DIR$/code/a_portfolio_choice_functions.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/code/a_return_prediction_functions.py" beforeDir="false" afterPath="$PROJECT_DIR$/code/a_return_prediction_functions.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/code/b_prepare_data.py" beforeDir="false" afterPath="$PROJECT_DIR$/code/b_prepare_data.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/code/f_base_case.py" beforeDir="false" afterPath="$PROJECT_DIR$/code/f_base_case.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/code/c_fit_models.py" beforeDir="false" afterPath="$PROJECT_DIR$/code/c_fit_models.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/code/i1_Main.py" beforeDir="false" afterPath="$PROJECT_DIR$/code/i1_Main.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/code/i2_fit_models.py" beforeDir="false" afterPath="$PROJECT_DIR$/code/i2_fit_models.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/code/i3_build_portfolios.py" beforeDir="false" afterPath="$PROJECT_DIR$/code/i3_build_portfolios.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/code/x_get_weights.py" beforeDir="false" afterPath="$PROJECT_DIR$/code/x_get_weights.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/code/x_pkl_to_csv2.py" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -65,48 +77,51 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "Python.Test.executor": "Run",
-    "Python.a_general_functions.executor": "Debug",
-    "Python.a_portfolio_choice_functions.executor": "Debug",
-    "Python.a_return_prediction_functions.executor": "Debug",
-    "Python.b_prepare_data.executor": "Debug",
-    "Python.c_fit_models.executor": "Debug",
-    "Python.cov_check.executor": "Run",
-    "Python.d_estimate_cov_matrix.executor": "Debug",
-    "Python.f_base_case.executor": "Debug",
-    "Python.f_feature_importance_ret.executor": "Run",
-    "Python.g_base_analysis.executor": "Debug",
-    "Python.i1_Main.executor": "Debug",
-    "Python.i2_build_portfolios.executor": "Debug",
-    "Python.i2_fit_models.executor": "Run",
-    "Python.i3_build_portfolios.executor": "Debug",
-    "Python.i4_run_analysis.executor": "Debug",
-    "Python.main.executor": "Debug",
-    "Python.pkl_to_csv2.executor": "Run",
-    "Python.temp_data_reduction.executor": "Run",
-    "Python.test.executor": "Run",
-    "Python.testerxxx.executor": "Run",
-    "Python.x_csv_to_pkl_converter.executor": "Run",
-    "Python.x_csv_to_pkl_heavy.executor": "Run",
-    "Python.x_get_weights.executor": "Debug",
-    "Python.x_pkl_to_csv2.executor": "Debug",
-    "Python.x_read_pkl_content.executor": "Debug",
-    "Python.x_read_temp.executor": "Run",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "git-widget-placeholder": "master",
-    "ignore.virus.scanning.warn.message": "true",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "settings.editor.selected.configurable": "com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Python.Test.executor&quot;: &quot;Run&quot;,
+    &quot;Python.a_general_functions.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.a_portfolio_choice_functions.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.a_return_prediction_functions.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.b_prepare_data.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.c_fit_models.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.check_models.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.cov_check.executor&quot;: &quot;Run&quot;,
+    &quot;Python.d_estimate_cov_matrix.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.f_base_case.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.f_feature_importance_ret.executor&quot;: &quot;Run&quot;,
+    &quot;Python.g_base_analysis.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.i1_Main.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.i2_build_portfolios.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.i2_fit_models.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.i3_build_portfolios.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.i4_run_analysis.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.main.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.pkl_to_csv2.executor&quot;: &quot;Run&quot;,
+    &quot;Python.temp_data_reduction.executor&quot;: &quot;Run&quot;,
+    &quot;Python.test.executor&quot;: &quot;Run&quot;,
+    &quot;Python.testerxxx.executor&quot;: &quot;Run&quot;,
+    &quot;Python.x_csv_to_pkl_converter.executor&quot;: &quot;Run&quot;,
+    &quot;Python.x_csv_to_pkl_heavy.executor&quot;: &quot;Run&quot;,
+    &quot;Python.x_get_weights.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.x_pkl_to_csv2.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.x_read_pkl_content.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.x_read_temp.executor&quot;: &quot;Run&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;database.data.extractors.current.export.id&quot;: &quot;Comma-separated (CSV)_id&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
+    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;C:/Master&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="MoveFile.RECENT_KEYS">
       <recent name="C:\Master\ml-implementable-efficient-frontier" />
@@ -279,23 +294,9 @@
       <workItem from="1743873020026" duration="717000" />
       <workItem from="1743875259172" duration="334000" />
       <workItem from="1743878172775" duration="1791000" />
-      <workItem from="1743880487842" duration="1092000" />
-    </task>
-    <task id="LOCAL-00083" summary="Push">
-      <option name="closed" value="true" />
-      <created>1740150486857</created>
-      <option name="number" value="00083" />
-      <option name="presentableId" value="LOCAL-00083" />
-      <option name="project" value="LOCAL" />
-      <updated>1740150486857</updated>
-    </task>
-    <task id="LOCAL-00084" summary="Push">
-      <option name="closed" value="true" />
-      <created>1740150542233</created>
-      <option name="number" value="00084" />
-      <option name="presentableId" value="LOCAL-00084" />
-      <option name="project" value="LOCAL" />
-      <updated>1740150542233</updated>
+      <workItem from="1743880487842" duration="6663000" />
+      <workItem from="1743922343369" duration="15563000" />
+      <workItem from="1744040242392" duration="382000" />
     </task>
     <task id="LOCAL-00085" summary="Push">
       <option name="closed" value="true" />
@@ -673,7 +674,23 @@
       <option name="project" value="LOCAL" />
       <updated>1743852173979</updated>
     </task>
-    <option name="localTasksCounter" value="132" />
+    <task id="LOCAL-00132" summary="Push">
+      <option name="closed" value="true" />
+      <created>1743881613192</created>
+      <option name="number" value="00132" />
+      <option name="presentableId" value="LOCAL-00132" />
+      <option name="project" value="LOCAL" />
+      <updated>1743881613196</updated>
+    </task>
+    <task id="LOCAL-00133" summary="Push">
+      <option name="closed" value="true" />
+      <created>1743881750685</created>
+      <option name="number" value="00133" />
+      <option name="presentableId" value="LOCAL-00133" />
+      <option name="project" value="LOCAL" />
+      <updated>1743881750685</updated>
+    </task>
+    <option name="localTasksCounter" value="134" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -705,32 +722,47 @@
           <option name="timeStamp" value="528" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/code/x_get_weights.py</url>
-          <line>25</line>
-          <option name="timeStamp" value="700" />
+          <url>file://$PROJECT_DIR$/code/i3_build_portfolios.py</url>
+          <line>224</line>
+          <option name="timeStamp" value="705" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/code/i3_build_portfolios.py</url>
-          <line>201</line>
-          <option name="timeStamp" value="703" />
+          <url>file://$PROJECT_DIR$/code/check_models.py</url>
+          <line>22</line>
+          <option name="timeStamp" value="710" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/code/x_get_weights.py</url>
+          <line>25</line>
+          <option name="timeStamp" value="718" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/code/a_portfolio_choice_functions.py</url>
+          <line>64</line>
+          <option name="timeStamp" value="719" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>
+    <watches-manager>
+      <configuration name="PythonConfigurationType">
+        <watch expression="pfml_results['aims']" />
+      </configuration>
+    </watches-manager>
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$d_estimate_cov_matrix.coverage" NAME="d_estimate_cov_matrix Coverage Results" MODIFIED="1741274401679" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />
-    <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$i3_build_portfolios.coverage" NAME="i3_build_portfolios Coverage Results" MODIFIED="1743881011836" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />
-    <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$a_portfolio_choice_functions.coverage" NAME="a_portfolio_choice_functions Coverage Results" MODIFIED="1742655832749" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />
+    <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$i3_build_portfolios.coverage" NAME="i3_build_portfolios Coverage Results" MODIFIED="1743922392725" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />
+    <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$a_portfolio_choice_functions.coverage" NAME="a_portfolio_choice_functions Coverage Results" MODIFIED="1743936629407" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />
     <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$x_read_pkl_content.coverage" NAME="x_read_pkl_content Coverage Results" MODIFIED="1742988548051" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />
     <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$i2_build_portfolios.coverage" NAME="i2_build_portfolios Coverage Results" MODIFIED="1739119880776" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />
     <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$temp_data_reduction.coverage" NAME="temp_data_reduction Coverage Results" MODIFIED="1739107077602" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />
     <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$f_base_case.coverage" NAME="f_base_case Coverage Results" MODIFIED="1742555535619" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />
     <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$pkl_to_csv2.coverage" NAME="pkl_to_csv2 Coverage Results" MODIFIED="1743668130554" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />
-    <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$x_get_weights.coverage" NAME="x_get_weights Coverage Results" MODIFIED="1743862929898" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />
+    <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$x_get_weights.coverage" NAME="x_get_weights Coverage Results" MODIFIED="1743936294633" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />
     <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$cov_check.coverage" NAME="cov_check Coverage Results" MODIFIED="1743880949367" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />
     <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$f_feature_importance_ret.coverage" NAME="f_feature_importance_ret Coverage Results" MODIFIED="1742988203616" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />
     <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$testerxxx.coverage" NAME="testerxxx Coverage Results" MODIFIED="1742738717373" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />
-    <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$i2_fit_models.coverage" NAME="i2_fit_models Coverage Results" MODIFIED="1743850142643" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />
+    <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$i2_fit_models.coverage" NAME="i2_fit_models Coverage Results" MODIFIED="1743926641215" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />
     <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$g_base_analysis.coverage" NAME="g_base_analysis Coverage Results" MODIFIED="1742924933816" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />
     <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$a_general_functions.coverage" NAME="a_general_functions Coverage Results" MODIFIED="1741884997769" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />
     <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$x_csv_to_pkl_converter.coverage" NAME="x_csv_to_pkl_converter Coverage Results" MODIFIED="1739210117303" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />
@@ -743,6 +775,7 @@
     <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$x_csv_to_pkl_heavy.coverage" NAME="x_csv_to_pkl_heavy Coverage Results" MODIFIED="1743012728510" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />
     <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$i4_run_analysis.coverage" NAME="i4_run_analysis Coverage Results" MODIFIED="1742930503653" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />
     <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$c_fit_models.coverage" NAME="c_fit_models Coverage Results" MODIFIED="1743666147000" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />
+    <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$check_models.coverage" NAME="check_models Coverage Results" MODIFIED="1743920029725" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />
     <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$test.coverage" NAME="test Coverage Results" MODIFIED="1743664687966" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />
     <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$Test.coverage" NAME="Test Coverage Results" MODIFIED="1737539048539" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />
   </component>

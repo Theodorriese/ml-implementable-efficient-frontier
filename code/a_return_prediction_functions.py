@@ -175,21 +175,10 @@ def rff_hp_search(data, feat, p_vec, g_vec, l_vec, seed):
     rff_test = rff(data['test'][feat].values, W=optimal_rff_train['W'][:, :opt_p // 2])
     X_test = (opt_p ** -0.5) * np.hstack([rff_test['X_cos'], rff_test['X_sin']])
 
-    data['test']['pred'] = final_model.predict(X_test)
-
-    # Plot validation errors
-    # val_errors_df['log_lambda'] = np.log10(val_errors_df['lambda'])
-    # for g in val_errors_df['g'].unique():
-    #     subset = val_errors_df[val_errors_df['g'] == g]
-    #     plt.figure(figsize=(8, 6))
-    #     for p in subset['p'].unique():
-    #         p_subset = subset[subset['p'] == p]
-    #         plt.plot(p_subset['log_lambda'], p_subset['mse'], label=f"p={p}")
-    #     plt.title(f"Validation MSE for g={g:.2f}")
-    #     plt.xlabel("log10(lambda)")
-    #     plt.ylabel("Mean Squared Error")
-    #     plt.legend()
-    #     plt.show()
+    if X_test.shape[0] > 0:
+        data['test']['pred'] = final_model.predict(X_test)
+    else:
+        data['test']['pred'] = np.nan
 
     return {
         "fit": final_model,
@@ -289,7 +278,6 @@ def ridge_hp_search(data, feat, vol_scale, lambdas):
     }
 
 
-# Not used?
 def fit_xgb(train, val, params, iter, es, cores, seed):
     """
     Fit an XGBoost model using the given training and validation datasets.

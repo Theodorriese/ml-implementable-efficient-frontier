@@ -41,13 +41,15 @@ def fit_models(search_grid, data_ret, chars, settings, features, output_path):
         if settings["split"]["model_update_freq"] == "once":
             val_ends = [settings["split"]["train_end"]]
             test_inc = 1000
+
         elif settings["split"]["model_update_freq"] == "yearly":
             val_ends = pd.date_range(
                 start=settings["split"]["train_end"],
-                end=settings["split"]["test_end"] - pd.DateOffset(years=settings["split"]["val_years"]),
+                end=settings["split"]["test_end"],
                 freq="Y"
             )
             test_inc = 1
+
         elif settings["split"]["model_update_freq"] == "decade":
             val_ends = pd.date_range(
                 start=settings["split"]["train_end"],
@@ -95,6 +97,5 @@ def fit_models(search_grid, data_ret, chars, settings, features, output_path):
     # Save the full model output
     full_model_path = Path(output_path) / "model_full.pkl"
     pd.to_pickle(models, full_model_path)
-
 
     return models

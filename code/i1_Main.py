@@ -33,8 +33,8 @@ txt_size = 10
 settings = {
     "region": "USA",
     "multi_process": False,
-    # "data_path": "C:\Master",
-    "data_path": "/work/frontier_ml/",
+    "data_path": "C:\Master",
+    # "data_path": "/work/frontier_ml/",
     "parallel": True,
     "seed_no": 1,
     "months": False,
@@ -45,10 +45,8 @@ settings = {
         # "val_years": 1, # reduced
         "val_years": 5,
         "model_update_freq": "yearly",
-        # "train_lookback": 5, # reduced
-        # "retrain_lookback": 5, # reduced
-        "train_lookback": 15, # reduced
-        "retrain_lookback": 15 # reduced
+        "train_lookback": 100, # just changed from 15
+        "retrain_lookback": 100 # just changed from 15
     },
     "feat_prank": True,
     "ret_impute": "zero",
