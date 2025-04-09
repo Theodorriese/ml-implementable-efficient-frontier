@@ -55,12 +55,10 @@ def m_func(w, mu, rf, sigma_gam, gam, lambda_mat, iterations):
 
     for _ in range(iterations):
         try:
-            m_tilde = pinv(x + y - np.multiply(m_tilde, sigma_gr))
-            m_tilde_v2 = pinv(x + y - m_tilde * sigma_gr)
+            m_tilde = pinv(x + y - m_tilde * sigma_gr)
         except np.linalg.LinAlgError:
             print(f"Singular matrix at iteration {_}. Using pseudo-inverse.")
-            m_tilde = pinv(x + y - np.multiply(m_tilde, sigma_gr))
-            m_tilde_v2 = pinv(x + y - m_tilde * sigma_gr)
+            m_tilde = pinv(x + y - m_tilde * sigma_gr)
 
     return lamb_neg05 @ m_tilde @ np.sqrt(lambda_mat)
 
@@ -1149,7 +1147,7 @@ def pfml_input_fun_multi(data_tc, cov_list, lambda_list, gamma_rel, wealth, mu, 
 
         return d, {"reals": reals, "signal_t": signal_t}
 
-    num_cores = max(1, int(cpu_count() * 0.5))
+    num_cores = max(1, int(cpu_count() * 0.80))
     print(f"🔧 Using all available CPU cores: {num_cores}")
     results = Parallel(n_jobs=num_cores)(
         delayed(process_date)(d) for d in tqdm(dates, desc="Step 4. Computing signals and realizations")
@@ -2352,35 +2350,31 @@ def static_implement_multip(data_tc, cov_list, lambda_list,
 
 
 # Portfolio ML: Compute portfolio weights for a single date
-def compute_weights_for_date_multip(idx, d, data, cov_list, lambda_list, gamma_rel, iter_, risk_free, wealth, mu, aims,
-                                    fa_weights, dates):
+def compute_weights_for_date_multip(
+        idx, d, data, cov_list, lambda_list, gamma_rel, iter_,
+        risk_free, wealth, mu, aims, fa_weights, dates
+):
     """
     Compute portfolio weights for a single date.
-    This is the same code as inside your loop, but for one date.
     """
     cur_date = pd.Timestamp(d)
-    # Filter to the stocks for this date
     ids_d = data.loc[data['eom'] == cur_date, 'id'].astype(str).unique()
 
-    # Covariance & Lambda
     sigma = create_cov(cov_list[cur_date], ids=ids_d)
     lambda_mat = create_lambda(lambda_list[cur_date], ids=ids_d)
 
-    # Wealth & risk-free
     w_val = wealth.loc[wealth['eom'] == cur_date, 'wealth'].iloc[0]
     rf_val = risk_free.loc[risk_free['date'] == cur_date, 'rf'].iloc[0]
 
-    # m matrix
     m = m_func(
         w=w_val, mu=mu, rf=rf_val,
         sigma_gam=sigma * gamma_rel,
-        gam=gamma_rel,
-        lambda_mat=lambda_mat,
+        gam=gamma_rel, lambda_mat=lambda_mat,
         iterations=iter_
     )
     iden = np.eye(m.shape[0])
 
-    # Merge aims with the existing weights for this date
+    # Merge aims with weights for the current date
     aims['id'] = aims['id'].astype(str)
     fa_weights['id'] = fa_weights['id'].astype(str)
 
@@ -2389,27 +2383,24 @@ def compute_weights_for_date_multip(idx, d, data, cov_list, lambda_list, gamma_r
         on=['id', 'eom'], how='left'
     )
 
-    # w_opt = m * w_start + (I - m) * w_aim
     w_cur['w_opt'] = (
             (m @ w_cur['w_start'].fillna(0).values) +
             ((iden - m) @ w_cur['w_aim'].values)
     )
 
-    # Save the optimized weight for the current month
     fa_weights.loc[
         (fa_weights['eom'] == cur_date) & (fa_weights['id'].isin(w_cur['id'])),
         'w'
     ] = w_cur['w_opt'].values
 
-    # If we have a next month, carry forward the weight
+    # Update w_start for the next month
     if idx + 1 < len(dates):
         next_date = pd.Timestamp(dates[idx + 1])
         w_cur['w_start_next'] = (
                 w_cur['w_opt'] * (1 + w_cur['tr_ld1']) / (1 + w_cur['mu_ld1'])
         ).fillna(0)
 
-        # Assign w_start for next_date
-        for row_i, row in w_cur.iterrows():
+        for _, row in w_cur.iterrows():
             fa_weights.loc[
                 (fa_weights['eom'] == next_date) & (fa_weights['id'] == row['id']),
                 'w_start'
@@ -2418,51 +2409,15 @@ def compute_weights_for_date_multip(idx, d, data, cov_list, lambda_list, gamma_r
     return fa_weights
 
 
-def pfml_w_parallel(data: pd.DataFrame, dates: list, cov_list: dict, lambda_list: dict, gamma_rel: float,
-                    iter_: int, risk_free: pd.DataFrame, wealth: pd.DataFrame, mu: float, aims: pd.DataFrame,
-                    fa_weights: pd.DataFrame) -> pd.DataFrame:
+def pfml_w_multip(
+        data: pd.DataFrame, dates: list, cov_list: dict, lambda_list: dict,
+        gamma_rel: float, iter_: int, risk_free: pd.DataFrame,
+        wealth: pd.DataFrame, mu: float,
+        aims: pd.DataFrame = None, signal_t: dict = None, aim_coef: any = None
+) -> pd.DataFrame:
     """
-    Parallelize the weight computation using joblib.
+    Compute Portfolio-ML weights using sequential date updates.
     """
-    # Use joblib to compute weights for all dates in parallel
-    results = Parallel(n_jobs=-1)(
-        delayed(compute_weights_for_date_multip)(idx, d, data, cov_list, lambda_list, gamma_rel, iter_,
-                                                 risk_free, wealth, mu, aims, fa_weights, dates) for idx, d in
-        enumerate(dates))
-
-    # After computing weights for all dates, return the final fa_weights DataFrame
-    return results[-1]  # The last result corresponds to the final weights
-
-
-def pfml_w_multip(data: pd.DataFrame, dates: list, cov_list: dict, lambda_list: dict, gamma_rel: float,
-                  iter_: int, risk_free: pd.DataFrame, wealth: pd.DataFrame, mu: float,
-                  aims: pd.DataFrame = None, signal_t: dict = None, aim_coef: any = None) -> pd.DataFrame:
-    """
-    Compute Portfolio-ML weights.
-
-    If 'aims' is None, an Aim Portfolio is constructed from 'signal_t' and 'aim_coef'.
-    Otherwise, we simply reuse the provided aims.
-
-    Parameters:
-        data (pd.DataFrame): Portfolio data with columns at least ['id','eom','tr_ld1','mu_ld1'].
-        dates (list): List of EOM dates for portfolio calculations.
-        cov_list (dict): Covariance matrices for each date (key=str(date)),
-                         each a matrix or data for create_cov(...).
-        lambda_list (dict): Lambda matrices for each date (key=str(date)),
-                            each a matrix or data for create_lambda(...).
-        gamma_rel (float): Risk-aversion parameter.
-        iter_ (int): Iterations for computing the m matrix.
-        risk_free (pd.DataFrame): Must have ['eom','rf'] columns for each date.
-        wealth (pd.DataFrame): Must have ['eom','wealth','mu_ld1'] columns for each date.
-        mu (float): Portfolio drift parameter.
-        aims (pd.DataFrame, optional): If provided, must have ['id','eom','w_aim'] columns.
-        signal_t (dict, optional): {str(date): 2D array of signals} for each date.
-        aim_coef (dict or 1D array, optional): If dict, keys are years as str; if array, used for all dates.
-
-    Returns:
-        pd.DataFrame: Final portfolio weights by date/stock, including intermediate columns.
-    """
-
     # 1. If no 'aims', build them using signal_t and aim_coef
     if aims is None:
         aim_list = []
@@ -2472,20 +2427,14 @@ def pfml_w_multip(data: pd.DataFrame, dates: list, cov_list: dict, lambda_list: 
             if (signal_t is not None) and (d_str in signal_t):
                 s = signal_t[d_str]
             else:
-                # If signals are not available, default to zero
                 s = np.zeros((len(data_d), 1))
 
-            # Extract the correct coefficient
+            # Extract coefficient
             if isinstance(aim_coef, dict):
-                # Dictionary keyed by year
-                year_str = str(pd.Timestamp(d).year)
-                coef = aim_coef.get(year_str, 0)
+                coef = aim_coef.get(str(pd.Timestamp(d).year), 0)
             else:
-                # Single array or None
                 coef = aim_coef if aim_coef is not None else 0
 
-            # If coef is an array, do matrix multiplication
-            # If it's a single float, broadcast multiply
             if isinstance(coef, (list, np.ndarray)):
                 coef = np.array(coef)
                 data_d['w_aim'] = s @ coef
@@ -2493,14 +2442,20 @@ def pfml_w_multip(data: pd.DataFrame, dates: list, cov_list: dict, lambda_list: 
                 data_d['w_aim'] = s * coef
 
             aim_list.append(data_d)
+
         aims = pd.concat(aim_list, ignore_index=True)
 
     # 2. Initialize weights with a "vw" (value-weighted) strategy
     fa_weights = initial_weights_new(data, w_type="vw")
+    aims['id'] = aims['id'].astype(str)
+    fa_weights['id'] = fa_weights['id'].astype(str)
 
-    # 3. Compute weights iteratively for each date using parallel processing
-    fa_weights = pfml_w_parallel(data, dates, cov_list, lambda_list, gamma_rel, iter_, risk_free, wealth, mu, aims,
-                                 fa_weights)
+    # 3. Loop over time sequentially (preserves weight path)
+    for idx, d in enumerate(dates):
+        fa_weights = compute_weights_for_date_multip(
+            idx, d, data, cov_list, lambda_list, gamma_rel,
+            iter_, risk_free, wealth, mu, aims, fa_weights, dates
+        )
 
     return fa_weights
 
@@ -2602,7 +2557,7 @@ def mp_implement_multi_process(data_tc, cov_list, lambda_list, rf,
     # Compute validation if not provided, in parallel
     if validation is None:
         total_cores = cpu_count()
-        num_cores = max(1, int(total_cores * 0.75))
+        num_cores = max(1, int(total_cores * 0.8))
         print(f"Using {num_cores} CPU cores for hyperparameter validation.")
 
         parallel_results = Parallel(n_jobs=num_cores)(
