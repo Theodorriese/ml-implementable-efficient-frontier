@@ -1856,46 +1856,38 @@ def mp_aim_fun(preds, sigma_gam, lambda_, m, w, K):
     Returns:
         np.ndarray: Multiperiod-ML aim portfolio weights.
     """
-    iden = np.eye(sigma_gam.shape[0])
+    n = sigma_gam.shape[0]
+    iden = np.eye(n)
     sigma_inv = np.linalg.inv(sigma_gam)
 
-    # g_bar is an identity matrix
-    g_bar = np.eye(lambda_.shape[0])
-
-    # Compute m_gbar and c
+    g_bar = np.eye(n)
     m_gbar = m @ g_bar
     c = (w ** -1) * m @ np.linalg.inv(lambda_) @ sigma_gam
 
-    # Compute c_tilde and convert to numpy immediately
-    c_tilde = np.linalg.inv(iden - m_gbar) @ np.linalg.inv(iden - m_gbar) @ c
+    inv_I_minus_mgbar = np.linalg.inv(iden - m_gbar)
+    c_tilde = inv_I_minus_mgbar @ inv_I_minus_mgbar @ c
     c_tilde_sigma_inv = c_tilde @ sigma_inv
 
-    # Ensure c_tilde_sigma_inv is a numpy array
-    if isinstance(c_tilde_sigma_inv, pd.DataFrame):
-        c_tilde_sigma_inv = c_tilde_sigma_inv.to_numpy()
+    aim_pf = np.zeros((n, 1))
+    m_gbar_pow = np.eye(n)
 
-    # Initialize aim_pf as a zero vector of appropriate size
-    aim_pf = np.zeros((c_tilde_sigma_inv.shape[0], 1))
-    m_gbar_pow = np.eye(m_gbar.shape[0])
-
-    # Iterate over prediction horizons
     for tau in range(1, K + 1):
         if tau > 1:
             m_gbar_pow = m_gbar_pow @ m_gbar
 
-        # Convert preds to a column vector
         preds_vec = preds[f"pred_ld{tau}"].to_numpy().reshape(-1, 1)
         aim_pf += m_gbar_pow @ c_tilde_sigma_inv @ preds_vec
 
-    # Final scaling operation
     aim_pf_rescaled = (
-            np.linalg.inv(iden - m) @
-            np.linalg.inv(iden - m_gbar) @ np.linalg.inv(iden - m_gbar) @
-            np.linalg.inv(iden - m_gbar_pow @ m_gbar) @
-            aim_pf
+        np.linalg.inv(iden - m) @
+        inv_I_minus_mgbar @ inv_I_minus_mgbar @
+        np.linalg.inv(iden - m_gbar_pow @ m_gbar) @
+        aim_pf
     )
 
     return aim_pf_rescaled
+
+
 
 
 def mp_val_fun(

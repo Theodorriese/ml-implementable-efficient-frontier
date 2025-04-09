@@ -36,7 +36,7 @@ def fit_single_model(row, data_ret, chars, settings, features, output_path):
     elif freq == "yearly":
         val_ends = pd.date_range(
             start=settings["split"]["train_end"],
-            end=settings["split"]["test_end"] - pd.DateOffset(years=settings["split"]["val_years"]),
+            end=settings["split"]["test_end"],
             freq="Y"
         )
         test_inc = 1
