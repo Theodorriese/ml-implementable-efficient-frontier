@@ -13,18 +13,18 @@ from i1_Main import (settings, pf_set, features, pf_order, pf_order_new, main_ty
 
 
 # # -------------------- CONFIGURATION (local) --------------------
-# data_path = r"C:\Master"
-# base_path = r"C:\Master\Data\Generated\Portfolios"
-# output_path = r"C:\Master\Data\Generated\Analysis"
-# latest_folder = r"C:\Master\Data\Generated\Portfolios\demo"
-# model_folder = r"C:\Master\Outputs"
+data_path = r"C:\Master"
+base_path = r"C:\Master\Data\Generated\Portfolios"
+output_path = r"C:\Master\Data\Generated\Analysis"
+latest_folder = r"C:\Master\Data\Generated\Portfolios\demo"
+model_folder = r"C:\Master\Outputs"
 
 # -------------------- CONFIGURATION --------------------
-data_path = "/work/frontier_ml/data"
-base_path = "/work/frontier_ml/data/Portfolios"
-output_path = "/work/frontier_ml/data/Analysis_EU"
-latest_folder = "/work/frontier_ml/data/Portfolios/demo"
-model_folder = "/work/frontier_ml/Outputs"
+# data_path = "/work/frontier_ml/data"
+# base_path = "/work/frontier_ml/data/Portfolios"
+# output_path = "/work/frontier_ml/data/Analysis_EU"
+# latest_folder = "/work/frontier_ml/data/Portfolios/demo"
+# model_folder = "/work/frontier_ml/Outputs"
 
 if not os.path.exists(output_path):
     os.makedirs(output_path)
@@ -78,7 +78,7 @@ print("Loading base case portfolios...")
 
 base_case = load_base_case_portfolios(base_path)
 
-mp = base_case["mp"]
+# mp = base_case["mp"]
 pfml = base_case["pfml"]
 static = base_case["static"]
 bm_pfs = base_case["bm_pfs"]
@@ -88,7 +88,8 @@ mkt = base_case["mkt"]
 
 
 # Combine portfolios
-pfs = combine_portfolios(mp, pfml, static, bm_pfs, pf_order, gamma_rel)
+# pfs = combine_portfolios(mp, pfml, static, bm_pfs, pf_order, gamma_rel)
+pfs = combine_portfolios(pfml, static, bm_pfs, pf_order, gamma_rel)
 
 # 2) Compute portfolio summary
 pf_summary, filtered_pfs = compute_portfolio_summary(pfs, main_types, pf_order_new, gamma_rel)

@@ -25,7 +25,7 @@ def load_base_case_portfolios(base_path):
     base_folder = next(os.walk(base_path))[1][0]
 
     # Load required datasets
-    mp = pd.read_pickle(os.path.join(base_path, base_folder, "multiperiod-ml.pkl"))
+    # mp = pd.read_pickle(os.path.join(base_path, base_folder, "multiperiod-ml.pkl"))
     pfml = pd.read_pickle(os.path.join(base_path, base_folder, "portfolio-ml.pkl"))
     static = pd.read_pickle(os.path.join(base_path, base_folder, "static-ml.pkl"))
     bm_pfs = pd.read_csv(os.path.join(base_path, base_folder, "bms.csv"))
@@ -38,59 +38,49 @@ def load_base_case_portfolios(base_path):
     bm_pfs["type"] = bm_pfs["type"].replace("Rank-Weighted", "Rank-ML")
 
     return {
-        "mp": mp,
+        # "mp": mp,
         "pfml": pfml,
         "static": static,
         "bm_pfs": bm_pfs,
         "tpf": tpf,
         "factor_ml": factor_ml,
-        "mkt": mkt  # Include market portfolio
+        "mkt": mkt
     }
 
 
 # Final Portfolios ---------------------
-def combine_portfolios(mp, pfml, static, bm_pfs, pf_order_new, gamma_rel):
+# MP has been removed
+def combine_portfolios(pfml, static, bm_pfs, pf_order_new, gamma_rel):
     """
     Combine multiple portfolios into a single dataframe.
-
-    Parameters:
-        mp (dict): Multiperiod-ML portfolio data.
-        pfml (dict): Portfolio-ML data.
-        static (dict): Static-ML data (now handled as a dictionary).
-        bm_pfs (pd.DataFrame): Benchmark portfolios data.
-        pf_order_new (list): Order of portfolio types for factor conversion.
-        gamma_rel (float): Gamma value for risk aversion.
-
-    Returns:
-        pd.DataFrame: Combined portfolio dataframe with utility adjustments.
     """
     # Ensure all relevant dates are converted to Timestamps
-    mp['pf']['eom_ret'] = pd.to_datetime(mp['pf']['eom_ret'])
+    # mp['pf']['eom_ret'] = pd.to_datetime(mp['pf']['eom_ret'])
     pfml['pf']['eom_ret'] = pd.to_datetime(pfml['pf']['eom_ret'])
     static['pf']['eom_ret'] = pd.to_datetime(static['pf']['eom_ret'])
     bm_pfs['eom_ret'] = pd.to_datetime(bm_pfs['eom_ret'])
 
     # Process each component separately
-    mp_pf = mp['pf'].copy()
+    # mp_pf = mp['pf'].copy()
     pfml_pf = pfml['pf'].copy()
-    static_pf = static['pf'].copy()  # Use 'pf' from the 'static' dictionary
+    static_pf = static['pf'].copy()
     bm_pfs_pf = bm_pfs.copy()
 
-    # Extract and process hps data for Multiperiod-ML and Static-ML
-    mp_hps = mp['hps'].loc[
-        (mp['hps']['eom_ret'].isin(mp['pf']['eom_ret'])) &
-        (mp['hps']['k'] == 1) & (mp['hps']['g'] == 0) & (mp['hps']['u'] == 1),
-        ['eom_ret', 'inv', 'shorting', 'turnover', 'r', 'tc']
-    ].assign(type='Multiperiod-ML')
+    # mp_hps = mp['hps'].loc[
+    #     (mp['hps']['eom_ret'].isin(mp['pf']['eom_ret'])) &
+    #     (mp['hps']['k'] == 1) & (mp['hps']['g'] == 0) & (mp['hps']['u'] == 1),
+    #     ['eom_ret', 'inv', 'shorting', 'turnover', 'r', 'tc']
+    # ].assign(type='Multiperiod-ML')
 
     static_hps = static['hps'].loc[
-        (static['hps']['eom_ret'].isin(static['pf']['eom_ret'])) &  # Match only those with relevant 'eom_ret'
+        (static['hps']['eom_ret'].isin(static['pf']['eom_ret'])) &
         (static['hps']['k'] == 1) & (static['hps']['g'] == 0) & (static['hps']['u'] == 1),
         ['eom_ret', 'inv', 'shorting', 'turnover', 'r', 'tc']
     ].assign(type='Static-ML')
 
     # Combine all parts together
-    pfs = pd.concat([mp_pf, pfml_pf, static_pf, bm_pfs_pf, mp_hps, static_hps], ignore_index=True)
+    # pfs = pd.concat([mp_pf, pfml_pf, static_pf, bm_pfs_pf, mp_hps, static_hps], ignore_index=True)
+    pfs = pd.concat([pfml_pf, bm_pfs_pf, static_pf, static_hps], ignore_index=True)
 
     # Remove the 'eom' column if it exists in the combined DataFrame
     if 'eom' in pfs.columns:
@@ -333,21 +323,6 @@ def compute_and_plot_portfolio_statistics_over_time(pfml, tpf, mp, static, facto
                                                     pf_order, main_types):
     """
     Compute and plot portfolio statistics over time, including ex-ante volatility, turnover, and leverage.
-
-    Parameters:
-        pfml (pd.DataFrame): Portfolio-ML weights.
-        tpf (pd.DataFrame): Markowitz-ML weights.
-        mp (pd.DataFrame): Multiperiod-ML* weights.
-        static (pd.DataFrame): Static-ML* weights.
-        factor_ml (pd.DataFrame): Factor-ML weights.
-        pfs (pd.DataFrame): Portfolio statistics and metadata.
-        barra_cov (dict): Covariance matrices for expected risk calculation.
-        dates_oos (list): Out-of-sample dates.
-        pf_order (list): Ordered list of portfolio types.
-        main_types (list): List of main portfolio types to include in the analysis.
-
-    Returns:
-        None
     """
     # Combine portfolio weights
     pfml_weights = pfml["w"].copy()
@@ -356,8 +331,8 @@ def compute_and_plot_portfolio_statistics_over_time(pfml, tpf, mp, static, facto
     tpf_weights = tpf["w"].copy()
     tpf_weights["type"] = "Markowitz-ML"
 
-    mp_weights = mp["w"].copy()
-    mp_weights["type"] = "Multiperiod-ML*"
+    # mp_weights = mp["w"].copy()
+    # mp_weights["type"] = "Multiperiod-ML*"
 
     static_weights = static["w"].copy()
     static_weights["type"] = "Static-ML*"
@@ -367,8 +342,12 @@ def compute_and_plot_portfolio_statistics_over_time(pfml, tpf, mp, static, facto
     factor_ml_weights["type"] = "Factor-ML"
 
     # Combine all weights
+    # combined_weights = pd.concat(
+    #     [pfml_weights, tpf_weights, mp_weights, static_weights, factor_ml_weights],
+    #     ignore_index=True
+    # )
     combined_weights = pd.concat(
-        [pfml_weights, tpf_weights, mp_weights, static_weights, factor_ml_weights],
+        [pfml_weights, tpf_weights, static_weights, factor_ml_weights],
         ignore_index=True
     )
     combined_weights["type"] = pd.Categorical(combined_weights["type"], categories=pf_order, ordered=True)
@@ -794,13 +773,6 @@ def plot_portfolio_tuning_results(data):
 def plot_optimal_hyperparameters(model_folder, mp, static, pfml, colours_theme, start_year):
     """
     Main function to plot optimal hyperparameters and portfolio tuning results.
-
-    Parameters:
-        get_from_path_model (str): Path to the model files.
-        mp, static, pfml (pd.DataFrame): DataFrames containing tuning results for Multiperiod-ML, Static-ML, and Portfolio-ML.
-        colours_theme (list): List of colors for the plot.
-        start_year (int): Start year for filtering tuning results.
-
     Returns:
         None
     """
