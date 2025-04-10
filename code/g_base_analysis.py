@@ -319,7 +319,7 @@ def compute_expected_risk(dates, cov_list, weights):
 
 
 # Compute portfolios statistics
-def compute_and_plot_portfolio_statistics_over_time(pfml, tpf, mp, static, factor_ml, pfs, barra_cov, dates_oos,
+def compute_and_plot_portfolio_statistics_over_time(pfml, tpf, static, factor_ml, pfs, barra_cov, dates_oos,
                                                     pf_order, main_types):
     """
     Compute and plot portfolio statistics over time, including ex-ante volatility, turnover, and leverage.
