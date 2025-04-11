@@ -3,6 +3,7 @@ import numpy as np
 from sklearn.linear_model import LinearRegression
 from tqdm import tqdm
 
+
 # Helper functions
 def weighted_corrcoef(data, weights):
     """
@@ -20,14 +21,24 @@ def weighted_corrcoef(data, weights):
     return corr
 
 
-def ewma_std_with_min_obs(series, halflife, min_obs):
+def recursive_ewma_std(series, lambda_, min_obs):
     """
-    Compute EWMA std only if there are at least `min_obs` observations.
-    Otherwise return NaNs.
+    Recursively compute EWMA standard deviation with a given lambda and min_obs.
     """
-    if len(series) < min_obs:
-        return pd.Series([np.nan] * len(series), index=series.index)
-    return series.ewm(halflife=halflife).std()
+    ewma_var = []
+    prev_var = np.nan
+    for i, x in enumerate(series):
+        if i == 0:
+            ewma_var.append(np.nan)
+        else:
+            if np.isnan(prev_var):
+                prev_var = x**2
+            else:
+                prev_var = lambda_ * prev_var + (1 - lambda_) * x**2
+            ewma_var.append(prev_var)
+    ewma_std = np.sqrt(ewma_var)
+    ewma_std = pd.Series(ewma_std, index=series.index)
+    return ewma_std if ewma_std.count() >= min_obs else pd.Series(np.nan, index=series.index)
 
 
 # Main function
@@ -133,18 +144,6 @@ def prepare_cluster_data(chars, cluster_labels, daily, settings, features):
         cov_data = fct_ret[fct_ret["date"].isin(sub_dates)].drop(columns="date")
         t = len(cov_data)
 
-        # # Weighted covariance - VERSION 2.4
-        # w_cur = w_var[-t:]
-        # weights = w_cur / np.sum(w_cur)
-        # weighted_mean = np.average(cov_data, axis=0, weights=weights)
-        # centered_data = cov_data - weighted_mean
-        # cov_matrix_numpy_unbias = np.cov(centered_data.T, aweights=weights, bias=False)
-        #
-        # factor_names = list(fct_ret.columns[1:])
-        # factor_cov_est[d] = pd.DataFrame(cov_matrix_numpy_unbias)
-        # factor_cov_est[d].index = factor_names
-        # factor_cov_est[d].columns = factor_names
-
         # NEW
 
         # 1. Compute correlation matrix with EWMA correlation weights
@@ -162,6 +161,10 @@ def prepare_cluster_data(chars, cluster_labels, daily, settings, features):
 
         # 3. Reconstruct covariance: cov = sd * cor * sd
         cov_matrix = sd_diag @ corr_matrix @ sd_diag
+
+        # Apply Bessel correction to match R's cov.wt(..., method = "unbiased")
+        correction_factor = np.sum(w_var_cur) / (np.sum(w_var_cur) - 1)
+        cov_matrix *= correction_factor
 
         # 4. Save to factor_cov_est
         factor_names = list(fct_ret.columns[1:])
@@ -186,9 +189,10 @@ def prepare_cluster_data(chars, cluster_labels, daily, settings, features):
     halflife_lambda = settings["cov_set"]["hl_stock_var"]
     initial_obs = settings["cov_set"]["initial_var_obs"]
 
+    lambda_ = 0.5 ** (1 / halflife_lambda)
     res_df["res_vol"] = (
         res_df.groupby("id")["residual"]
-        .apply(lambda x: ewma_std_with_min_obs(x, halflife=halflife_lambda, min_obs=initial_obs))
+        .apply(lambda x: recursive_ewma_std(x, lambda_=lambda_, min_obs=initial_obs))
         .reset_index(drop=True)
     )
 
@@ -244,7 +248,11 @@ def prepare_cluster_data(chars, cluster_labels, daily, settings, features):
             print(f"Warning: Missing factor names in char_data for {d}")
             continue  # Skip if factor exposures are not properly available
 
-        X = char_data[factor_names].fillna(0)
+        # X = char_data[factor_names].fillna(0)
+
+        char_data = char_data.dropna(subset=factor_names)
+        X = char_data[factor_names]
+
         X.index = char_data["id"].astype(str)
 
         # Step 7: Store results in dictionary (barra_cov)
