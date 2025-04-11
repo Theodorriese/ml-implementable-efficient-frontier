@@ -3,33 +3,6 @@ import numpy as np
 from sklearn.linear_model import LinearRegression
 from tqdm import tqdm
 
-# Helper functions
-def weighted_corrcoef(data, weights):
-    """
-    Compute weighted correlation matrix from 2D data (rows: observations, columns: variables)
-    using aweights (1D array).
-    """
-    w = weights / np.sum(weights)
-    mean = np.average(data, axis=0, weights=w)
-    centered = data - mean
-    cov = np.cov(centered.T, aweights=w, bias=False)
-    stddev = np.sqrt(np.diag(cov))
-    outer_std = np.outer(stddev, stddev)
-    corr = cov / outer_std
-    corr[outer_std == 0] = 0
-    return corr
-
-def ewma_std_with_min_obs(series, halflife, min_obs):
-    """
-    Compute EWMA std only if there are at least `min_obs` observations.
-    Otherwise return NaNs.
-    """
-    if len(series) < min_obs:
-        return pd.Series([np.nan] * len(series), index=series.index)
-    return series.ewm(halflife=halflife).std()
-
-
-# Main function
 def prepare_cluster_data(chars, cluster_labels, daily, settings, features):
     # 1) Monthly cluster exposures
     cluster_data_m = chars[chars["valid"]].copy()
@@ -132,39 +105,17 @@ def prepare_cluster_data(chars, cluster_labels, daily, settings, features):
         cov_data = fct_ret[fct_ret["date"].isin(sub_dates)].drop(columns="date")
         t = len(cov_data)
 
-        # # Weighted covariance - VERSION 2.4
-        # w_cur = w_var[-t:]
-        # weights = w_cur / np.sum(w_cur)
-        # weighted_mean = np.average(cov_data, axis=0, weights=weights)
-        # centered_data = cov_data - weighted_mean
-        # cov_matrix_numpy_unbias = np.cov(centered_data.T, aweights=weights, bias=False)
-        #
-        # factor_names = list(fct_ret.columns[1:])
-        # factor_cov_est[d] = pd.DataFrame(cov_matrix_numpy_unbias)
-        # factor_cov_est[d].index = factor_names
-        # factor_cov_est[d].columns = factor_names
+        # Weighted covariance - VERSION 2.4
+        w_cur = w_var[-t:]
+        weights = w_cur / np.sum(w_cur)
+        weighted_mean = np.average(cov_data, axis=0, weights=weights)
+        centered_data = cov_data - weighted_mean
+        cov_matrix_numpy_unbias = np.cov(centered_data.T, aweights=weights, bias=False)
 
-        # NEW
-
-        # 1. Compute correlation matrix with EWMA correlation weights
-        w_cor_cur = w_cor[-t:]
-        w_cor_norm = w_cor_cur / np.sum(w_cor_cur)
-        corr_matrix = weighted_corrcoef(cov_data.values, w_cor_norm)
-
-        # 2. Compute standard deviations (from EWMA variance weights)
-        w_var_cur = w_var[-t:]
-        w_var_norm = w_var_cur / np.sum(w_var_cur)
-        weighted_mean2 = np.average(cov_data, axis=0, weights=w_var_norm)
-        centered_data2 = cov_data - weighted_mean2
-        var_vector = np.average(centered_data2 ** 2, axis=0, weights=w_var_norm)
-        sd_diag = np.diag(np.sqrt(var_vector))
-
-        # 3. Reconstruct covariance: cov = sd * cor * sd
-        cov_matrix = sd_diag @ corr_matrix @ sd_diag
-
-        # 4. Save to factor_cov_est
         factor_names = list(fct_ret.columns[1:])
-        factor_cov_est[d] = pd.DataFrame(cov_matrix, index=factor_names, columns=factor_names)
+        factor_cov_est[d] = pd.DataFrame(cov_matrix_numpy_unbias)
+        factor_cov_est[d].index = factor_names
+        factor_cov_est[d].columns = factor_names
 
     # 11) Specific Risk: residuals from daily cross-sectional regressions
     res_list = []
@@ -183,11 +134,9 @@ def prepare_cluster_data(chars, cluster_labels, daily, settings, features):
 
     # 12) EWMA of residual -> res_vol
     halflife_lambda = settings["cov_set"]["hl_stock_var"]
-    initial_obs = settings["cov_set"]["initial_var_obs"]
-
     res_df["res_vol"] = (
         res_df.groupby("id")["residual"]
-        .apply(lambda x: ewma_std_with_min_obs(x, halflife=halflife_lambda, min_obs=initial_obs))
+        .apply(lambda x: x.ewm(halflife=halflife_lambda).std())
         .reset_index(drop=True)
     )
 
