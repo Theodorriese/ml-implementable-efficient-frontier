@@ -39,11 +39,11 @@ settings = {
     "seed_no": 1,
     "months": False,
     "split": {
-        # "train_end": pd.Timestamp("2017-12-31"), # reduced
-        "train_end": pd.Timestamp("1996-12-31"),
-        "test_end": pd.Timestamp("2023-12-31"),
-        # "val_years": 1, # reduced
-        "val_years": 5,
+        "train_end": pd.Timestamp("2017-12-31"), # reduced
+        # "train_end": pd.Timestamp("1996-12-31"),
+        "test_end": pd.Timestamp("2020-12-31"),
+        "val_years": 1, # reduced
+        # "val_years": 5,
         "model_update_freq": "yearly",
         "train_lookback": 100, # just changed from 15
         "retrain_lookback": 100 # just changed from 15
@@ -54,27 +54,28 @@ settings = {
     "addition_n": 12,
     "deletion_n": 12,
     "screens": {
-        # "start": pd.Timestamp("2010-01-01"), # reduced
-        "start": pd.Timestamp("1986-01-01"),
-        "end": pd.Timestamp("2023-12-31"),
+        "start": pd.Timestamp("2010-01-01"), # reduced
+        # "start": pd.Timestamp("1986-01-01"),
+        "end": pd.Timestamp("2020-12-31"),
         "feat_pct": 0.5,
         "nyse_stocks": True
     },
     "pi": 0.1,
     "rff": {
         # "p_vec": [2 ** i for i in range(1, 3)], # smaller
-        "p_vec": [64],
+        # "p_vec": [64],
         # "p_vec": [8, 16, 32, 64],
-        # "p_vec": [2 ** i for i in range(1, 10)],  # original
+        "p_vec": [2 ** i for i in range(1, 10)],  # original
         "g_vec": np.exp(np.arange(-3, -1)),
         "l_vec": np.concatenate(([0], np.exp(np.linspace(-10, 10, 100))))
     },
     "pf": {
         "dates": {
-            # "start_year": 2018, # reduced
-            "start_year": 1997,
-            "end_yr": 2023,
-            "split_years": 5,
+            "start_year": 2018, # reduced
+            # "start_year": 1997,
+            "end_yr": 2020,
+            "split_years": 1,
+            # "split_years": 5, # reduced
         },
         "hps": {
             "cov_type": "cov_add",
@@ -104,8 +105,8 @@ settings = {
     },
     "cov_set": {
         "industries": True,
-        # "obs": 252 * 2, # reduced
-        "obs": 252 * 5,
+        "obs": 252 * 2, # reduced
+        # "obs": 252 * 5,
         "hl_cor": 252 * 3 / 2,
         "hl_var": 252 / 2,
         "hl_stock_var": 252 / 2,
