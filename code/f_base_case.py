@@ -277,7 +277,7 @@ def run_f_base_case(chars, barra_cov, wealth, dates_oos, pf_set, settings, confi
         output_path (str): Path to save the output.
     """
     # Run benchmark portfolios
-    # benchmark_portfolios(chars, barra_cov, wealth, dates_oos, pf_set, settings, output_path)
+    benchmark_portfolios(chars, barra_cov, wealth, dates_oos, pf_set, settings, output_path)
 
     # Run Static-ML
     static_ml(chars, barra_cov, lambda_list, wealth, pf_set, settings, dates_oos, dates_hp, output_path)

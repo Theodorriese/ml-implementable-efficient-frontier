@@ -1,61 +1,27 @@
 import os
+import pickle
 import pandas as pd
-import numpy as np
 
-# Input
-file_name = "model_1.pkl"
-input_folder = r"C:\Master\ml-implementable-efficient-frontier\code\Outputs"
-output_folder = r"C:\Master\ml-implementable-efficient-frontier\code\Outputs"
-
-# Setup paths
-full_path = os.path.join(input_folder, file_name)
+# Full path to the .pkl file
+pkl_path = r"C:\Users\theod\OneDrive - CBS - Copenhagen Business School\4. semester FIN - Master\settings.pkl"
+output_folder = r"C:\Users\theod\OneDrive - CBS - Copenhagen Business School\4. semester FIN - Master"
 os.makedirs(output_folder, exist_ok=True)
 
-# Load and handle
-try:
-    obj = pd.read_pickle(full_path)
-    print(f"Loaded: {type(obj)}")
+# Output CSV path
+csv_path = os.path.join(output_folder, "settings_converted.csv")
 
-    if isinstance(obj, pd.DataFrame):
-        obj.to_csv(os.path.join(output_folder, file_name.replace(".pkl", ".csv")), index=False)
-        print("Saved DataFrame.")
+# Load the object
+with open(pkl_path, "rb") as f:
+    settings = pickle.load(f)
 
-    elif isinstance(obj, pd.Series):
-        obj.to_frame().to_csv(os.path.join(output_folder, file_name.replace(".pkl", ".csv")))
-        print("Saved Series.")
+# Save to CSV depending on type
+if isinstance(settings, pd.DataFrame):
+    settings.to_csv(csv_path, index=False)
+elif isinstance(settings, dict):
+    df = pd.DataFrame.from_dict(settings, orient="index").reset_index()
+    df.columns = ['key', 'value']  # Optional
+    df.to_csv(csv_path, index=False)
+else:
+    raise TypeError(f"Unsupported type for CSV export: {type(settings)}")
 
-    elif isinstance(obj, dict):
-        for k, v in obj.items():
-            print(f"Processing key: {k} ({type(v)})")
-
-            try:
-                if isinstance(v, pd.DataFrame):
-                    v.to_csv(os.path.join(output_folder, f"{file_name}_{k}.csv"), index=False)
-                elif isinstance(v, pd.Series):
-                    v.to_frame().to_csv(os.path.join(output_folder, f"{file_name}_{k}.csv"))
-                elif isinstance(v, np.ndarray):
-                    # Flatten if necessary
-                    if v.ndim == 1:
-                        pd.DataFrame(v).to_csv(os.path.join(output_folder, f"{file_name}_{k}.csv"), index=False)
-                    elif v.ndim == 2:
-                        pd.DataFrame(v).to_csv(os.path.join(output_folder, f"{file_name}_{k}.csv"), index=False)
-                    elif v.ndim == 3:
-                        for i in range(v.shape[0]):
-                            slice_df = pd.DataFrame(v[i])
-                            slice_df.to_csv(os.path.join(output_folder, f"{file_name}_{k}_slice{i}.csv"), index=False)
-                elif isinstance(v, list):
-                    pd.DataFrame(v).to_csv(os.path.join(output_folder, f"{file_name}_{k}.csv"), index=False)
-                else:
-                    print(f"Skipped {k} - unsupported type: {type(v)}")
-            except Exception as e:
-                print(f"Error processing key {k}: {e}")
-
-    elif isinstance(obj, list):
-        pd.DataFrame(obj).to_csv(os.path.join(output_folder, file_name.replace(".pkl", ".csv")), index=False)
-        print("Saved list.")
-
-    else:
-        print("Unsupported object type.")
-
-except Exception as e:
-    print(f"Error converting {file_name}: {e}")
+print(f"✅ Exported settings to: {csv_path}")

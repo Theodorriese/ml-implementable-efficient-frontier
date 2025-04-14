@@ -1404,89 +1404,89 @@ def pfml_implement(data_tc, cov_list, lambda_list, risk_free, features, wealth, 
             - "rff_w_list": RFF weight objects.
     """
 
-    # if not hps:
-    # 	hps = {}
-    # 	for g in g_vec:
-    # 		print(f"Processing g: {g}")
-
-    # 		if settings["multi_process"]:
-    # 			pfml_input = pfml_input_fun_multi(
-    # 				data_tc, cov_list, lambda_list,
-    # 				gamma_rel, wealth, mu, dates_full,
-    # 				lb, scale, risk_free, features,
-    # 				rff_feat, seed, p_max=max(p_vec),
-    # 				g=g, add_orig=orig_feat,
-    # 				iter=iter, balanced=balanced
-    # 			)
-    # 		else:
-    # 			pfml_input = pfml_input_fun(
-    # 				data_tc, cov_list, lambda_list,
-    # 				gamma_rel, wealth, mu, dates_full,
-    # 				lb, scale, risk_free, features,
-    # 				rff_feat, seed, p_max=max(p_vec),
-    # 				g=g, add_orig=orig_feat,
-    # 				iter=iter, balanced=balanced
-    # 			)
-
-    # 		with open(f"/work/frontier_ml/pfml_input_g{g:.4f}.pkl", "wb") as f:
-    # 			pickle.dump(pfml_input, f)
-
-    # 		rff_w = pfml_input.get("rff_w")
-
-    # 		feat_all = pfml_feat_fun(max(p_vec), orig_feat, features)
-    # 		reals_adj = {}
-    # 		for date_key, val in pfml_input["reals"].items():
-    # 			reals_adj[date_key] = {
-    # 				"r_tilde": val["r_tilde"].loc[feat_all]
-    # 			}
-    # 			for subk, mat_ in val.items():
-    # 				if subk != "r_tilde":
-    # 					reals_adj[date_key][subk] = mat_.loc[feat_all, feat_all]
-
-    # 		signals_adj = {
-    # 			date_key: mat_.loc[:, feat_all]
-    # 			for date_key, mat_ in pfml_input["signal_t"].items()
-    # 		}
-
-    # 		pfml_input = {
-    # 			"reals": reals_adj,
-    # 			"signal_t": signals_adj
-    # 		}
-
-    # 		pfml_hp_coef = pfml_search_coef(
-    # 			pfml_input, p_vec, l_vec, hp_years,
-    # 			orig_feat, features
-    # 		)
-
-    # 		validation = pfml_hp_reals_fun(
-    # 			pfml_input, pfml_hp_coef, p_vec, l_vec,
-    # 			hp_years, orig_feat, features
-    # 		)
-    # 		validation["g"] = g
-
-    # 		aims = pfml_aims_fun(
-    # 			pfml_input, validation, data_tc,
-    # 			pfml_hp_coef, dates_oos,
-    # 			orig_feat, features
-    # 		)
-    # 		hps[g] = {
-    # 			"aim_pfs_list": aims,
-    # 			"validation": validation,
-    # 			"rff_w": rff_w
-    # 		}
-
-    # 		with open(f"/work/frontier_ml/hps_g{g:.4f}.pkl", "wb") as f:
-    # 			pickle.dump(hps[g], f)
-
-    # Load both pfml_input and hps files
     if not hps:
-        hps = {}
-        for g in g_vec:
-            print(f"Loading precomputed data for g: {g}")
+    	hps = {}
+    	for g in g_vec:
+    		print(f"Processing g: {g}")
 
-            # Load hps data
-            with open(f"/work/frontier_ml/hps_g{g:.4f}.pkl", "rb") as f:
-                hps[g] = pickle.load(f)
+    		if settings["multi_process"]:
+    			pfml_input = pfml_input_fun_multi(
+    				data_tc, cov_list, lambda_list,
+    				gamma_rel, wealth, mu, dates_full,
+    				lb, scale, risk_free, features,
+    				rff_feat, seed, p_max=max(p_vec),
+    				g=g, add_orig=orig_feat,
+    				iter=iter, balanced=balanced
+    			)
+    		else:
+    			pfml_input = pfml_input_fun(
+    				data_tc, cov_list, lambda_list,
+    				gamma_rel, wealth, mu, dates_full,
+    				lb, scale, risk_free, features,
+    				rff_feat, seed, p_max=max(p_vec),
+    				g=g, add_orig=orig_feat,
+    				iter=iter, balanced=balanced
+    			)
+
+    		with open(f"/work/frontier_ml/pfml_input_g{g:.4f}.pkl", "wb") as f:
+    			pickle.dump(pfml_input, f)
+
+    		rff_w = pfml_input.get("rff_w")
+
+    		feat_all = pfml_feat_fun(max(p_vec), orig_feat, features)
+    		reals_adj = {}
+    		for date_key, val in pfml_input["reals"].items():
+    			reals_adj[date_key] = {
+    				"r_tilde": val["r_tilde"].loc[feat_all]
+    			}
+    			for subk, mat_ in val.items():
+    				if subk != "r_tilde":
+    					reals_adj[date_key][subk] = mat_.loc[feat_all, feat_all]
+
+    		signals_adj = {
+    			date_key: mat_.loc[:, feat_all]
+    			for date_key, mat_ in pfml_input["signal_t"].items()
+    		}
+
+    		pfml_input = {
+    			"reals": reals_adj,
+    			"signal_t": signals_adj
+    		}
+
+    		pfml_hp_coef = pfml_search_coef(
+    			pfml_input, p_vec, l_vec, hp_years,
+    			orig_feat, features
+    		)
+
+    		validation = pfml_hp_reals_fun(
+    			pfml_input, pfml_hp_coef, p_vec, l_vec,
+    			hp_years, orig_feat, features
+    		)
+    		validation["g"] = g
+
+    		aims = pfml_aims_fun(
+    			pfml_input, validation, data_tc,
+    			pfml_hp_coef, dates_oos,
+    			orig_feat, features
+    		)
+    		hps[g] = {
+    			"aim_pfs_list": aims,
+    			"validation": validation,
+    			"rff_w": rff_w
+    		}
+
+    		with open(f"/work/frontier_ml/hps_g{g:.4f}.pkl", "wb") as f:
+    			pickle.dump(hps[g], f)
+
+    # # Load both pfml_input and hps files
+    # if not hps:
+    #     hps = {}
+    #     for g in g_vec:
+    #         print(f"Loading precomputed data for g: {g}")
+    #
+    #         # Load hps data
+    #         with open(f"/work/frontier_ml/hps_g{g:.4f}.pkl", "rb") as f:
+    #             hps[g] = pickle.load(f)
 
     # 2. Find best hyperparameters at end of year
     best_hps = pd.concat([hps[g]["validation"] for g in hps], ignore_index=True)

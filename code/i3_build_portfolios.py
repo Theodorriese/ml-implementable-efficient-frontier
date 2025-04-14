@@ -101,8 +101,8 @@ if not os.path.exists(fitted_models_path):
 fitted_models = pd.read_pickle(fitted_models_path)
 
 # -------------------- Step 2: Estimate Covariance Matrix --------------------
-print("Step 2: Estimating covariance matrix...")
-
+# print("Step 2: Estimating covariance matrix...")
+#
 # cov_results = prepare_cluster_data(
 #     chars=chars,
 #     cluster_labels=cluster_labels,
