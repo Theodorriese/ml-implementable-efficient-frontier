@@ -144,14 +144,12 @@ def prepare_cluster_data(chars, cluster_labels, daily, settings, features):
         cov_data = fct_ret[fct_ret["date"].isin(sub_dates)].drop(columns="date")
         t = len(cov_data)
 
-        # NEW
-
-        # 1. Compute correlation matrix with EWMA correlation weights
+        # 10.1 Compute weighted correlation matrix
         w_cor_cur = w_cor[-t:]
         w_cor_norm = w_cor_cur / np.sum(w_cor_cur)
         corr_matrix = weighted_corrcoef(cov_data.values, w_cor_norm)
 
-        # 2. Compute standard deviations (from EWMA variance weights)
+        # 10.2. Compute standard deviations (from EWMA variance weights)
         w_var_cur = w_var[-t:]
         w_var_norm = w_var_cur / np.sum(w_var_cur)
         weighted_mean2 = np.average(cov_data, axis=0, weights=w_var_norm)
@@ -159,14 +157,14 @@ def prepare_cluster_data(chars, cluster_labels, daily, settings, features):
         var_vector = np.average(centered_data2 ** 2, axis=0, weights=w_var_norm)
         sd_diag = np.diag(np.sqrt(var_vector))
 
-        # 3. Reconstruct covariance: cov = sd * cor * sd
+        # 10.3. Reconstruct covariance: cov = sd * cor * sd
         cov_matrix = sd_diag @ corr_matrix @ sd_diag
 
-        # Apply Bessel correction to match R's cov.wt(..., method = "unbiased")
+        # 10.4 Apply Bessel correction to match R's cov.wt(..., method = "unbiased")
         correction_factor = np.sum(w_var_cur) / (np.sum(w_var_cur) - 1)
         cov_matrix *= correction_factor
 
-        # 4. Save to factor_cov_est
+        # 10.5. Save to factor_cov_est
         factor_names = list(fct_ret.columns[1:])
         factor_cov_est[d] = pd.DataFrame(cov_matrix, index=factor_names, columns=factor_names)
 

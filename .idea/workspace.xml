@@ -6,8 +6,7 @@
   <component name="ChangeListManager">
     <list default="true" id="001ad656-4e1d-41a9-98d4-c3629915c329" name="Changes" comment="Push">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/code/a_portfolio_choice_functions.py" beforeDir="false" afterPath="$PROJECT_DIR$/code/a_portfolio_choice_functions.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/code/f_base_case.py" beforeDir="false" afterPath="$PROJECT_DIR$/code/f_base_case.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/code/d_estimate_cov_matrix.py" beforeDir="false" afterPath="$PROJECT_DIR$/code/d_estimate_cov_matrix.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -61,52 +60,52 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "Python.Test.executor": "Run",
-    "Python.a_general_functions.executor": "Debug",
-    "Python.a_portfolio_choice_functions.executor": "Debug",
-    "Python.a_return_prediction_functions.executor": "Debug",
-    "Python.b_prepare_data.executor": "Debug",
-    "Python.c_fit_models.executor": "Debug",
-    "Python.check_models.executor": "Debug",
-    "Python.cov_check.executor": "Run",
-    "Python.d_estimate_cov_matrix.executor": "Debug",
-    "Python.f_base_case.executor": "Run",
-    "Python.f_feature_importance_ret.executor": "Run",
-    "Python.g_base_analysis.executor": "Debug",
-    "Python.i1_Main.executor": "Debug",
-    "Python.i2_build_portfolios.executor": "Debug",
-    "Python.i2_fit_models.executor": "Debug",
-    "Python.i3_build_portfolios.executor": "Debug",
-    "Python.i4_run_analysis.executor": "Debug",
-    "Python.main.executor": "Debug",
-    "Python.pkl_to_csv2.executor": "Run",
-    "Python.temp_data_reduction.executor": "Run",
-    "Python.test.executor": "Run",
-    "Python.testerxxx.executor": "Run",
-    "Python.x_csv_to_pkl_converter.executor": "Run",
-    "Python.x_csv_to_pkl_heavy.executor": "Run",
-    "Python.x_get_weights.executor": "Debug",
-    "Python.x_pkl_to_csv.executor": "Run",
-    "Python.x_pkl_to_csv2.executor": "Debug",
-    "Python.x_read_pkl_content.executor": "Debug",
-    "Python.x_read_temp.executor": "Run",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "database.data.extractors.current.export.id": "Comma-separated (CSV)_id",
-    "git-widget-placeholder": "master",
-    "ignore.virus.scanning.warn.message": "true",
-    "last_opened_file_path": "C:/Master",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "settings.editor.selected.configurable": "com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Python.Test.executor&quot;: &quot;Run&quot;,
+    &quot;Python.a_general_functions.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.a_portfolio_choice_functions.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.a_return_prediction_functions.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.b_prepare_data.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.c_fit_models.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.check_models.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.cov_check.executor&quot;: &quot;Run&quot;,
+    &quot;Python.d_estimate_cov_matrix.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.f_base_case.executor&quot;: &quot;Run&quot;,
+    &quot;Python.f_feature_importance_ret.executor&quot;: &quot;Run&quot;,
+    &quot;Python.g_base_analysis.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.i1_Main.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.i2_build_portfolios.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.i2_fit_models.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.i3_build_portfolios.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.i4_run_analysis.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.main.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.pkl_to_csv2.executor&quot;: &quot;Run&quot;,
+    &quot;Python.temp_data_reduction.executor&quot;: &quot;Run&quot;,
+    &quot;Python.test.executor&quot;: &quot;Run&quot;,
+    &quot;Python.testerxxx.executor&quot;: &quot;Run&quot;,
+    &quot;Python.x_csv_to_pkl_converter.executor&quot;: &quot;Run&quot;,
+    &quot;Python.x_csv_to_pkl_heavy.executor&quot;: &quot;Run&quot;,
+    &quot;Python.x_get_weights.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.x_pkl_to_csv.executor&quot;: &quot;Run&quot;,
+    &quot;Python.x_pkl_to_csv2.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.x_read_pkl_content.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.x_read_temp.executor&quot;: &quot;Run&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;database.data.extractors.current.export.id&quot;: &quot;Comma-separated (CSV)_id&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
+    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;C:/Master&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="MoveFile.RECENT_KEYS">
       <recent name="C:\Master\ml-implementable-efficient-frontier" />
@@ -299,15 +298,8 @@
       <workItem from="1744640492428" duration="7310000" />
       <workItem from="1744656028613" duration="1787000" />
       <workItem from="1744697916831" duration="306000" />
-      <workItem from="1744709561187" duration="3329000" />
-    </task>
-    <task id="LOCAL-00100" summary="Push">
-      <option name="closed" value="true" />
-      <created>1742399547608</created>
-      <option name="number" value="00100" />
-      <option name="presentableId" value="LOCAL-00100" />
-      <option name="project" value="LOCAL" />
-      <updated>1742399547608</updated>
+      <workItem from="1744709561187" duration="3653000" />
+      <workItem from="1744722643230" duration="162000" />
     </task>
     <task id="LOCAL-00101" summary="Push">
       <option name="closed" value="true" />
@@ -693,7 +685,15 @@
       <option name="project" value="LOCAL" />
       <updated>1744709642311</updated>
     </task>
-    <option name="localTasksCounter" value="149" />
+    <task id="LOCAL-00149" summary="Push">
+      <option name="closed" value="true" />
+      <created>1744713643064</created>
+      <option name="number" value="00149" />
+      <option name="presentableId" value="LOCAL-00149" />
+      <option name="project" value="LOCAL" />
+      <updated>1744713643064</updated>
+    </task>
+    <option name="localTasksCounter" value="150" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
