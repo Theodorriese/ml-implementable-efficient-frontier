@@ -1475,8 +1475,8 @@ def pfml_implement(data_tc, cov_list, lambda_list, risk_free, features, wealth, 
     			"rff_w": rff_w
     		}
 
-    		with open(f"/work/frontier_ml/hps_g{g:.4f}.pkl", "wb") as f:
-    			pickle.dump(hps[g], f)
+    		# with open(f"/work/frontier_ml/hps_g{g:.4f}.pkl", "wb") as f:
+    		# 	pickle.dump(hps[g], f)
 
     # # Load both pfml_input and hps files
     # if not hps:
@@ -2183,7 +2183,7 @@ def pfml_input_fun_multi(data_tc, cov_list, lambda_list, gamma_rel, wealth, mu, 
         if scales_list:
             scales_df = pd.concat(scales_list, ignore_index=True)
 
-            chunk_size = 100000
+            chunk_size = 25000
             chunked_data = []
             for i in range(0, len(data), chunk_size):
                 data_chunk = data.iloc[i:i + chunk_size]
