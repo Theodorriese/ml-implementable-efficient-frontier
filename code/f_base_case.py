@@ -59,7 +59,6 @@ def benchmark_portfolios(chars, barra_cov, wealth, dates_oos, pf_set, settings, 
             cov_list=barra_cov,
             wealth=wealth,
             dates=dates_oos,
-            n_jobs=-1
         )
     else:
         print("Using single-core implementation for Minimum Variance...")
@@ -124,7 +123,6 @@ def static_ml(chars, barra_cov, lambda_list, wealth, pf_set, settings, dates_oos
             cov_type=settings["pf"]["hps"]["cov_type"],
             validation=None,
             seed=None,
-            n_jobs=-1
         )
     else:
         print("Using single-core implementation for Static-ML...")
@@ -277,10 +275,10 @@ def run_f_base_case(chars, barra_cov, wealth, dates_oos, pf_set, settings, confi
         output_path (str): Path to save the output.
     """
     # Run benchmark portfolios
-    # benchmark_portfolios(chars, barra_cov, wealth, dates_oos, pf_set, settings, output_path)
+    benchmark_portfolios(chars, barra_cov, wealth, dates_oos, pf_set, settings, output_path)
 
     # Run Static-ML
-    # static_ml(chars, barra_cov, lambda_list, wealth, pf_set, settings, dates_oos, dates_hp, output_path)
+    static_ml(chars, barra_cov, lambda_list, wealth, pf_set, settings, dates_oos, dates_hp, output_path)
 
     # Run Portfolio-ML
     portfolio_ml(chars, barra_cov, lambda_list, features, risk_free, wealth, pf_set, settings, dates_m2,
