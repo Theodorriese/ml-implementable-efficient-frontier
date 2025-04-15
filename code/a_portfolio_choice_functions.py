@@ -39,8 +39,7 @@ def m_func(w, mu, rf, sigma_gam, gam, lambda_mat, iterations):
 
     # Ensure lambda_mat is diagonal & avoid division by zero
     n = lambda_mat.shape[0]
-    eps = 1e-8
-    lamb_neg05 = np.diag(1.0 / np.sqrt(np.diag(lambda_mat) + eps))
+    lamb_neg05 = np.diag(np.diag(lambda_mat) ** -0.5)
 
     g_bar = np.ones(n)
     mu_bar_vec = np.ones(n) * (1 + rf + mu)
@@ -1639,45 +1638,57 @@ def pfml_cf_fun(data, cf_cluster, pfml_base, dates, cov_list, lambda_list, scale
 
 def mp_aim_fun(preds, sigma_gam, lambda_, m, w, K):
     """
-    Compute the multiperiod-ML aim portfolio.
+    Compute the multiperiod-ML aim portfolio (1:1 R translation).
 
     Parameters:
-        preds (pd.DataFrame): Predictions for different horizons, keyed by "pred_ld[tau]".
-        sigma_gam (np.ndarray): Adjusted covariance matrix scaled by gamma.
-        lambda_ (np.ndarray): Regularization matrix.
-        m (np.ndarray): Transition matrix for weights.
+        preds (dict): Predictions for different horizons, keys = "pred_ld1", "pred_ld2", ...
+        sigma_gam (np.ndarray): Scaled covariance matrix (gamma * Σ).
+        lambda_ (np.ndarray): Transaction cost matrix (Λ).
+        m (np.ndarray): Transition matrix (m).
         w (float): Current wealth.
-        K (int): Prediction horizon.
+        K (int): Prediction horizon (number of future steps).
 
     Returns:
-        np.ndarray: Multiperiod-ML aim portfolio weights.
+        np.ndarray: Multiperiod aim portfolio weights (column vector).
     """
     n = sigma_gam.shape[0]
     iden = np.eye(n)
-    sigma_inv = np.linalg.inv(sigma_gam)
 
+    # Inverses
+    sigma_inv = np.linalg.inv(sigma_gam)
+    lambda_inv = np.linalg.inv(lambda_)
+
+    # g_bar is identity in this simplified case
     g_bar = np.eye(n)
     m_gbar = m @ g_bar
-    c = (w ** -1) * m @ np.linalg.inv(lambda_) @ sigma_gam
+
+    # Initial c term (wealth-scaled)
+    c = (w ** -1) * m @ lambda_inv @ sigma_gam
 
     inv_I_minus_mgbar = np.linalg.inv(iden - m_gbar)
     c_tilde = inv_I_minus_mgbar @ inv_I_minus_mgbar @ c
     c_tilde_sigma_inv = c_tilde @ sigma_inv
 
+    # Accumulate aim_pf
     aim_pf = np.zeros((n, 1))
-    m_gbar_pow = np.eye(n)
+    m_gbar_pow = np.eye(n)  # m_gbar^0 initially
 
     for tau in range(1, K + 1):
         if tau > 1:
             m_gbar_pow = m_gbar_pow @ m_gbar
 
-        preds_vec = preds[f"pred_ld{tau}"].to_numpy().reshape(-1, 1)
-        aim_pf += m_gbar_pow @ c_tilde_sigma_inv @ preds_vec
+        pred_tau = preds[f"pred_ld{tau}"]
+        pred_vec = pred_tau.to_numpy().reshape(-1, 1)  # ensure column vector
+        aim_pf += m_gbar_pow @ c_tilde_sigma_inv @ pred_vec
+
+    # Final rescaling
+    inv_I_minus_m = np.linalg.inv(iden - m)
+    inv_I_minus_mgbar_pow_mgbar = np.linalg.inv(iden - m_gbar_pow @ m_gbar)
 
     aim_pf_rescaled = (
-            np.linalg.inv(iden - m) @
-            inv_I_minus_mgbar @ inv_I_minus_mgbar @
-            np.linalg.inv(iden - m_gbar_pow @ m_gbar) @
+            inv_I_minus_m @
+            (inv_I_minus_mgbar @ inv_I_minus_mgbar) @
+            inv_I_minus_mgbar_pow_mgbar @
             aim_pf
     )
 
@@ -1829,7 +1840,7 @@ def mp_implement(data_tc, cov_list, lambda_list, rf,
         iter_ (int): Number of iterations for optimization.
         validation (pd.DataFrame, optional): Precomputed validation results.
         seed (int, optional): Random seed for reproducibility.
-        mu (float, optional): Drift parameter (required for `mp_val_fun`).
+        mu (float, optional): Drift parameter.
 
     Returns:
         dict: Dictionary containing:
@@ -2391,7 +2402,7 @@ def mp_implement_multi_process(data_tc, cov_list, lambda_list, rf,
         iter_ (int): Number of iterations for optimization.
         validation (pd.DataFrame, optional): Precomputed validation results.
         seed (int, optional): Random seed for reproducibility.
-        mu (float, optional): Drift parameter (required for mp_val_fun).
+        mu (float, optional): Drift parameter.
 
     Returns:
         dict: Dictionary containing:
