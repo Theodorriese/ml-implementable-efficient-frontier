@@ -29,17 +29,19 @@ cluster_order = [
 txt_size = 10
 
 # -------------------- Setup --------------------
+# Data settings dictionary
 settings = {
     "region": "USA",
     "multi_process": False,
-    "data_path": r"C:\Master",
+    # "data_path": "C:\Master",
+    "data_path": "/work/frontier_ml/",
     "parallel": True,
     "seed_no": 1,
     "months": False,
     "split": {
-        "train_end": pd.Timestamp("2017-12-31"),
-        "test_end": pd.Timestamp("2020-12-31"),
-        "val_years": 1,
+        "train_end": pd.Timestamp("1996-12-31"),
+        "test_end": pd.Timestamp("2023-12-31"),
+        "val_years": 5,
         "model_update_freq": "yearly",
         "train_lookback": 100,
         "retrain_lookback": 100
@@ -50,21 +52,22 @@ settings = {
     "addition_n": 12,
     "deletion_n": 12,
     "screens": {
-        "start": pd.Timestamp("2010-01-01"),
-        "end": pd.Timestamp("2020-12-31"),
+        "start": pd.Timestamp("1986-01-01"),
+        "end": pd.Timestamp("2023-12-31"),
         "feat_pct": 0.5,
-        "nyse_stocks": True,
-        "size_screen": "perc_low50_high100_min50"
+        "nyse_stocks": True
     },
     "pi": 0.1,
     "rff": {
-        "p_vec": [2 ** i for i in range(1, 10)]
+        "p_vec": [2 ** i for i in range(1, 10)],
+        "g_vec": np.exp(np.arange(-3, -1)),
+        "l_vec": np.concatenate(([0], np.exp(np.linspace(-10, 10, 100))))
     },
     "pf": {
         "dates": {
-            "start_year": 2018,
-            "end_yr": 2020,
-            "split_years": 1
+            "start_year": 1997,
+            "end_yr": 2023,
+            "split_years": 5,
         },
         "hps": {
             "cov_type": "cov_add",
@@ -75,7 +78,7 @@ settings = {
                 "K": 12
             },
             "static": {
-                "k": [1.0, 1/3, 0.3333333333333333, 0.2],
+                "k": [1 / 1, 1 / 3, 1 / 5],
                 "u": [0.25, 0.5, 1],
                 "g": [0, 1, 2]
             }
@@ -83,7 +86,7 @@ settings = {
     },
     "pf_ml": {
         "g_vec": np.exp(np.arange(-3, -1)),
-        "p_vec": [2 ** i for i in range(6, 10)],
+        "p_vec": [2**i for i in range(6, 10)],
         "l_vec": np.concatenate(([0], np.exp(np.linspace(-10, 10, 100)))),
         "orig_feat": False,
         "scale": True
@@ -94,12 +97,12 @@ settings = {
     },
     "cov_set": {
         "industries": True,
-        "obs": 504,
-        "hl_cor": 378.0,
-        "hl_var": 126.0,
-        "hl_stock_var": 126.0,
+        "obs": 252 * 5,
+        "hl_cor": 252 * 3 / 2,
+        "hl_var": 252 / 2,
+        "hl_stock_var": 252 / 2,
         "min_stock_obs": 252,
-        "initial_var_obs": 63
+        "initial_var_obs": 21 * 3
     },
     "factor_ml": {
         "n_pfs": 10
