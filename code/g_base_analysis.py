@@ -2,6 +2,7 @@ import os
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.ticker import ScalarFormatter
 import seaborn as sns
 from matplotlib.dates import DateFormatter
 from scipy.stats import norm
@@ -152,77 +153,98 @@ def compute_portfolio_summary(pfs, main_types, pf_order, gamma_rel):
 # Performance Time-Series -----------
 def compute_and_plot_performance_time_series(pfs, main_types, start_date, end_date):
     """
-    Computes and plots the performance time-series for different portfolio types.
-
-    Parameters:
-        pfs (pd.DataFrame): DataFrame containing portfolio performance metrics.
-        main_types (list): List of main portfolio types to include in the plots.
-        start_date (str): Start date of the time-series plots (e.g., '1980-12-31').
-        end_date (str): End date of the time-series plots (e.g., '2020-12-31').
-
-    Returns:
-        matplotlib.figure.Figure: Figure containing the cumulative performance plots.
+    Computes and plots the performance time-series for different portfolio types,
+    producing a single legend above the subplots, no gridlines, and manual y-axis control.
     """
-    # Filter and compute cumulative returns
+
+    # Compute cumulative returns
     pfs['cumret'] = pfs.groupby('type', observed=True)['r'].cumsum()
     pfs['cumret_tc'] = pfs['r'] - pfs['tc']
     pfs['cumret_tc'] = pfs.groupby('type', observed=True)['cumret_tc'].cumsum()
     pfs['cumret_tc_risk'] = pfs.groupby('type', observed=True)['utility_t'].cumsum()
 
-    # Filter for main types and reshape data
+    # Melt into long format
     ts_data = (
         pfs[pfs['type'].isin(main_types)]
-        .melt(id_vars=['type', 'eom_ret'], value_vars=['cumret', 'cumret_tc', 'cumret_tc_risk'], var_name='metric')
+        .melt(
+            id_vars=['type', 'eom_ret'],
+            value_vars=['cumret', 'cumret_tc', 'cumret_tc_risk'],
+            var_name='metric'
+        )
     )
 
-    # Add initial zero values for each type
+    # Add initial zeros
     initial_values = pd.DataFrame({
         'eom_ret': pd.Timestamp(start_date) - pd.offsets.MonthBegin(),
         'type': main_types * 3,
         'value': 0,
-        'metric': ['cumret'] * len(main_types) + ['cumret_tc'] * len(main_types) + ['cumret_tc_risk'] * len(main_types)
+        'metric': (
+            ['cumret'] * len(main_types)
+            + ['cumret_tc'] * len(main_types)
+            + ['cumret_tc_risk'] * len(main_types)
+        )
     })
     ts_data = pd.concat([ts_data, initial_values], ignore_index=True)
+    ts_data['eom_ret'] = pd.to_datetime(ts_data['eom_ret'])
+    ts_data = ts_data.sort_values(by=['type', 'eom_ret', 'metric'])
 
-    # Create pretty labels for the metrics
+    # Label mapping
     metric_labels = {
         'cumret': 'Gross Return',
         'cumret_tc': 'Return net of TC',
         'cumret_tc_risk': 'Return net of TC and Risk'
     }
     ts_data['metric_pretty'] = ts_data['metric'].map(metric_labels)
-    ts_data['metric_pretty'] = pd.Categorical(ts_data['metric_pretty'], categories=metric_labels.values())
+    ts_data['metric_pretty'] = pd.Categorical(
+        ts_data['metric_pretty'],
+        categories=list(metric_labels.values())
+    )
 
-    # Plot settings
-    sns.set_theme(style="whitegrid", context="talk")
-    fig, axes = plt.subplots(1, 3, figsize=(18, 5), sharey=False, gridspec_kw={'width_ratios': [1.07, 1, 1]})
+    # Set up plot
+    sns.set_theme(style="white", context="talk")
+    fig, axes = plt.subplots(1, 3, figsize=(18, 5), sharey=False,
+                             gridspec_kw={'width_ratios': [1.07, 1, 1]})
 
+    # Define manual y-axis ranges for each plot (adjust as needed)
+    ylims = {
+        'Gross Return': (-0.5, 2.5),
+        'Return net of TC': (-0.5, 1.5),
+        'Return net of TC and Risk': (-0.5, 0.75)
+    }
+
+    # Plot
     for ax, metric in zip(axes, ts_data['metric_pretty'].cat.categories):
         plot_data = ts_data[ts_data['metric_pretty'] == metric]
-
         for portfolio_type in main_types:
-            portfolio_data = plot_data[plot_data['type'] == portfolio_type]
-            ax.plot(portfolio_data['eom_ret'], portfolio_data['value'], label=portfolio_type)
+            subset = plot_data[plot_data['type'] == portfolio_type]
+            ax.plot(subset['eom_ret'], subset['value'], label=portfolio_type, linewidth=2)
 
         ax.set_title(metric)
         ax.set_xlabel("")
         ax.set_ylabel("Cumulative Performance")
         ax.xaxis.set_major_formatter(DateFormatter('%Y'))
         ax.tick_params(axis='x', rotation=45)
-        ax.grid(True)
+        ax.grid(False)
+        # ax.set_xlim(pd.Timestamp(start_date), pd.Timestamp(end_date))
+        pad_months = 12  # Have added 12 months for padding
+        ax.set_xlim(pd.Timestamp(start_date) - pd.DateOffset(months=pad_months), pd.Timestamp(end_date))
 
-        # Set axis limits
-        ax.set_xlim(pd.Timestamp(start_date), pd.Timestamp(end_date))
 
-        if metric == 'Gross Return':
-            max_val = plot_data[plot_data['type'] != "Markowitz-ML"]['value'].max()
-            min_val = plot_data[plot_data['type'] != "Markowitz-ML"]['value'].min()
-            ax.set_ylim(min_val, max_val)
+        # Set manually specified y-axis limits
+        if metric in ylims:
+            ax.set_ylim(*ylims[metric])
 
-        ax.legend(loc="upper left", fontsize='small', title="Method:")
+    # Single legend above
+    fig.legend(
+        handles=axes[0].get_lines(),
+        labels=main_types,
+        loc="upper center",
+        ncol=len(main_types),
+        frameon=False,
+        bbox_to_anchor=(0.5, 1.10)
+    )
 
-    # Adjust layout
-    fig.tight_layout()
+    fig.tight_layout(rect=[0, 0, 1, 0.97])
     return fig
 
 
@@ -322,87 +344,75 @@ def compute_expected_risk(dates, cov_list, weights):
 def compute_and_plot_portfolio_statistics_over_time(pfml, tpf, static, factor_ml, pfs, barra_cov, dates_oos,
                                                     pf_order, main_types):
     """
-    Compute and plot portfolio statistics over time, including ex-ante volatility, turnover, and leverage.
+    Compute and plot portfolio statistics over time: ex-ante volatility, leverage, and turnover.
     """
+
     # Combine portfolio weights
-    pfml_weights = pfml["w"].copy()
-    pfml_weights["type"] = "Portfolio-ML"
+    pfml_weights = pfml["w"].copy(); pfml_weights["type"] = "Portfolio-ML"
+    tpf_weights = tpf["w"].copy(); tpf_weights["type"] = "Markowitz-ML"
+    # mp_weights = mp["w"].copy(); mp_weights["type"] = "Multiperiod-ML*"
+    static_weights = static["w"].copy(); static_weights["type"] = "Static-ML*"; static_weights.drop(columns=["pred_ld1"], inplace=True)
+    factor_ml_weights = factor_ml["w"].copy(); factor_ml_weights["type"] = "Factor-ML"
 
-    tpf_weights = tpf["w"].copy()
-    tpf_weights["type"] = "Markowitz-ML"
-
-    # mp_weights = mp["w"].copy()
-    # mp_weights["type"] = "Multiperiod-ML*"
-
-    static_weights = static["w"].copy()
-    static_weights["type"] = "Static-ML*"
-    static_weights.drop(columns=["pred_ld1"], inplace=True)
-
-    factor_ml_weights = factor_ml["w"].copy()
-    factor_ml_weights["type"] = "Factor-ML"
-
-    # Combine all weights
-    # combined_weights = pd.concat(
-    #     [pfml_weights, tpf_weights, mp_weights, static_weights, factor_ml_weights],
-    #     ignore_index=True
-    # )
     combined_weights = pd.concat(
         [pfml_weights, tpf_weights, static_weights, factor_ml_weights],
         ignore_index=True
     )
     combined_weights["type"] = pd.Categorical(combined_weights["type"], categories=pf_order, ordered=True)
 
-    # Compute expected portfolio risks
+    # Compute expected risks
     pf_vars = compute_expected_risk(dates_oos, barra_cov, combined_weights)
 
-    # Merge risk and portfolio statistics
+    # Merge with pfs
     pfs = pfs.copy()
-    pfs["eom"] = (pfs["eom_ret"] - pd.offsets.MonthEnd(1))
-    merged_stats = pf_vars.merge(
-        pfs[["type", "eom", "inv", "turnover"]],
-        on=["type", "eom"],
-        how="inner"
-    )
+    pfs["eom"] = pfs["eom_ret"] - pd.offsets.MonthEnd(1)
+    merged_stats = pf_vars.merge(pfs[["type", "eom", "inv", "turnover"]], on=["type", "eom"], how="inner")
     merged_stats = merged_stats[merged_stats["type"].isin(main_types)]
 
-    # Compute additional statistics
-    # Pre-compute e_sd as a separate series to avoid modifying the original DataFrame
+    # Create long format for plotting
     e_sd_series = np.sqrt(merged_stats["pf_var"].values * 252)
-
-    # Create sub-dataframes directly instead of melting
     dfs = [
         merged_stats[["type", "eom"]].assign(stat="e_sd", value=e_sd_series),
         merged_stats[["type", "eom"]].assign(stat="inv", value=merged_stats["inv"]),
         merged_stats[["type", "eom"]].assign(stat="turnover", value=merged_stats["turnover"])
     ]
-
-    # Concatenate all at once
     merged_stats_long = pd.concat(dfs, ignore_index=True)
 
     stat_name_map = {
         "e_sd": "Ex-ante Volatility",
-        "turnover": "Turnover",
-        "inv": "Leverage"
+        "inv": "Leverage",
+        "turnover": "Turnover"
     }
     merged_stats_long["stat"] = merged_stats_long["stat"].map(stat_name_map)
 
-    # Plot portfolio statistics over time
-    sns.set_theme(style="whitegrid")
+    # Plotting
+    sns.set_theme(style="white")  # Removes background grids
     g = sns.FacetGrid(
-        merged_stats_long, col="stat", sharey=False, height=4, aspect=1.5,
+        merged_stats_long, col="stat", sharey=False, height=2.5, aspect=3.0,
         col_wrap=1, margin_titles=True
     )
     g.map_dataframe(
         sns.lineplot, x="eom", y="value", hue="type", style="type", palette="deep"
     )
+
+    # Set labels and titles
     g.set_axis_labels("Date", "Value")
     g.set_titles(col_template="{col_name}")
-    g.set(yscale="log")  # Log scale for better visualization
-    g.add_legend(title="Portfolio Type", bbox_to_anchor=(0.5, -0.1), loc="lower center", ncol=2)
-    g.tight_layout()
+    g.set(yscale="log")
 
-    # Show the plot
-    plt.show()
+    # Turn off gridlines and disable scientific y-axis labels
+    for ax in g.axes.flat:
+        ax.grid(False)  # Remove gridlines
+        ax.yaxis.set_major_formatter(ScalarFormatter())
+        ax.ticklabel_format(style='plain', axis='y')
+
+    # Add one legend centered above all plots
+    g.add_legend(bbox_to_anchor=(0.5, 1.05), loc="upper center", ncol=len(main_types), frameon=False)
+
+    # Adjust layout for legend spacing
+    g.tight_layout(rect=[0, 0, 1, 0.97])
+
+    return g.figure
 
 
 # Correlation ----------------------------------
@@ -445,7 +455,7 @@ def compute_and_plot_correlation_matrix(pfs, main_types):
 
 
 # Apple vs. Xerox ----------------------------------------------------
-def plot_apple_vs_xerox(mp, pfml, static, tpf, factor_ml, mkt,
+def plot_apple_vs_xerox(pfml, static, tpf, factor_ml, mkt,
                         pfs, liquid_id, illiquid_id, start_year):
     """
     Compare portfolio weights for a liquid and illiquid stock across different portfolios over time.
@@ -465,7 +475,7 @@ def plot_apple_vs_xerox(mp, pfml, static, tpf, factor_ml, mkt,
 
     # Generate position_frames directly, checking if "w" exists before accessing
     position_frames = [
-        mp["w"][mp["w"]["id"].isin([liquid_id, illiquid_id])].assign(type="Multiperiod-ML*") if "w" in mp else None,
+        # mp["w"][mp["w"]["id"].isin([liquid_id, illiquid_id])].assign(type="Multiperiod-ML*") if "w" in mp else None,
         pfml["w"][pfml["w"]["id"].isin([liquid_id, illiquid_id])].assign(type="Portfolio-ML") if "w" in pfml else None,
         static["w"][static["w"]["id"].isin([liquid_id, illiquid_id])].assign(
             type="Static-ML*") if "w" in static else None,
@@ -541,11 +551,15 @@ def plot_apple_vs_xerox(mp, pfml, static, tpf, factor_ml, mkt,
         plt.title(portfolio_type)
         plt.xlabel("End of Month")
         plt.ylabel("Portfolio Weight")
-        plt.legend(loc="best", fontsize=8)
+        plt.legend(loc="upper center", fontsize=8)
         plt.grid(True, which="both", linestyle="--", linewidth=0.5)
 
     plt.tight_layout()
+    fig = plt.gcf() # saves figure
     plt.show()
+
+    return fig
+
 
 
 # Optimal Hyper-parameters ----------------------------
@@ -594,7 +608,7 @@ def load_model_hyperparameters(model_path, horizon_label):
     return pd.concat(processed_data, ignore_index=True)
 
 
-def process_portfolio_tuning_data(mp, static, pfml, start_year):
+def process_portfolio_tuning_data(static, pfml, start_year):
     """
     Process portfolio tuning data for Multiperiod-ML, Static-ML, and Portfolio-ML.
 
@@ -611,21 +625,21 @@ def process_portfolio_tuning_data(mp, static, pfml, start_year):
     required_columns_mp_static = {"rank", "eom_ret", "k", "g", "u"}
     required_columns_pfml = {"eom_ret", "l", "p", "g"}
 
-    if not required_columns_mp_static.issubset(mp.columns) or not required_columns_mp_static.issubset(static.columns):
-        raise ValueError("mp or static DataFrames are missing required columns.")
+    # if not required_columns_mp_static.issubset(mp.columns) or not required_columns_mp_static.issubset(static.columns):
+    #     raise ValueError("mp or static DataFrames are missing required columns.")
 
     if not required_columns_pfml.issubset(pfml.columns):
         raise ValueError("pfml DataFrame is missing required columns.")
 
-    # ---- Process Multiperiod-ML Data ----
-    mp_hps = mp[
-        (mp["rank"] == 1) &
-        (mp["eom_ret"].dt.year >= start_year) &
-        (mp["eom_ret"].dt.month == 12)
-    ][["eom_ret", "k", "g", "u"]].copy()
-    mp_hps["type"] = "Multiperiod-ML*"
-    mp_hps["horizon"] = "Multiperiod-ML"  # Adding horizon label
-    mp_hps.rename(columns={"g": "eta"}, inplace=True)
+    # # ---- Process Multiperiod-ML Data ----
+    # mp_hps = mp[
+    #     (mp["rank"] == 1) &
+    #     (mp["eom_ret"].dt.year >= start_year) &
+    #     (mp["eom_ret"].dt.month == 12)
+    # ][["eom_ret", "k", "g", "u"]].copy()
+    # mp_hps["type"] = "Multiperiod-ML*"
+    # mp_hps["horizon"] = "Multiperiod-ML"  # Adding horizon label
+    # mp_hps.rename(columns={"g": "eta"}, inplace=True)
 
     # ---- Process Static-ML Data ----
     static_hps = static[
@@ -647,12 +661,13 @@ def process_portfolio_tuning_data(mp, static, pfml, start_year):
     pfml_hps.rename(columns={"g": "eta"}, inplace=True)
 
     # ---- Reshape Data for Plotting ----
-    mp_long = mp_hps.melt(id_vars=["type", "eom_ret", "horizon"])
+    # mp_long = mp_hps.melt(id_vars=["type", "eom_ret", "horizon"])
     static_long = static_hps.melt(id_vars=["type", "eom_ret", "horizon"])
     pfml_long = pfml_hps.melt(id_vars=["type", "eom_ret"])
 
     # ---- Combine All Results ----
-    combined_hps = pd.concat([mp_long, static_long, pfml_long], ignore_index=True)
+    # combined_hps = pd.concat([mp_long, static_long, pfml_long], ignore_index=True)
+    combined_hps = pd.concat([static_long, pfml_long], ignore_index=True)
 
     # ---- Add Combination Names for Plotting ----
     combined_hps["comb_name"] = combined_hps["type"] + ": " + combined_hps["variable"]
@@ -711,9 +726,12 @@ def plot_hyperparameter_trends(data, colours_theme):
             ax.set_xlabel("End of Month")
 
     # Adjust the layout
-    plt.tight_layout()
-    plt.subplots_adjust(top=0.93)
+    plt.tight_layout(rect=[0, 0, 1, 0.95])
+
+    # plt.subplots_adjust(top=0.93)
+    fig_hyper = plt.gcf()
     plt.show()
+    return fig_hyper
 
 
 def plot_portfolio_tuning_results(data):
@@ -732,15 +750,15 @@ def plot_portfolio_tuning_results(data):
 
     # Create a dictionary to map each combination to a specific subplot
     combination_mapping = {
+        "Portfolio-ML: log(lambda)": (2, 0),
+        "Portfolio-ML: p": (2, 1),
+        "Portfolio-ML: eta": (2, 2),
         "Multiperiod-ML*: k": (0, 0),
         "Multiperiod-ML*: eta": (0, 1),
         "Multiperiod-ML*: u": (0, 2),
         "Static-ML*: k": (1, 0),
         "Static-ML*: eta": (1, 1),
-        "Static-ML*: u": (1, 2),
-        "Portfolio-ML: log(lambda)": (2, 0),
-        "Portfolio-ML: p": (2, 1),
-        "Portfolio-ML: eta": (2, 2)
+        "Static-ML*: u": (1, 2)
     }
 
     # Plot each combination in its respective subplot
@@ -765,12 +783,15 @@ def plot_portfolio_tuning_results(data):
             ax.set_xlabel("End of Month")
 
     # Adjust layout
-    plt.tight_layout()
-    plt.subplots_adjust(top=0.93)
+    plt.tight_layout(rect=[0, 0, 1, 0.95])
+
+    # plt.subplots_adjust(top=0.93)
+    fig_tuning = plt.gcf()
     plt.show()
+    return fig_tuning
 
 
-def plot_optimal_hyperparameters(model_folder, mp, static, pfml, colours_theme, start_year):
+def plot_optimal_hyperparameters(model_folder, static, pfml, colours_theme, start_year):
     """
     Main function to plot optimal hyperparameters and portfolio tuning results.
     Returns:
@@ -806,11 +827,12 @@ def plot_optimal_hyperparameters(model_folder, mp, static, pfml, colours_theme, 
     melted_data["comb_name"] = pd.Categorical(melted_data["comb_name"], categories=desired_order, ordered=True)
 
     # Plot hyperparameter trends
-    plot_hyperparameter_trends(melted_data, colours_theme)
+    fig_hyper = plot_hyperparameter_trends(melted_data, colours_theme)
 
-    # Process and plot portfolio tuning results
-    tuning_data = process_portfolio_tuning_data(mp, static, pfml, start_year)
-    plot_portfolio_tuning_results(tuning_data)
+    tuning_data = process_portfolio_tuning_data(static, pfml, start_year)
+    fig_tuning = plot_portfolio_tuning_results(tuning_data)
+
+    return fig_hyper, fig_tuning
 
 
 # Plot AR ----------------------------
@@ -880,28 +902,35 @@ def compute_ar1_plot(chars, features, cluster_labels, output_path):
     ar1_df["sort_var"] = ar1_df.groupby("cluster")["ar1"].transform("mean") + ar1_df["ar1"] / 100000
     ar1_df = ar1_df.sort_values(by=["pretty_name", "sort_var"], ascending=[True, True])
 
-    # Plot AR1
+    # Plot setup (seaborn)
     sns.set_theme(style="whitegrid")
-    plt.figure(figsize=(10, 6))
+    plt.figure(figsize=(12, 14))  # Wider and taller
+    unique_themes = ar1_df["pretty_name"].cat.categories
+    # palette = sns.color_palette("tab20", n_colors=len(unique_themes)) # more brownish / pink
+    palette = sns.color_palette("tab10", n_colors=len(unique_themes))
+    theme_colors = dict(zip(unique_themes, palette))
+    
+    # Plot AR1
     ax = sns.barplot(
         data=ar1_df,
         y="char",
         x="ar1",
         hue="pretty_name",
-        dodge=False
+        dodge=False,
+        palette=theme_colors
     )
-    ax.set_title("Average Monthly Autocorrelation (AR1) by Characteristic")
-    ax.set_xlabel("Average Monthly Autocorrelation")
+    ax.set_title("Average Monthly Autocorrelation (AR1) by Characteristic", fontsize=16)
+    ax.set_xlabel("Average Monthly Autocorrelation", fontsize=12)
     ax.set_ylabel("")
-    ax.legend(title="Theme", loc="upper right", frameon=True)
+    ax.tick_params(axis='y', labelsize=9)  # Smaller y-axis font
+    ax.tick_params(axis='x', labelsize=10)
+    ax.legend(title="Theme", loc="center right", bbox_to_anchor=(1, 0.5), frameon=False)
     plt.gca().invert_yaxis()
 
-    plt.tight_layout()
-    plt.savefig(f"{output_path}/ar1_plot.png", dpi=300)
-
-    return plt.gcf()
-
-
+    plt.tight_layout(rect=[0, 0, 0.8, 1])
+    AR1_fig = plt.gcf()
+    plt.show()
+    return AR1_fig
 
 
 
@@ -929,7 +958,7 @@ def process_features_with_sufficient_coverage(features, feat_excl, settings):
 
     # Load the data
     data = pd.read_csv(
-        "../Data/usa.csv",
+        os.path.join(r"C:\Master\Raw_data_folders_usa_eu\full_us_data_1986_2023", "usa.csv"), # OBS manual folder
         usecols=list(set(ids + features_all)),  # Load required columns
         dtype={"eom": str, "sic": str}  # Define column data types
     )
@@ -1012,7 +1041,3 @@ def process_features_with_sufficient_coverage(features, feat_excl, settings):
     # Check coverage by 'eom'
     coverage = data[features_all].notna().groupby(data["eom"]).mean()
     return data, coverage
-
-
-
-
