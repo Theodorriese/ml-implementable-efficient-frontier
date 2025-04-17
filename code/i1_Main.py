@@ -109,7 +109,6 @@ settings = {
     }
 }
 
-
 # -------------------- Portfolio Settings --------------------
 pf_set = {
     "wealth": 1e10,
