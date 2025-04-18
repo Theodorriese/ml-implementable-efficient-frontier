@@ -35,9 +35,7 @@ def fit_models(search_grid, data_ret, chars, settings, features, output_path):
                              how="right")
         print(f"Processing horizons: {h}")
 
-        # Define validation endpoints and test increment
-        val_ends, test_inc = None, None  # Ensure initialization
-
+        # Define validation endpoint and test increment
         val_ends = pd.date_range(
             start=settings["split"]["train_end"],
             end=settings["split"]["test_end"],
