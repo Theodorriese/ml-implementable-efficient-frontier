@@ -29,26 +29,12 @@ def fit_single_model(row, data_ret, chars, settings, features, output_path):
     data_pred = pd.merge(pred_y, chars[chars["valid"]], left_on=["id", "eom_m"], right_on=["id", "eom"], how="right")
     print(f"Processing horizons: {h}")
 
-    freq = settings["split"]["model_update_freq"]
-    if freq == "once":
-        val_ends = [settings["split"]["train_end"]]
-        test_inc = 1000
-    elif freq == "yearly":
-        val_ends = pd.date_range(
-            start=settings["split"]["train_end"],
-            end=settings["split"]["test_end"],
-            freq="Y"
-        )
-        test_inc = 1
-    elif freq == "decade":
-        val_ends = pd.date_range(
-            start=settings["split"]["train_end"],
-            end=settings["split"]["test_end"],
-            freq="10Y"
-        )
-        test_inc = 10
-    else:
-        raise ValueError("Invalid model_update_freq.")
+    val_ends = pd.date_range(
+        start=settings["split"]["train_end"],
+        end=settings["split"]["test_end"],
+        freq="YE"
+    )
+    test_inc = 1
 
     op = {}
     for val_end in val_ends:

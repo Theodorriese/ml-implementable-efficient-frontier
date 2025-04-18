@@ -32,17 +32,16 @@ txt_size = 10
 # Data settings dictionary
 settings = {
     "region": "USA",
-    "multi_process": False,
-    # "data_path": "C:\Master",
-    "data_path": "/work/frontier_ml/",
+    "multi_process": True,
+    # "data_path": "C:\Master", # Local
+    "data_path": "/work/frontier_ml/", # UCloud
     "parallel": True,
     "seed_no": 1,
     "months": False,
     "split": {
-        "train_end": pd.Timestamp("1996-12-31"),
+        "train_end": pd.Timestamp("2009-12-31"),
         "test_end": pd.Timestamp("2023-12-31"),
-        "val_years": 5,
-        "model_update_freq": "yearly",
+        "val_years": 3,
         "train_lookback": 100,
         "retrain_lookback": 100
     },
@@ -52,22 +51,22 @@ settings = {
     "addition_n": 12,
     "deletion_n": 12,
     "screens": {
-        "start": pd.Timestamp("1986-01-01"),
+        "start": pd.Timestamp("1999-12-31"),
         "end": pd.Timestamp("2023-12-31"),
         "feat_pct": 0.5,
         "nyse_stocks": True
     },
     "pi": 0.1,
     "rff": {
-        "p_vec": [2 ** i for i in range(1, 10)],
-        "g_vec": np.exp(np.arange(-3, -1)),
-        "l_vec": np.concatenate(([0], np.exp(np.linspace(-10, 10, 100))))
+        "g_vec": np.exp(np.linspace(-3, -2, 3)),  # [0.0498, 0.0821, 0.1353]
+        "p_vec": [2**i for i in range(6, 11)],    # [64, 128, 256, 512, 1024]
+        "l_vec": np.concatenate(([0], np.exp(np.linspace(-10, 10, 100)))),  # 101 values
     },
     "pf": {
         "dates": {
-            "start_year": 1997,
+            "start_year": 2010,
             "end_yr": 2023,
-            "split_years": 5,
+            "split_years": 3,
         },
         "hps": {
             "cov_type": "cov_add",
@@ -108,6 +107,7 @@ settings = {
         "n_pfs": 10
     }
 }
+
 
 # -------------------- Portfolio Settings --------------------
 pf_set = {

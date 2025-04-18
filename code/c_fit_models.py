@@ -38,28 +38,12 @@ def fit_models(search_grid, data_ret, chars, settings, features, output_path):
         # Define validation endpoints and test increment
         val_ends, test_inc = None, None  # Ensure initialization
 
-        if settings["split"]["model_update_freq"] == "once":
-            val_ends = [settings["split"]["train_end"]]
-            test_inc = 1000
-
-        elif settings["split"]["model_update_freq"] == "yearly":
-            val_ends = pd.date_range(
-                start=settings["split"]["train_end"],
-                end=settings["split"]["test_end"],
-                freq="Y"
-            )
-            test_inc = 1
-
-        elif settings["split"]["model_update_freq"] == "decade":
-            val_ends = pd.date_range(
-                start=settings["split"]["train_end"],
-                end=settings["split"]["test_end"],
-                freq="10Y"
-            )
-            test_inc = 10
-
-        if val_ends is None or test_inc is None:
-            raise ValueError("Validation endpoints or test increment not properly initialized.")
+        val_ends = pd.date_range(
+            start=settings["split"]["train_end"],
+            end=settings["split"]["test_end"],
+            freq="YE"
+        )
+        test_inc = 1
 
         op = {}
 
