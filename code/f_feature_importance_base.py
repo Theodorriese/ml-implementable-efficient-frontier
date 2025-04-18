@@ -80,19 +80,19 @@ def run_feature_importance_base(chars, er_models, cluster_labels, barra_cov, set
     """
     Main function to execute implementations for Markowitz-ML and Portfolio-ML.
     """
-    # Implement Markowitz-ML Base Case
-    print("Running Markowitz-ML Base Case...")
-    implement_markowitz_ml_base(
-        chars=chars,
-        er_models=er_models,
-        cluster_labels=cluster_labels,
-        dates_oos=dates_oos,
-        barra_cov=barra_cov,
-        settings=settings,
-        tpf_cf_wealth=tpf_cf_wealth,
-        features=features,
-        output_path=output_path,
-    )
+    # # Implement Markowitz-ML Base Case
+    # print("Running Markowitz-ML Base Case...")
+    # implement_markowitz_ml_base(
+    #     chars=chars,
+    #     er_models=er_models,
+    #     cluster_labels=cluster_labels,
+    #     dates_oos=dates_oos,
+    #     barra_cov=barra_cov,
+    #     settings=settings,
+    #     tpf_cf_wealth=tpf_cf_wealth,
+    #     features=features,
+    #     output_path=output_path,
+    # )
 
     # Implement Portfolio-ML Base Case
     print("Running Portfolio-ML Base Case...")

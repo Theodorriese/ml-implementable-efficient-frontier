@@ -1246,50 +1246,56 @@ def pfml_aims_fun(pfml_input, validation, data_tc, hp_coef, dates_oos, orig_feat
 
 def pfml_w(data: pd.DataFrame, dates: list, cov_list: dict, lambda_list: dict, gamma_rel: float,
            iter_: int, risk_free: pd.DataFrame, wealth: pd.DataFrame, mu: float,
-           aims: pd.DataFrame = None, signal_t: dict = None, aim_coef: any = None,
-           save_path: str = "/work/frontier_ml/data/Portfolios/demo/weights_pfml/") -> pd.DataFrame:
+           aims: pd.DataFrame = None, signal_t: dict = None, aim_coef: any = None) -> pd.DataFrame:
     """
-    Compute Portfolio-ML weights. Extended with resume/save capability.
+    Compute Portfolio-ML weights.
+
+    If 'aims' is None, an Aim Portfolio is constructed from 'signal_t' and 'aim_coef'.
+    Otherwise, we simply reuse the provided aims.
+
+    Parameters:
+        data (pd.DataFrame): Portfolio data with columns at least ['id','eom','tr_ld1','mu_ld1'].
+        dates (list): List of EOM dates for portfolio calculations.
+        cov_list (dict): Covariance matrices for each date (key=str(date)),
+                         each a matrix or data for create_cov(...).
+        lambda_list (dict): Lambda matrices for each date (key=str(date)),
+                            each a matrix or data for create_lambda(...).
+        gamma_rel (float): Risk-aversion parameter.
+        iter_ (int): Iterations for computing the m matrix.
+        risk_free (pd.DataFrame): Must have ['eom','rf'] columns for each date.
+        wealth (pd.DataFrame): Must have ['eom','wealth','mu_ld1'] columns for each date.
+        mu (float): Portfolio drift parameter.
+        aims (pd.DataFrame, optional): If provided, must have ['id','eom','w_aim'] columns.
+        signal_t (dict, optional): {str(date): 2D array of signals} for each date.
+        aim_coef (dict or 1D array, optional): If dict, keys are years as str; if array, used for all dates.
+
+    Returns:
+        pd.DataFrame: Final portfolio weights by date/stock, including intermediate columns.
     """
 
-    # 1. Set up saved file tracking
-    saved_dates = set()
-    if save_path:
-        os.makedirs(save_path, exist_ok=True)
-        saved_files = set(os.listdir(save_path))
-        for f in saved_files:
-            if f.startswith("weights_") and f.endswith(".pkl"):
-                try:
-                    date_str = f.replace("weights_", "").replace(".pkl", "")
-                    saved_dates.add(pd.Timestamp(date_str).normalize())
-                except Exception as e:
-                    print(f"Skipping file {f}: {e}")
-
-    # 2. Load latest weights if available, otherwise initialize
-    latest_date = max(saved_dates) if saved_dates else None
-    if latest_date:
-        latest_file = os.path.join(save_path, f"weights_{latest_date.date()}.pkl")
-        with open(latest_file, "rb") as f:
-            fa_weights = pickle.load(f)
-        print(f"Loaded saved weights from: {latest_file}")
-    else:
-        fa_weights = initial_weights_new(data, w_type="vw").copy()
-
-    # 3. Build aims if not provided
+    # 1. If no 'aims', build them using signal_t and aim_coef
     if aims is None:
         aim_list = []
         for d in dates:
+            d_str = str(pd.Timestamp(d))
             data_d = data.loc[data['eom'] == pd.Timestamp(d), ['id', 'eom']].copy()
-            if (signal_t is not None) and (d in signal_t):
-                s = signal_t[d]
+            if (signal_t is not None) and (d_str in signal_t):
+                s = signal_t[d_str]
             else:
+                # If signals are not available, default to zero
                 s = np.zeros((len(data_d), 1))
 
+            # Extract the correct coefficient
             if isinstance(aim_coef, dict):
-                coef = aim_coef.get(str(pd.Timestamp(d).year), 0)
+                # Dictionary keyed by year
+                year_str = str(pd.Timestamp(d).year)
+                coef = aim_coef.get(year_str, 0)
             else:
+                # Single array or None
                 coef = aim_coef if aim_coef is not None else 0
 
+            # If coef is an array, do matrix multiplication
+            # If it's a single float, broadcast multiply
             if isinstance(coef, (list, np.ndarray)):
                 coef = np.array(coef)
                 data_d['w_aim'] = s @ coef
@@ -1299,23 +1305,26 @@ def pfml_w(data: pd.DataFrame, dates: list, cov_list: dict, lambda_list: dict, g
             aim_list.append(data_d)
         aims = pd.concat(aim_list, ignore_index=True)
 
-    # 4. Loop through each date
+    # 2. Initialize weights with a "vw" (value-weighted) strategy
+    fa_weights = initial_weights_new(data, w_type="vw")
+
+    # 3. Compute weights iteratively for each date
     for idx, d in enumerate(dates):
-        cur_date = pd.Timestamp(d).normalize()
-
-        if latest_date and cur_date <= latest_date:
-            print(f"[{idx + 1}/{len(dates)}] Skipping {cur_date.date()} (already saved)")
-            continue
-
-        print(f"[{idx + 1}/{len(dates)}] Processing {cur_date.date()}")
-
+        cur_date = pd.Timestamp(d)
+        # Filter to the stocks for this date
         ids_d = data.loc[data['eom'] == cur_date, 'id'].astype(str).unique()
-        sigma = create_cov(cov_list[cur_date], ids=ids_d)
-        lambda_mat = create_lambda(lambda_list[cur_date], ids=ids_d)
 
+        # Covariance & Lambda
+        cov_list = {pd.Timestamp(k): v for k, v in cov_list.items()}
+        lambda_list = {pd.Timestamp(k): v for k, v in lambda_list.items()}
+        sigma = create_cov(cov_list[d], ids=ids_d)
+        lambda_mat = create_lambda(lambda_list[d], ids=ids_d)
+
+        # Wealth & risk-free
         w_val = wealth.loc[wealth['eom'] == cur_date, 'wealth'].iloc[0]
         rf_val = risk_free.loc[risk_free['date'] == cur_date, 'rf'].iloc[0]
 
+        # m matrix
         m = m_func(
             w=w_val, mu=mu, rf=rf_val,
             sigma_gam=sigma * gamma_rel,
@@ -1325,6 +1334,7 @@ def pfml_w(data: pd.DataFrame, dates: list, cov_list: dict, lambda_list: dict, g
         )
         iden = np.eye(m.shape[0])
 
+        # Merge aims with the existing weights for this date
         aims['id'] = aims['id'].astype(str)
         fa_weights['id'] = fa_weights['id'].astype(str)
 
@@ -1333,35 +1343,31 @@ def pfml_w(data: pd.DataFrame, dates: list, cov_list: dict, lambda_list: dict, g
             on=['id', 'eom'], how='left'
         )
 
+        # w_opt = m * w_start + (I - m) * w_aim
         w_cur['w_opt'] = (
                 (m @ w_cur['w_start'].fillna(0).values) +
                 ((iden - m) @ w_cur['w_aim'].values)
         )
 
+        # Save the optimized weight for the current month
         fa_weights.loc[
             (fa_weights['eom'] == cur_date) & (fa_weights['id'].isin(w_cur['id'])),
             'w'
         ] = w_cur['w_opt'].values
 
-        # Prepare next month’s w_start
+        # If we have a next month, carry forward the weight
         if idx + 1 < len(dates):
-            next_date = pd.Timestamp(dates[idx + 1]).normalize()
+            next_date = pd.Timestamp(dates[idx + 1])
             w_cur['w_start_next'] = (
                     w_cur['w_opt'] * (1 + w_cur['tr_ld1']) / (1 + w_cur['mu_ld1'])
             ).fillna(0)
 
+            # Assign w_start for next_date
             for row_i, row in w_cur.iterrows():
                 fa_weights.loc[
                     (fa_weights['eom'] == next_date) & (fa_weights['id'] == row['id']),
                     'w_start'
                 ] = row['w_start_next']
-
-        # Save every 2 steps or final date
-        if save_path and ((idx + 1) % 2 == 0 or idx == len(dates) - 1):
-            save_file = os.path.join(save_path, f"weights_{cur_date.date()}.pkl")
-            with open(save_file, "wb") as f:
-                pickle.dump(fa_weights.copy(), f)
-            print(f"Saved to {save_file}")
 
     return fa_weights
 
@@ -2152,7 +2158,6 @@ def static_implement_multip(data_tc, cov_list, lambda_list,
 
 
 # Portfolio ML
-
 def pfml_input_fun_multi(data_tc, cov_list, lambda_list, gamma_rel, wealth, mu, dates, lb, scale,
                          risk_free, features, rff_feat, seed, p_max, g, add_orig, iter, balanced):
     dates = [pd.to_datetime(d) for d in dates]

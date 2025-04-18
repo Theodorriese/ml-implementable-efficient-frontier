@@ -33,15 +33,15 @@ txt_size = 10
 settings = {
     "region": "USA",
     "multi_process": True,
-    # "data_path": "C:\Master", # Local
-    "data_path": "/work/frontier_ml/", # UCloud
+    "data_path": "C:\Master", # Local
+    # "data_path": "/work/frontier_ml/", # UCloud
     "parallel": True,
     "seed_no": 1,
     "months": False,
     "split": {
-        "train_end": pd.Timestamp("2009-12-31"),
-        "test_end": pd.Timestamp("2023-12-31"),
-        "val_years": 3,
+        "train_end": pd.Timestamp("2017-12-31"),
+        "test_end": pd.Timestamp("2020-12-31"),
+        "val_years": 1,
         "train_lookback": 100,
         "retrain_lookback": 100
     },
@@ -51,22 +51,25 @@ settings = {
     "addition_n": 12,
     "deletion_n": 12,
     "screens": {
-        "start": pd.Timestamp("1999-12-31"),
-        "end": pd.Timestamp("2023-12-31"),
+        "start": pd.Timestamp("2010-01-01"),
+        "end": pd.Timestamp("2020-12-31"),
         "feat_pct": 0.5,
         "nyse_stocks": True
     },
     "pi": 0.1,
+    # "rff": {
+    #     "g_vec": np.exp(np.linspace(-3, -2, 3)),  # [0.0498, 0.0821, 0.1353]
+    #     "p_vec": [2**i for i in range(6, 11)],    # [64, 128, 256, 512, 1024]
+    #     "l_vec": np.concatenate(([0], np.exp(np.linspace(-10, 10, 100)))),  # 101 values
+    # },
     "rff": {
-        "g_vec": np.exp(np.linspace(-3, -2, 3)),  # [0.0498, 0.0821, 0.1353]
-        "p_vec": [2**i for i in range(6, 11)],    # [64, 128, 256, 512, 1024]
-        "l_vec": np.concatenate(([0], np.exp(np.linspace(-10, 10, 100)))),  # 101 values
+        "p_vec": [2 ** i for i in range(1, 10)]
     },
     "pf": {
         "dates": {
-            "start_year": 2010,
-            "end_yr": 2023,
-            "split_years": 3,
+            "start_year": 2018,
+            "end_yr": 2020,
+            "split_years": 1
         },
         "hps": {
             "cov_type": "cov_add",
@@ -96,12 +99,12 @@ settings = {
     },
     "cov_set": {
         "industries": True,
-        "obs": 252 * 5,
-        "hl_cor": 252 * 3 / 2,
-        "hl_var": 252 / 2,
-        "hl_stock_var": 252 / 2,
+        "obs": 504,
+        "hl_cor": 378.0,
+        "hl_var": 126.0,
+        "hl_stock_var": 126.0,
         "min_stock_obs": 252,
-        "initial_var_obs": 21 * 3
+        "initial_var_obs": 63
     },
     "factor_ml": {
         "n_pfs": 10

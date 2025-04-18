@@ -16,7 +16,6 @@ config_params = {
     "wealth": pf_set["wealth"],
     "gamma_rel": pf_set["gamma_rel"],
     "industry_cov": settings["cov_set"]["industries"],
-    "update_mp": True,
     "update_base": True,
     "update_fi_base": True,
     "update_fi_ief": True,
@@ -35,20 +34,20 @@ pf_set["wealth"] = config_params["wealth"]
 pf_set["gamma_rel"] = config_params["gamma_rel"]
 
 # -------------------- DEFINE PATHS --------------------
-# data_path = settings["data_path"]
-# portfolios_dir = os.path.join(data_path, "Data", "Generated", "Portfolios")
-# get_from_path_model = os.path.join(data_path, "Outputs")
-#
-# latest_folder = os.path.join(portfolios_dir, "demo")
-# output_path = os.path.join(portfolios_dir, "demo")
-
-# # -------------------- DEFINE PATHS --------------------
 data_path = settings["data_path"]
-portfolios_dir = os.path.join(data_path, "data", "Portfolios")
+portfolios_dir = os.path.join(data_path, "Data", "Generated", "Portfolios")
 get_from_path_model = os.path.join(data_path, "Outputs")
 
 latest_folder = os.path.join(portfolios_dir, "demo")
 output_path = os.path.join(portfolios_dir, "demo")
+
+# # -------------------- DEFINE PATHS --------------------
+# data_path = settings["data_path"]
+# portfolios_dir = os.path.join(data_path, "data", "Portfolios")
+# get_from_path_model = os.path.join(data_path, "Outputs")
+#
+# latest_folder = os.path.join(portfolios_dir, "demo")
+# output_path = os.path.join(portfolios_dir, "demo")
 
 # Save config for reproducibility
 
