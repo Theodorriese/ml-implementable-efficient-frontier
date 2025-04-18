@@ -451,8 +451,10 @@ def rw_implement(data, wealth, dates):
         # Compute ranks (equivalent to `frank()` in R)
         data_sub['rank'] = data_sub['pred_ld1'].rank(method="first").astype(float)
 
-        # Center ranks around 0 and normalize sum(abs(weights)) = 2
-        data_sub['w'] = (data_sub['rank'] - data_sub['rank'].mean()) * (2 / data_sub['rank'].abs().sum())
+        # compute centered “pos” vector
+        pos = data_sub['rank'] - data_sub['rank'].mean()
+        # scale so that sum(abs(w)) == 2
+        data_sub['w'] = pos * (2.0 / pos.abs().sum())
 
         rw_opt.append(data_sub[['id', 'eom', 'w']])
 
