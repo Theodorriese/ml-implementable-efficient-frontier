@@ -26,7 +26,6 @@ def load_base_case_portfolios(base_path):
     base_folder = next(os.walk(base_path))[1][0]
 
     # Load required datasets
-    # mp = pd.read_pickle(os.path.join(base_path, base_folder, "multiperiod-ml.pkl"))
     pfml = pd.read_pickle(os.path.join(base_path, base_folder, "portfolio-ml.pkl"))
     static = pd.read_pickle(os.path.join(base_path, base_folder, "static-ml.pkl"))
     bm_pfs = pd.read_csv(os.path.join(base_path, base_folder, "bms.csv"))
@@ -56,22 +55,14 @@ def combine_portfolios(pfml, static, bm_pfs, pf_order_new, gamma_rel):
     Combine multiple portfolios into a single dataframe.
     """
     # Ensure all relevant dates are converted to Timestamps
-    # mp['pf']['eom_ret'] = pd.to_datetime(mp['pf']['eom_ret'])
     pfml['pf']['eom_ret'] = pd.to_datetime(pfml['pf']['eom_ret'])
     static['pf']['eom_ret'] = pd.to_datetime(static['pf']['eom_ret'])
     bm_pfs['eom_ret'] = pd.to_datetime(bm_pfs['eom_ret'])
 
     # Process each component separately
-    # mp_pf = mp['pf'].copy()
     pfml_pf = pfml['pf'].copy()
     static_pf = static['pf'].copy()
     bm_pfs_pf = bm_pfs.copy()
-
-    # mp_hps = mp['hps'].loc[
-    #     (mp['hps']['eom_ret'].isin(mp['pf']['eom_ret'])) &
-    #     (mp['hps']['k'] == 1) & (mp['hps']['g'] == 0) & (mp['hps']['u'] == 1),
-    #     ['eom_ret', 'inv', 'shorting', 'turnover', 'r', 'tc']
-    # ].assign(type='Multiperiod-ML')
 
     static_hps = static['hps'].loc[
         (static['hps']['eom_ret'].isin(static['pf']['eom_ret'])) &
@@ -80,7 +71,6 @@ def combine_portfolios(pfml, static, bm_pfs, pf_order_new, gamma_rel):
     ].assign(type='Static-ML')
 
     # Combine all parts together
-    # pfs = pd.concat([mp_pf, pfml_pf, static_pf, bm_pfs_pf, mp_hps, static_hps], ignore_index=True)
     pfs = pd.concat([pfml_pf, bm_pfs_pf, static_pf, static_hps], ignore_index=True)
 
     # Remove the 'eom' column if it exists in the combined DataFrame
@@ -475,7 +465,6 @@ def plot_apple_vs_xerox(pfml, static, tpf, factor_ml, mkt,
 
     # Generate position_frames directly, checking if "w" exists before accessing
     position_frames = [
-        # mp["w"][mp["w"]["id"].isin([liquid_id, illiquid_id])].assign(type="Multiperiod-ML*") if "w" in mp else None,
         pfml["w"][pfml["w"]["id"].isin([liquid_id, illiquid_id])].assign(type="Portfolio-ML") if "w" in pfml else None,
         static["w"][static["w"]["id"].isin([liquid_id, illiquid_id])].assign(
             type="Static-ML*") if "w" in static else None,
@@ -561,7 +550,6 @@ def plot_apple_vs_xerox(pfml, static, tpf, factor_ml, mkt,
     return fig
 
 
-
 # Optimal Hyper-parameters ----------------------------
 def load_model_hyperparameters(model_path, horizon_label):
     """
@@ -622,24 +610,11 @@ def process_portfolio_tuning_data(static, pfml, start_year):
         pd.DataFrame: Processed and combined tuning data.
     """
     # Ensure columns are present in DataFrames before processing
-    required_columns_mp_static = {"rank", "eom_ret", "k", "g", "u"}
     required_columns_pfml = {"eom_ret", "l", "p", "g"}
 
-    # if not required_columns_mp_static.issubset(mp.columns) or not required_columns_mp_static.issubset(static.columns):
-    #     raise ValueError("mp or static DataFrames are missing required columns.")
 
     if not required_columns_pfml.issubset(pfml.columns):
         raise ValueError("pfml DataFrame is missing required columns.")
-
-    # # ---- Process Multiperiod-ML Data ----
-    # mp_hps = mp[
-    #     (mp["rank"] == 1) &
-    #     (mp["eom_ret"].dt.year >= start_year) &
-    #     (mp["eom_ret"].dt.month == 12)
-    # ][["eom_ret", "k", "g", "u"]].copy()
-    # mp_hps["type"] = "Multiperiod-ML*"
-    # mp_hps["horizon"] = "Multiperiod-ML"  # Adding horizon label
-    # mp_hps.rename(columns={"g": "eta"}, inplace=True)
 
     # ---- Process Static-ML Data ----
     static_hps = static[
@@ -661,12 +636,10 @@ def process_portfolio_tuning_data(static, pfml, start_year):
     pfml_hps.rename(columns={"g": "eta"}, inplace=True)
 
     # ---- Reshape Data for Plotting ----
-    # mp_long = mp_hps.melt(id_vars=["type", "eom_ret", "horizon"])
     static_long = static_hps.melt(id_vars=["type", "eom_ret", "horizon"])
     pfml_long = pfml_hps.melt(id_vars=["type", "eom_ret"])
 
     # ---- Combine All Results ----
-    # combined_hps = pd.concat([mp_long, static_long, pfml_long], ignore_index=True)
     combined_hps = pd.concat([static_long, pfml_long], ignore_index=True)
 
     # ---- Add Combination Names for Plotting ----
@@ -906,7 +879,6 @@ def compute_ar1_plot(chars, features, cluster_labels, output_path):
     sns.set_theme(style="whitegrid")
     plt.figure(figsize=(12, 14))  # Wider and taller
     unique_themes = ar1_df["pretty_name"].cat.categories
-    # palette = sns.color_palette("tab20", n_colors=len(unique_themes)) # more brownish / pink
     palette = sns.color_palette("tab10", n_colors=len(unique_themes))
     theme_colors = dict(zip(unique_themes, palette))
     
@@ -930,8 +902,8 @@ def compute_ar1_plot(chars, features, cluster_labels, output_path):
     plt.tight_layout(rect=[0, 0, 0.8, 1])
     AR1_fig = plt.gcf()
     plt.show()
-    return AR1_fig
 
+    return AR1_fig
 
 
 # Features with sufficient coverage ------------------
