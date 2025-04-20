@@ -5,9 +5,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="001ad656-4e1d-41a9-98d4-c3629915c329" name="Changes" comment="Push">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/code/g_base_analysis.py" beforeDir="false" afterPath="$PROJECT_DIR$/code/g_base_analysis.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/code/i4_run_analysis.py" beforeDir="false" afterPath="$PROJECT_DIR$/code/i4_run_analysis.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/code/i1_Main.py" beforeDir="false" afterPath="$PROJECT_DIR$/code/i1_Main.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -80,7 +78,7 @@
     "Python.i2_build_portfolios.executor": "Debug",
     "Python.i2_fit_models.executor": "Debug",
     "Python.i3_build_portfolios.executor": "Debug",
-    "Python.i4_run_analysis.executor": "Debug",
+    "Python.i4_run_analysis.executor": "Run",
     "Python.main.executor": "Debug",
     "Python.pkl_to_csv2.executor": "Run",
     "Python.temp_data_reduction.executor": "Run",
@@ -309,15 +307,7 @@
       <workItem from="1744905902303" duration="2802000" />
       <workItem from="1744962973565" duration="259000" />
       <workItem from="1744971518682" duration="9499000" />
-      <workItem from="1745142970421" duration="5260000" />
-    </task>
-    <task id="LOCAL-00113" summary="Push">
-      <option name="closed" value="true" />
-      <created>1742903039271</created>
-      <option name="number" value="00113" />
-      <option name="presentableId" value="LOCAL-00113" />
-      <option name="project" value="LOCAL" />
-      <updated>1742903039271</updated>
+      <workItem from="1745142970421" duration="5568000" />
     </task>
     <task id="LOCAL-00114" summary="Push">
       <option name="closed" value="true" />
@@ -703,7 +693,15 @@
       <option name="project" value="LOCAL" />
       <updated>1745147191615</updated>
     </task>
-    <option name="localTasksCounter" value="162" />
+    <task id="LOCAL-00162" summary="Push">
+      <option name="closed" value="true" />
+      <created>1745149130888</created>
+      <option name="number" value="00162" />
+      <option name="presentableId" value="LOCAL-00162" />
+      <option name="project" value="LOCAL" />
+      <updated>1745149130888</updated>
+    </task>
+    <option name="localTasksCounter" value="163" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -739,11 +737,6 @@
           <line>720</line>
           <option name="timeStamp" value="761" />
         </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/code/g_base_analysis.py</url>
-          <line>620</line>
-          <option name="timeStamp" value="764" />
-        </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>
   </component>
@@ -772,7 +765,7 @@
     <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$a_return_prediction_functions.coverage" NAME="a_return_prediction_functions Coverage Results" MODIFIED="1738924575052" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />
     <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$x_csv_to_pkl_heavy.coverage" NAME="x_csv_to_pkl_heavy Coverage Results" MODIFIED="1743012728510" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />
     <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$x_read_csv.coverage" NAME="x_read_csv Coverage Results" MODIFIED="1744904066907" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />
-    <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$i4_run_analysis.coverage" NAME="i4_run_analysis Coverage Results" MODIFIED="1745148313057" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />
+    <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$i4_run_analysis.coverage" NAME="i4_run_analysis Coverage Results" MODIFIED="1745149012100" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />
     <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$x_pkl_to_csv.coverage" NAME="x_pkl_to_csv Coverage Results" MODIFIED="1744649668858" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />
     <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$c_fit_models.coverage" NAME="c_fit_models Coverage Results" MODIFIED="1743666147000" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />
     <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$check_models.coverage" NAME="check_models Coverage Results" MODIFIED="1743920029725" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />

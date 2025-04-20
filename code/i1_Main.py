@@ -57,13 +57,10 @@ settings = {
         "nyse_stocks": True
     },
     "pi": 0.1,
-    # "rff": {
-    #     "g_vec": np.exp(np.linspace(-3, -2, 3)),  # [0.0498, 0.0821, 0.1353]
-    #     "p_vec": [2**i for i in range(6, 11)],    # [64, 128, 256, 512, 1024]
-    #     "l_vec": np.concatenate(([0], np.exp(np.linspace(-10, 10, 100)))),  # 101 values
-    # },
     "rff": {
-        "p_vec": [2 ** i for i in range(1, 10)]
+        "g_vec": np.exp(np.arange(-3, -1)),
+        "p_vec": [2**i for i in range(6, 10)],
+        "l_vec": np.concatenate(([0], np.exp(np.linspace(-10, 10, 100)))),
     },
     "pf": {
         "dates": {
@@ -93,10 +90,10 @@ settings = {
         "orig_feat": False,
         "scale": True
     },
-    "ef": {
-        "wealth": [1, 1e9, 1e10, 1e11],
-        "gamma_rel": [1, 5, 10, 20, 100]
-    },
+    # "ef": {
+    #     "wealth": [1, 1e9, 1e10, 1e11],
+    #     "gamma_rel": [1, 5, 10, 20, 100]
+    # },
     "cov_set": {
         "industries": True,
         "obs": 504,
