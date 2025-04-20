@@ -670,7 +670,8 @@ def static_val_fun(data, dates, cov_list, lambda_list, wealth, cov_type,
             )
 
             # 3) Fill old w_start from the new w_start_new, only where it's NaN:
-            static_weights['w_start'] = static_weights['w_start'].fillna(static_weights['w_start_new'])
+            mask = static_weights['w_start'].isna() & static_weights['w_start_new'].notna()
+            static_weights.loc[mask, 'w_start'] = static_weights.loc[mask, 'w_start_new']
 
             # 4) Drop the extra w_start_new column if you no longer need it:
             static_weights.drop(columns='w_start_new', inplace=True)
@@ -2122,12 +2123,12 @@ def static_implement_multip(data_tc, cov_list, lambda_list,
 
     # Compute cumulative metrics
     validation = validation.sort_values(by=['hp_no', 'eom_ret'])
-    validation['cum_var'] = validation.groupby('hp_no')['r'].transform(lambda x: x.expanding().var())
+    validation['cum_mean_r'] = validation.groupby('hp_no')['r'].transform(lambda x: x.expanding().mean())
+    validation['cum_mean_r2'] = validation.groupby('hp_no')['r'].transform(lambda x: (x ** 2).expanding().mean())
+    validation['cum_var'] = validation['cum_mean_r2'] - validation['cum_mean_r'] ** 2
     validation['cum_obj'] = (
-        validation.groupby('hp_no')
-        .apply(lambda df: (df['r'] - df['tc'] - 0.5 * df['cum_var'] * gamma_rel).expanding().mean())
-        .reset_index(level=0, drop=True)
-    )
+            validation['r'] - validation['tc'] - 0.5 * gamma_rel * validation['cum_var']
+    ).groupby(validation['hp_no']).transform(lambda x: x.expanding().mean())
     validation['rank'] = validation.groupby('eom_ret')['cum_obj'].rank(ascending=False)
 
     # Choose best hyperparams per year-end
