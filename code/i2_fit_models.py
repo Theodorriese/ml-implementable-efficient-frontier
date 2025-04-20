@@ -35,11 +35,6 @@ config_params = {
     "wealth": 1e10,
     "gamma_rel": 10,
     "industry_cov": True,
-    "update_mp": False,
-    "update_base": False,
-    "update_fi_base": False,
-    "update_fi_ief": False,
-    "update_fi_ret": False
 }
 
 search_grid = pd.DataFrame({
