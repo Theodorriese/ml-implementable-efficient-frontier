@@ -598,25 +598,21 @@ def load_model_hyperparameters(model_path, horizon_label):
 
 def process_portfolio_tuning_data(static, pfml, start_year):
     """
-    Process portfolio tuning data for Multiperiod-ML, Static-ML, and Portfolio-ML.
+    Process portfolio tuning data for Static-ML and Portfolio-ML.
 
     Parameters:
-        mp (pd.DataFrame): DataFrame containing tuning results for Multiperiod-ML.
-        static (pd.DataFrame): DataFrame containing tuning results for Static-ML.
-        pfml (pd.DataFrame): DataFrame containing tuning results for Portfolio-ML.
-        start_year (int): Start year for filtering tuning results.
+        static (pd.DataFrame): Tuning results for Static-ML.
+        pfml (pd.DataFrame): Tuning results for Portfolio-ML.
+        start_year (int): Starting year filter.
 
     Returns:
-        pd.DataFrame: Processed and combined tuning data.
+        pd.DataFrame: Combined and reshaped hyperparameter data.
     """
-    # Ensure columns are present in DataFrames before processing
     required_columns_pfml = {"eom_ret", "l", "p", "g"}
-
-
     if not required_columns_pfml.issubset(pfml.columns):
         raise ValueError("pfml DataFrame is missing required columns.")
 
-    # ---- Process Static-ML Data ----
+    # ---- Static-ML ----
     static_hps = static[
         (static["rank"] == 1) &
         (static["eom_ret"].dt.year >= start_year) &
@@ -626,23 +622,16 @@ def process_portfolio_tuning_data(static, pfml, start_year):
     static_hps["horizon"] = "Static-ML"
     static_hps.rename(columns={"g": "eta"}, inplace=True)
 
-    # ---- Process Portfolio-ML Data ----
-    pfml_hps = pfml[
-        pfml["eom_ret"].dt.year >= start_year
-    ][["eom_ret", "l", "p", "g"]].copy()
+    # ---- Portfolio-ML ----
+    pfml_hps = pfml[pfml["eom_ret"].dt.year >= start_year][["eom_ret", "l", "p", "g"]].copy()
     pfml_hps["type"] = "Portfolio-ML"
     pfml_hps["log(lambda)"] = np.log(pfml_hps["l"])
     pfml_hps = pfml_hps.drop(columns="l")
     pfml_hps.rename(columns={"g": "eta"}, inplace=True)
 
-    # ---- Reshape Data for Plotting ----
     static_long = static_hps.melt(id_vars=["type", "eom_ret", "horizon"])
     pfml_long = pfml_hps.melt(id_vars=["type", "eom_ret"])
-
-    # ---- Combine All Results ----
     combined_hps = pd.concat([static_long, pfml_long], ignore_index=True)
-
-    # ---- Add Combination Names for Plotting ----
     combined_hps["comb_name"] = combined_hps["type"] + ": " + combined_hps["variable"]
 
     return combined_hps
@@ -709,66 +698,51 @@ def plot_hyperparameter_trends(data, colours_theme):
 
 def plot_portfolio_tuning_results(data):
     """
-    Plot portfolio tuning results over time in a 3x3 grid.
+    Plot Static-ML and Portfolio-ML tuning results.
 
     Parameters:
-        data (pd.DataFrame): Data containing portfolio tuning results.
+        data (pd.DataFrame): Processed tuning data.
 
     Returns:
-        None
+        Figure
     """
-    # Define the plot grid (3 rows x 3 columns)
-    fig, axes = plt.subplots(3, 3, figsize=(15, 12), sharex=True)
+    fig, axes = plt.subplots(2, 3, figsize=(15, 8), sharex=True)
     fig.suptitle("Portfolio Tuning Results Over Time", fontsize=16, y=0.93)
 
-    # Create a dictionary to map each combination to a specific subplot
     combination_mapping = {
-        "Portfolio-ML: log(lambda)": (2, 0),
-        "Portfolio-ML: p": (2, 1),
-        "Portfolio-ML: eta": (2, 2),
-        "Multiperiod-ML*: k": (0, 0),
-        "Multiperiod-ML*: eta": (0, 1),
-        "Multiperiod-ML*: u": (0, 2),
+        "Portfolio-ML: log(lambda)": (0, 0),
+        "Portfolio-ML: p": (0, 1),
+        "Portfolio-ML: eta": (0, 2),
         "Static-ML*: k": (1, 0),
         "Static-ML*: eta": (1, 1),
         "Static-ML*: u": (1, 2)
     }
 
-    # Plot each combination in its respective subplot
     for comb_name, group in data.groupby("comb_name"):
         if comb_name not in combination_mapping:
             continue
-
         row, col = combination_mapping[comb_name]
         ax = axes[row, col]
-
-        # Plot the scatter plot for this particular combination
         ax.scatter(group["eom_ret"], group["value"], alpha=0.75, color="steelblue")
-
-        # Set titles and labels
         ax.set_title(comb_name, fontsize=12)
         ax.grid(True, linestyle="--", linewidth=0.5)
-
         if col == 0:
             ax.set_ylabel("Optimal Hyper-Parameter")
-
-        if row == 2:
+        if row == 1:
             ax.set_xlabel("End of Month")
 
-    # Adjust layout
     plt.tight_layout(rect=[0, 0, 1, 0.95])
-
-    # plt.subplots_adjust(top=0.93)
     fig_tuning = plt.gcf()
     plt.show()
     return fig_tuning
+
 
 
 def plot_optimal_hyperparameters(model_folder, static, pfml, colours_theme, start_year):
     """
     Main function to plot optimal hyperparameters and portfolio tuning results.
     Returns:
-        None
+        Tuple: (figure for hyperparameter trends, figure for portfolio tuning)
     """
     # Load and process hyperparameters for each horizon
     data_1 = load_model_hyperparameters(f"{model_folder}/model_1.pkl", "Return t+1")
@@ -788,10 +762,9 @@ def plot_optimal_hyperparameters(model_folder, static, pfml, colours_theme, star
         value_name="value"
     )
 
-    # Create 'comb_name' column
     melted_data["comb_name"] = melted_data["horizon"] + ": " + melted_data["name"]
 
-    # Reorder 'comb_name' levels as per R's factor(levels = c(...))
+    # Reorder 'comb_name' levels (Multiperiod-ML removed)
     desired_order = [
         "Return t+1: log(lambda)", "Return t+1: p", "Return t+1: eta",
         "Return t+6: log(lambda)", "Return t+6: p", "Return t+6: eta",
@@ -799,9 +772,7 @@ def plot_optimal_hyperparameters(model_folder, static, pfml, colours_theme, star
     ]
     melted_data["comb_name"] = pd.Categorical(melted_data["comb_name"], categories=desired_order, ordered=True)
 
-    # Plot hyperparameter trends
     fig_hyper = plot_hyperparameter_trends(melted_data, colours_theme)
-
     tuning_data = process_portfolio_tuning_data(static, pfml, start_year)
     fig_tuning = plot_portfolio_tuning_results(tuning_data)
 
