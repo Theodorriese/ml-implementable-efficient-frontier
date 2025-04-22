@@ -160,7 +160,7 @@ def prepare_cluster_data(chars, cluster_labels, daily, settings, features):
         # 10.3. Reconstruct covariance: cov = sd * cor * sd
         cov_matrix = sd_diag @ corr_matrix @ sd_diag
 
-        # 10.4 Apply Bessel correction to match R's cov.wt(..., method = "unbiased")
+        # 10.4 Apply Bessel correction
         correction_factor = np.sum(w_var_cur) / (np.sum(w_var_cur) - 1)
         cov_matrix *= correction_factor
 
@@ -210,8 +210,6 @@ def prepare_cluster_data(chars, cluster_labels, daily, settings, features):
 
 
     # 14) Stock-level data for each calc_date
-
-    # Initialize dictionary for stock-level covariance results
     barra_cov = {}
 
     for d in tqdm(calc_dates, desc="Stock-level covariances"):

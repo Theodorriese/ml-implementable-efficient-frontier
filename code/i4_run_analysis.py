@@ -72,19 +72,7 @@ dates_oos = dates_data["dates_oos"]
 dates_hp = dates_data["dates_hp"]
 
 # Configuration parameters
-config_params = {
-    "size_screen": "perc_low50_high100_min40",
-    "wealth": pf_set["wealth"],
-    "gamma_rel": pf_set["gamma_rel"],
-    "industry_cov": settings["cov_set"]["industries"],
-    "update_mp": True,
-    "update_base": True,
-    "update_fi_base": True,
-    "update_fi_ief": True,
-    "update_fi_ret": True,
-}
-
-gamma_rel = config_params["gamma_rel"]
+gamma_rel = pf_set["gamma_rel"]
 
 colours_theme = ["blue", "green", "red", "orange", "purple", "brown"] # For parameter and ACR plots later
 

@@ -58,9 +58,9 @@ settings = {
     },
     "pi": 0.1,
     "rff": {
+        "p_vec": [2 ** i for i in range(1, 10)],
         "g_vec": np.exp(np.arange(-3, -1)),
-        "p_vec": [2**i for i in range(6, 10)],
-        "l_vec": np.concatenate(([0], np.exp(np.linspace(-10, 10, 100)))),
+        "l_vec": np.concatenate(([0], np.exp(np.linspace(-10, 10, 100))))
     },
     "pf": {
         "dates": {
