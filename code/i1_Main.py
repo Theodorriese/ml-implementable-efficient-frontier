@@ -3,19 +3,17 @@ import pandas as pd
 
 # ------------------ Portfolios and clusters ------------------
 pf_order = [
-    "Portfolio-ML", "Multiperiod-ML", "Multiperiod-ML*",
-    "Static-ML", "Static-ML*", "Market", "1/N",
+    "Portfolio-ML", "Static-ML", "Static-ML*", "Market", "1/N",
     "Minimum Variance", "Factor-ML", "Rank-ML", "Markowitz-ML"
 ]
 
 pf_order_new = [
-    "Portfolio-ML", "Multiperiod-ML*", "Static-ML*",
-    "Multiperiod-ML", "Static-ML", "Markowitz-ML",
+    "Portfolio-ML", "Static-ML*", "Static-ML", "Markowitz-ML",
     "Rank-ML", "Factor-ML", "Minimum Variance", "1/N", "Market"
 ]
 
 main_types = [
-    "Portfolio-ML", "Multiperiod-ML*", "Static-ML*",
+    "Portfolio-ML", "Static-ML*",
     "Factor-ML", "Markowitz-ML"
 ]
 
@@ -33,15 +31,16 @@ txt_size = 10
 settings = {
     "region": "USA",
     "multi_process": True,
-    "data_path": "C:\Master", # Local
-    # "data_path": "/work/frontier_ml/", # UCloud
+    # "data_path": "C:\Master",
+    "data_path": "/work/frontier_ml/",
     "parallel": True,
     "seed_no": 1,
     "months": False,
     "split": {
-        "train_end": pd.Timestamp("2017-12-31"),
-        "test_end": pd.Timestamp("2020-12-31"),
-        "val_years": 1,
+        "train_end": pd.Timestamp("1996-12-31"),
+        "test_end": pd.Timestamp("2023-12-31"),
+        "val_years": 5,
+        "model_update_freq": "yearly",
         "train_lookback": 100,
         "retrain_lookback": 100
     },
@@ -51,8 +50,8 @@ settings = {
     "addition_n": 12,
     "deletion_n": 12,
     "screens": {
-        "start": pd.Timestamp("2010-01-01"),
-        "end": pd.Timestamp("2020-12-31"),
+        "start": pd.Timestamp("1986-01-01"),
+        "end": pd.Timestamp("2023-12-31"),
         "feat_pct": 0.5,
         "nyse_stocks": True
     },
@@ -64,9 +63,9 @@ settings = {
     },
     "pf": {
         "dates": {
-            "start_year": 2018,
-            "end_yr": 2020,
-            "split_years": 1
+            "start_year": 1997,
+            "end_yr": 2023,
+            "split_years": 5
         },
         "hps": {
             "cov_type": "cov_add",
@@ -96,12 +95,12 @@ settings = {
     # },
     "cov_set": {
         "industries": True,
-        "obs": 504,
-        "hl_cor": 378.0,
-        "hl_var": 126.0,
-        "hl_stock_var": 126.0,
+        "obs": 252 * 5,
+        "hl_cor": 252 * 3 / 2,
+        "hl_var": 252 / 2,
+        "hl_stock_var": 252 / 2,
         "min_stock_obs": 252,
-        "initial_var_obs": 63
+        "initial_var_obs": 21 * 3
     },
     "factor_ml": {
         "n_pfs": 10
@@ -112,7 +111,7 @@ settings = {
 # -------------------- Portfolio Settings --------------------
 pf_set = {
     "wealth": 1e10,
-    "gamma_rel": 10,
+    "gamma_rel": 5,
     "mu": 0.007,
     "lb_hor": 11
 }
