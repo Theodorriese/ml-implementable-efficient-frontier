@@ -1,9 +1,7 @@
 import numpy as np
 import pandas as pd
-import os
 import pickle
 import os
-import re
 from tqdm import tqdm
 from scipy.linalg import sqrtm, pinv
 from itertools import product
@@ -69,8 +67,9 @@ def m_func(w, mu, rf, sigma_gam, gam, lambda_mat, iterations):
     return lamb_neg05 @ m_tilde @ np.sqrt(lambda_mat)
 
 
-def m_func_2(w, mu, rf, sigma_gam, gam, lambda_mat, iterations, plot_path='/work/frontier_ml_eu/m_plots'):
+def m_func_2(w, mu, rf, sigma_gam, gam, lambda_mat, iterations, plot_path='/work/frontier_ml/m_plots'):
     """
+    This is an additional m function to be run when convergence is to be check.
     Computes the m matrix and plots convergence over iterations, saving the plot to a specified directory.
 
     Parameters:
@@ -1567,8 +1566,8 @@ def pfml_implement(data_tc, cov_list, lambda_list, risk_free, features, wealth, 
     			"rff_w": rff_w
     		}
 
-    		with open(f"/work/frontier_ml_g5/hps_g{g:.4f}.pkl", "wb") as f:
-    			pickle.dump(hps[g], f)
+    		# with open(f"/work/frontier_ml_g5/hps_g{g:.4f}.pkl", "wb") as f:
+    		# 	pickle.dump(hps[g], f)
 
     # # Load both pfml_input and hps files
     # if not hps:

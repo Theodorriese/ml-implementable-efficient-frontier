@@ -3,8 +3,7 @@ import pickle
 import os
 from a_portfolio_choice_functions import (tpf_implement, factor_ml_implement, mkt_implement,
                                           ew_implement, rw_implement, mv_implement, static_implement,
-                                          pfml_implement, mp_implement, mp_implement_multi_process,
-                                          mv_implement_multip, static_implement_multip)
+                                          pfml_implement, mv_implement_multip, static_implement_multip)
 
 
 def benchmark_portfolios(chars, barra_cov, wealth, dates_oos, pf_set, settings, output_path):
@@ -170,7 +169,7 @@ def portfolio_ml(chars, barra_cov, lambda_list, features, risk_free, wealth, pf_
 
     ###############################################################################
     # BE AWARE OF THIS
-    iter = 50
+    iter = 100
     ###############################################################################
 
     pfml = pfml_implement(chars, cov_list=barra_cov, lambda_list=lambda_list, features=features, risk_free=risk_free,
@@ -185,76 +184,7 @@ def portfolio_ml(chars, barra_cov, lambda_list, features, risk_free, wealth, pf_
         pickle.dump(pfml, file)
 
 
-def multiperiod_ml(config_params, chars, barra_cov, lambda_list, risk_free, wealth, pf_set, settings,
-                   dates_oos, dates_hp, output_path):
-    """
-    Implement and save Multiperiod-ML if enabled.
-
-    Parameters:
-        config_params (dict): Configuration parameters.
-        chars (pd.DataFrame): Characteristics data.
-        barra_cov (dict): Covariance matrices.
-        lambda_list (dict): Lambda values.
-        risk_free (pd.DataFrame): Risk-free rate data.
-        wealth (pd.DataFrame): Wealth data.
-        pf_set (dict): Portfolio settings.
-        settings (dict): Configuration settings.
-        dates_oos (list): Out-of-sample dates.
-        dates_hp (list): Holding period dates.
-        output_path (str): Path to save the output.
-    """
-    if config_params["update_mp"]:
-        print("Implementing Multiperiod-ML...")
-
-        if settings["multi_process"]:
-            print("Using multiprocessing implementation...")
-            mp = mp_implement_multi_process(
-                data_tc=chars,
-                cov_list=barra_cov,
-                lambda_list=lambda_list,
-                rf=risk_free,
-                wealth=wealth,
-                mu=pf_set["mu"],
-                gamma_rel=pf_set["gamma_rel"],
-                dates_oos=dates_oos,
-                dates_hp=dates_hp,
-                k_vec=settings["pf"]["hps"]["m1"]["k"],
-                u_vec=settings["pf"]["hps"]["m1"]["u"],
-                g_vec=settings["pf"]["hps"]["m1"]["g"],
-                cov_type=settings["pf"]["hps"]["cov_type"],
-                validation=None,
-                iter_=50,
-                K=settings["pf"]["hps"]["m1"]["K"]
-            )
-        else:
-            print("Using single-core implementation...")
-            mp = mp_implement(
-                data_tc=chars,
-                cov_list=barra_cov,
-                lambda_list=lambda_list,
-                rf=risk_free,
-                wealth=wealth,
-                mu=pf_set["mu"],
-                gamma_rel=pf_set["gamma_rel"],
-                dates_oos=dates_oos,
-                dates_hp=dates_hp,
-                k_vec=settings["pf"]["hps"]["m1"]["k"],
-                u_vec=settings["pf"]["hps"]["m1"]["u"],
-                g_vec=settings["pf"]["hps"]["m1"]["g"],
-                cov_type=settings["pf"]["hps"]["cov_type"],
-                validation=None,
-                iter_=50,
-                K=settings["pf"]["hps"]["m1"]["K"]
-            )
-
-        # Save the entire dictionary to 'multiperiod-ml.pkl'
-        with open(f"{output_path}/multiperiod-ml.pkl", 'wb') as file:
-            pickle.dump(mp, file)
-
-        pickle.dump(mp, open(f"{output_path}/multiperiod-ml_2.pkl", 'wb'))
-
-
-def run_f_base_case(chars, barra_cov, wealth, dates_oos, pf_set, settings, config_params, lambda_list, risk_free,
+def run_f_base_case(chars, barra_cov, wealth, dates_oos, pf_set, settings, lambda_list, risk_free,
                     features, dates_m2, dates_hp, hp_years, output_path):
     """
     Main function to run portfolio implementation steps.
@@ -283,7 +213,3 @@ def run_f_base_case(chars, barra_cov, wealth, dates_oos, pf_set, settings, confi
     # Run Portfolio-ML
     portfolio_ml(chars, barra_cov, lambda_list, features, risk_free, wealth, pf_set, settings, dates_m2,
                 dates_oos, hp_years, output_path)
-
-    # # Run Multiperiod-ML
-    # multiperiod_ml(config_params, chars, barra_cov, lambda_list, risk_free, wealth, pf_set, settings,
-    #                dates_oos, dates_hp, output_path)
