@@ -29,24 +29,11 @@ else:
     from c_fit_models import fit_models
 
 
-# -------------------- Config Parameters and Search grid (Manually Set) --------------------
-config_params = {
-    "size_screen": "perc_low50_high100_min50",
-    "wealth": 1e10,
-    "gamma_rel": 10,
-    "industry_cov": True,
-}
-
+# -------------------- Search grid  --------------------
 search_grid = pd.DataFrame({
     "name": [f"m{i}" for i in range(1, 13)],
     "horizon": [[i] for i in range(1, 13)]
 })
-
-# Assign values from config_params to settings and portfolio configurations
-settings["screens"]["size_screen"] = config_params["size_screen"]
-settings["cov_set"]["industries"] = config_params["industry_cov"]
-pf_set["wealth"] = config_params["wealth"]
-pf_set["gamma_rel"] = config_params["gamma_rel"]
 
 
 # -------------------- Run  --------------------

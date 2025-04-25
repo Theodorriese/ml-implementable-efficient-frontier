@@ -53,7 +53,8 @@ settings = {
         "start": pd.Timestamp("1986-01-01"),
         "end": pd.Timestamp("2023-12-31"),
         "feat_pct": 0.5,
-        "nyse_stocks": True
+        "nyse_stocks": True,
+        "size_screen": "perc_low50_high100_min50"
     },
     "pi": 0.1,
     "rff": {
@@ -89,10 +90,6 @@ settings = {
         "orig_feat": False,
         "scale": True
     },
-    # "ef": {
-    #     "wealth": [1, 1e9, 1e10, 1e11],
-    #     "gamma_rel": [1, 5, 10, 20, 100]
-    # },
     "cov_set": {
         "industries": True,
         "obs": 252 * 5,
@@ -111,7 +108,7 @@ settings = {
 # -------------------- Portfolio Settings --------------------
 pf_set = {
     "wealth": 1e10,
-    "gamma_rel": 5,
+    "gamma_rel": 10,
     "mu": 0.007,
     "lb_hor": 11
 }
