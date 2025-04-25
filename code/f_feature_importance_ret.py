@@ -36,6 +36,8 @@ def run_feature_importance_ret(chars, cluster_labels, features, settings, output
         preds_list = [m['pred'] for m in model.values()]
         if preds_list:
             preds = pd.concat(preds_list, ignore_index=True)
+            preds['id'] = preds['id'].astype(str)
+            ret_cf_data['id'] = ret_cf_data['id'].astype(str)
             ret_cf_data = pd.merge(ret_cf_data, preds[['id', 'eom', 'pred']], on=['id', 'eom'], how='left')
 
         ret_cf_data = ret_cf_data.dropna(subset=['ret_pred'])
