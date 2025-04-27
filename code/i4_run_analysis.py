@@ -1,6 +1,9 @@
 import os
 import pandas as pd
-from b_prepare_data import load_cluster_labels
+from b_prepare_data import (load_cluster_labels,
+    load_market_data,
+    load_risk_free
+)
 from g_base_analysis import (
     load_base_case_portfolios, combine_portfolios, compute_portfolio_summary,
     compute_and_plot_performance_time_series, compute_probability_of_outperformance,
@@ -21,9 +24,9 @@ from g_feature_importance import (
     plot_feature_importance_for_return_predictions,
     analyze_seasonality_effect
 )
-
 from i1_Main import (settings, pf_set, features, pf_order, pf_order_new, main_types,
                      cluster_order, feat_excl)
+from g_implementable_efficient_frontier import run_ief
 
 
 # # -------------------- CONFIGURATION (local) --------------------
@@ -79,7 +82,16 @@ dates_data = pd.read_pickle(dates_path)
 
 # Load cluster labels
 cluster_labels = load_cluster_labels(data_path)
-print("Loaded cluster labels")
+
+# Load Market data
+market_data = load_market_data(settings)
+
+# Load risk-free rate
+risk_free = load_risk_free(data_path)
+
+# Load wealth data
+wealth_path = os.path.join(data_path, "wealth_processed.pkl")
+wealth = pd.read_pickle(wealth_path)
 
 # Extract dates
 dates_oos = dates_data["dates_oos"]
@@ -207,6 +219,8 @@ mkt = base_case["mkt"]
 
 
 # -------------------- 9) Implementable  Efficient Frontier --------------------
+print("Running initial IEF script...")
+run_ief(chars, dates_oos, pf_set, wealth, barra_cov, market_data, risk_free, settings, output_path)
 
 # -------------------- 10) PORTFOLIO WEIGHTS ANALYSIS --------------------
 print("Analyzing portfolio weights...")

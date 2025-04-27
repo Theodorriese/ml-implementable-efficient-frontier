@@ -10,171 +10,219 @@ from b_prepare_data import wealth_func
 from i1_Main import settings, pf_set
 
 
+def summarize_factor_ef(df, gamma_rel):
+    """
+    Summarize factor efficient frontier portfolios.
+
+    Parameters:
+        df (pd.DataFrame): Concatenated DataFrame from different vol targets.
+        gamma_rel (float): Risk aversion parameter.
+
+    Returns:
+        pd.DataFrame: Aggregated summary statistics by volatility level.
+    """
+    grouped = []
+
+    for vol_target, group in df.groupby('vol_target'):
+        r = group['r']
+        tc = group['tc']
+        r_net = r - tc
+        sd_r = r.std()
+        obj = (r.mean() - 0.5 * r.var() * gamma_rel - tc.mean()) * 12
+
+        row = {
+            'vol_target': vol_target,
+            'n': len(group),
+            'inv': group['inv'].mean(),
+            'to': group['turnover'].mean(),
+            'r': r.mean() * 12,
+            'sd': sd_r * np.sqrt(12),
+            'sr_gross': r.mean() / sd_r * np.sqrt(12),
+            'tc': tc.mean() * 12,
+            'r_tc': r_net.mean() * 12,
+            'sr': r_net.mean() / sd_r * np.sqrt(12),
+            'obj': obj
+        }
+
+        grouped.append(row)
+
+    return pd.DataFrame(grouped)
+
+
 # 1) Generate Factor-ML with different volatility levels
 def generate_factor_ml_volatility(chars, dates_oos, pf_set, wealth):
     """
     Generate Factor-ML portfolios with different volatility levels.
-
-    Parameters:
-        chars (pd.DataFrame): The dataset containing characteristics of assets.
-        dates_oos (list): List of out-of-sample dates.
-        pf_set (dict): Portfolio settings, including factor_ml configurations.
-        wealth (pd.DataFrame): Wealth data for the portfolio.
 
     Returns:
         pd.DataFrame: Summary statistics for Factor-ML portfolios with different volatility levels.
     """
     vol_range = np.arange(0, 0.51, 0.01)
 
-    # Generate Factor-ML base portfolio
-    factor_base = factor_ml_implement(chars, wealth, dates_oos, pf_set['factor_ml']['n_pfs'])
-
-    # Calculate base portfolio volatility
+    # Base portfolio
+    factor_base = factor_ml_implement(chars, wealth, dates_oos, settings['factor_ml']['n_pfs'])
     factor_base_vol = factor_base['pf']['r'].std() * np.sqrt(12)
 
-    # Generate Factor-ML portfolios with different volatility levels
+    # Portfolios across volatility levels
     factor_ef = []
     for vol_target in vol_range:
         scale = vol_target / factor_base_vol
-        scaled_factors = factor_base['w'] * scale
-        factor_ef.append(pf_ts_fun(scaled_factors, chars, wealth))
+        scaled_factors = factor_base['w'].copy()
+        scaled_factors['w'] *= scale
+        scaled_factors['w_start'] *= scale
+
+        pf = pf_ts_fun(scaled_factors, chars, wealth)
+        pf['vol_target'] = vol_target
+        factor_ef.append(pf)
 
     factor_ef_df = pd.concat(factor_ef, ignore_index=True)
     factor_ef_df['type'] = 'Factor-ML'
 
-    # Summary statistics for Factor-ML portfolios
-    factor_ss = factor_ef_df.groupby('vol_target').agg(
-        n='size',
-        inv='mean',
-        to='mean',
-        r='mean',
-        sd='std',
-        sr_gross='mean',
-        tc='mean',
-        r_tc='mean',
-        sr='mean',
-        obj='mean'
-    )
+    factor_ss = summarize_factor_ef(factor_ef_df, pf_set['gamma_rel'])
 
     return factor_ss
 
 
 # 2) Generate Markowitz-ML with different volatility levels
 def generate_markowitz_ml_volatility(chars, barra_cov, wealth, dates_oos, pf_set):
+    """
+    Generate Markowitz-ML portfolios with different volatility levels.
+
+    Returns:
+        pd.DataFrame: Summary statistics for Markowitz-ML portfolios with different volatility levels.
+    """
     vol_range = np.arange(0, 0.51, 0.01)
 
+    # Base portfolio
     tpf_base = tpf_implement(chars, barra_cov, wealth, dates_oos, pf_set['gamma_rel'])
     tpf_base_vol = tpf_base['pf']['r'].std() * np.sqrt(12)
 
+    # Portfolios across volatility levels
     tpf_ef = []
     for vol_target in vol_range:
         scale = vol_target / tpf_base_vol
-        scaled_tpf = tpf_base['w'] * scale
-        tpf_ef.append(pf_ts_fun(scaled_tpf, chars, wealth))
+        scaled_tpf = tpf_base['w'].copy()
+        scaled_tpf['w'] *= scale
+        scaled_tpf['w_start'] *= scale
+
+        pf = pf_ts_fun(scaled_tpf, chars, wealth)
+        pf['vol_target'] = vol_target
+        tpf_ef.append(pf)
 
     tpf_ef_df = pd.concat(tpf_ef, ignore_index=True)
     tpf_ef_df['type'] = 'Markowitz-ML'
 
-    # Summary statistics for Markowitz-ML
-    tpf_ss = tpf_ef_df.groupby('vol_target').agg(
-        n='size',
-        inv='mean',
-        to='mean',
-        r='mean',
-        sd='std',
-        sr_gross='mean',
-        tc='mean',
-        r_tc='mean',
-        sr='mean',
-        obj='mean'
-    )
+    tpf_ss = summarize_factor_ef(tpf_ef_df, pf_set['gamma_rel'])
 
     return tpf_ss
 
 
 # 3) Generate Mean-Variance Efficient Frontier
-def generate_mv_risky_ef(barra_cov, wealth, dates_oos, pf_set, u_vec):
-    mv_risky_ef = mv_risky_fun(barra_cov, wealth, dates_oos, pf_set['gamma_rel'], u_vec)
-
-    mv_risky_ef_df = mv_risky_ef['pf']
-
-    mv_ss = mv_risky_ef_df.groupby('u').agg(
-        n='size',
-        inv='mean',
-        to='mean',
-        r='mean',
-        sd='std',
-        sr_gross='mean',
-        tc='mean',
-        r_tc='mean',
-        sr='mean',
-        obj='mean'
-    )
-
-    return mv_ss
-
-
-def get_ief_portfolios(output_path):
+def generate_mv_risky_ef(chars, barra_cov, wealth_0, dates_oos, pf_set, u_vec):
     """
-    Reads the IEF portfolio data from the given output_path and returns it as a DataFrame.
-
-    Parameters:
-        output_path (str): Path to the directory containing the portfolios.
+    Generate mean-variance efficient frontier of risky assets.
 
     Returns:
-        pd.DataFrame: The combined IEF portfolio data.
+        pd.DataFrame: Summary statistics for each utility level.
     """
-    # Path to the folder containing the IEF portfolios
-    ief_path = os.path.join(output_path, "Data/Generated/Portfolios/IEF/")
+    mv_risky_ef_df = mv_risky_fun(
+        data=chars,
+        cov_list=barra_cov,
+        wealth=wealth_0,
+        dates=dates_oos,
+        gam=pf_set['gamma_rel'],
+        u_vec=u_vec
+    )
 
-    ief_pfs = []
+    grouped = []
 
-    # Read pfml_cf_ief.csv directly into DataFrame
-    pfml_cf_ief_path = os.path.join(ief_path, "pfml_cf_ief.csv")
-    pfml_cf_ief_df = pd.read_csv(pfml_cf_ief_path)
+    for u, group in mv_risky_ef_df.groupby('u'):
+        r = group['r']
+        tc = group['tc']
+        r_net = r - tc
+        sd_r = r.std()
+        obj = (r.mean() - 0.5 * r.var() * pf_set['gamma_rel'] - tc.mean()) * 12
 
-    # Iterate through each folder in the directory (we only have one gamma and wealth config)
-    for folder in os.listdir(ief_path):
-        folder_path = os.path.join(ief_path, folder)
+        row = {
+            'u': u,
+            'n': len(group),
+            'inv': group['inv'].mean(),
+            'to': group['turnover'].mean(),
+            'r': r.mean() * 12,
+            'sd': sd_r * np.sqrt(12),
+            'sr_gross': r.mean() / sd_r * np.sqrt(12) if sd_r != 0 else np.nan,
+            'tc': tc.mean() * 12,
+            'r_tc': r_net.mean() * 12,
+            'sr': r_net.mean() / sd_r * np.sqrt(12) if sd_r != 0 else np.nan,
+            'obj': obj
+        }
 
-        if os.path.isdir(folder_path):
-            # Read files for each portfolio
-            bms_path = os.path.join(folder_path, "bms.csv")
-            static_ml_rds_path = os.path.join(folder_path, "static-ml.RDS")
-            portfolio_ml_rds_path = os.path.join(folder_path, "portfolio-ml.RDS")
+        grouped.append(row)
 
-            # Read 'bms.csv' into DataFrame
-            bms_df = pd.read_csv(bms_path)
-            bms_df['eom_ret'] = pd.to_datetime(bms_df['eom_ret'])
+    return pd.DataFrame(grouped)
 
-            # Read .RDS files - We will assume that the static-ml and portfolio-ml RDS files have been converted to DataFrames.
-            # For this example, assuming the data is available as pandas DataFrames:
-            static_ml_df = pd.read_pickle(
-                static_ml_rds_path)  # Placeholder, if static-ml.RDS has been converted to pickle
-            portfolio_ml_df = pd.read_pickle(portfolio_ml_rds_path)  # Placeholder, same for portfolio-ml.RDS
 
-            # Combine data from CSV and the two RDS converted DataFrames
-            combined_df = pd.concat([bms_df, static_ml_df, portfolio_ml_df], ignore_index=True)
+# 3) Get portfolios
+def get_ief_portfolios(output_path, settings):
+    """
+    Reads IEF portfolio data from disk, supporting both single and multi-gamma folder structures.
 
-            # Assuming the type of the portfolio is Static-ML for the static ML data
-            combined_df['type'] = "Static-ML"
+    Parameters:
+        output_path (str): Root path to IEF folders.
+        settings (dict): Must contain 'ief_multi_gamma' (bool).
 
-            # Append the combined DataFrame to the list
-            ief_pfs.append(combined_df)
+    Returns:
+        pd.DataFrame: Combined portfolio performance data.
+    """
 
-    # Combine all DataFrames into a single DataFrame
-    ief_pfs_df = pd.concat(ief_pfs, ignore_index=True)
+    all_portfolios = []
 
-    # Combine pfml_cf_ief.csv data with the rest of the portfolios (from the other CSVs and RDS files)
-    ief_ss = pd.concat([pfml_cf_ief_df, ief_pfs_df], ignore_index=True)
+    if settings.get("ief_multi_gamma", False):
+        # MULTI-GAMMA mode
+        for folder in os.listdir(output_path):
+            folder_path = os.path.join(output_path, folder)
+            if not os.path.isdir(folder_path) or not folder.startswith("gamma_"):
+                continue
 
-    # Check for duplicates (in terms of wealth_end, gamma_rel, type, and eom_ret)
+            try:
+                gamma_val = float(folder.split("_")[1])
+            except (IndexError, ValueError):
+                continue
+
+            # Read core files
+            pfml_cf = pd.read_csv(os.path.join(folder_path, "pfml_cf_ief.csv"))
+            bms = pd.read_csv(os.path.join(folder_path, "bms.csv"))
+            static_ml = pd.read_pickle(os.path.join(folder_path, "static-ml.pkl"))
+            portfolio_ml = pd.read_pickle(os.path.join(folder_path, "portfolio-ml.pkl"))
+
+            # Clean/label
+            bms['eom_ret'] = pd.to_datetime(bms['eom_ret'])
+            for df in [pfml_cf, bms, static_ml, portfolio_ml]:
+                df['gamma_rel'] = gamma_val
+
+            # Merge and tag
+            all_portfolios.extend([pfml_cf, bms, static_ml, portfolio_ml])
+
+    else:
+        # SINGLE-GAMMA mode
+        demo_path = os.path.join(output_path, "demo")
+        pfml_cf = pd.read_csv(os.path.join(demo_path, "pfml_cf_ief.csv"))
+        bms = pd.read_csv(os.path.join(demo_path, "bms.csv"))
+        static_ml = pd.read_pickle(os.path.join(demo_path, "static-ml.pkl"))
+        portfolio_ml = pd.read_pickle(os.path.join(demo_path, "portfolio-ml.pkl"))
+
+        bms['eom_ret'] = pd.to_datetime(bms['eom_ret'])
+        all_portfolios.extend([pfml_cf, bms, static_ml, portfolio_ml])
+
+    # Combine everything
+    ief_ss = pd.concat(all_portfolios, ignore_index=True)
+
+    # Check duplicates
     duplicate_check = ief_ss.groupby(['wealth_end', 'gamma_rel', 'type', 'eom_ret']).size()
-    if (duplicate_check != 1).any():
-        raise ValueError("Found duplicates in the IEF portfolios data!")
+    if (duplicate_check > 1).any():
+        raise ValueError("Found duplicates in the IEF portfolios!")
 
     return ief_ss
-
 
 # 5) Build inputs for IEF
 def build_ief_input(factor_ss, tpf_ss, ief_ss, pf_set):
@@ -214,17 +262,17 @@ def plot_figure_1B(comb_data):
 
 
 # Main execution function
-def run_ief(chars, dates_oos, pf_set, wealth, barra_cov, market, risk_free, settings, output_path):
+def run_ief(chars, dates_oos, pf_set, wealth, barra_cov, market_data, risk_free, settings, output_path):
     # Generate Factor-ML portfolio
-    factor_ss = generate_factor_ml_volatility(chars, dates_oos, pf_set, wealth)
+    # factor_ss = generate_factor_ml_volatility(chars, dates_oos, pf_set, wealth)
 
     # Generate Markowitz-ML portfolio
-    tpf_ss = generate_markowitz_ml_volatility(chars, barra_cov, wealth, dates_oos, pf_set)
+    # tpf_ss = generate_markowitz_ml_volatility(chars, barra_cov, wealth, dates_oos, pf_set)
 
     # Generate Mean-Variance Risky Portfolio
     u_vec = np.concatenate([np.arange(-0.5, 0.5, 0.05), [0.6, 0.75, 1, 2]]) / 12
-    wealth_0 = wealth_func(wealth_end=0, end=settings['split']['test_end'], market=market, risk_free=risk_free)
-    mv_ss = generate_mv_risky_ef(barra_cov, wealth_0, dates_oos, pf_set, u_vec)
+    wealth_0 = wealth_func(wealth_end=0, end=settings['split']['test_end'], market=market_data, risk_free=risk_free)
+    mv_ss = generate_mv_risky_ef(chars, barra_cov, wealth_0, dates_oos, pf_set, u_vec)
 
     # Get IEF portfolios
     ief_ss = get_ief_portfolios(output_path)

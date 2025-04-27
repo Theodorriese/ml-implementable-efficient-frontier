@@ -627,90 +627,75 @@ def mv_implement(data, cov_list, wealth, dates):
     return {"w": mv_w, "pf": mv_pf}
 
 
-def mv_risky_fun(data, cov_list, wealth, dates, u_vec):
+def mv_risky_fun(data, cov_list, wealth, dates, gam, u_vec):
     """
     Mean-variance efficient portfolios of risky assets.
-
-    Parameters:
-        data (pd.DataFrame): DataFrame containing portfolio data, including predicted returns.
-        cov_list (dict): Dictionary of covariance matrices.
-        wealth (pd.DataFrame): Wealth information.
-        dates (list): List of dates to calculate the portfolio.
-        gam (float): Risk-aversion parameter.
-        u_vec (list): Utility vector for targeting different risk levels.
-
-    Returns:
-        dict: Dictionary containing portfolio weights and performance.
     """
-    # Filter data for valid entries and the selected dates
-    data_rel = data[(data['valid'] == True) & (data['eom'].isin(dates))].copy()
-    data_rel = data_rel[['id', 'eom', 'me', 'pred_ld1']].sort_values(by=['id', 'eom'])
+    data_rel = data[(data['valid']) & (data['eom'].isin(dates))].copy()
+    data_rel = data_rel[['id', 'eom', 'me', 'tr_ld1', 'pred_ld1', 'lambda']].sort_values(by=['id', 'eom'])
 
-    # Split data by end-of-month (eom)
     data_split = {date: group for date, group in data_rel.groupby('eom')}
+    mv_opt_all = []
 
-    mv_opt_all = []  # To store the results
-
-    # Loop over each date in the provided dates
     for d in dates:
         data_sub = data_split.get(d, pd.DataFrame())
         if data_sub.empty:
             continue
 
-        sigma_data = cov_list.get(d, None)
+        sigma_data = cov_list.get(d)
         if sigma_data is None or "fct_cov" not in sigma_data:
-            print(f"Warning: Missing 'fct_cov' for {d}")
             continue
 
         ids = data_sub["id"].astype(str).unique()
         sigma = create_cov(sigma_data, ids)
 
         if sigma is None or sigma.shape[0] != sigma.shape[1]:
-            print(f"Warning: Invalid covariance matrix for {d}")
             continue
 
         pred_ld1 = data_sub.set_index("id")["pred_ld1"].dropna()
-        sigma = pd.DataFrame(sigma)
-        sigma.index = sigma.index.astype(str)
+        sigma = pd.DataFrame(sigma, index=ids, columns=ids)
         pred_ld1.index = pred_ld1.index.astype(str)
 
-        if not set(pred_ld1.index).issubset(sigma.index):
-            print(f"Warning: Some IDs in pred_ld1 are missing from sigma for {d}")
-            continue
-
-        if pred_ld1.empty:
-            print(f"Warning: pred_ld1 is empty for date {d}, skipping.")
-            continue
-
         common_ids = pred_ld1.index.intersection(sigma.index)
-
         if common_ids.empty:
-            print(f"Warning: No common IDs between pred_ld1 and sigma for {d}, skipping.")
             continue
 
         pred_ld1 = pred_ld1.loc[common_ids].to_numpy()
-        sigma = sigma.loc[common_ids, common_ids]
+        sigma = sigma.loc[common_ids, common_ids].to_numpy()
 
-        # Compute the mean-variance optimization components
         sigma_inv = np.linalg.pinv(sigma)
-        a = np.dot(pred_ld1.T, sigma_inv.dot(pred_ld1))
-        b = np.dot(sigma_inv, pred_ld1)
-        c = np.sum(sigma_inv, axis=1)
-        d = a * c - np.dot(b, b)
+        a = pred_ld1.T @ sigma_inv @ pred_ld1
+        b = sigma_inv @ pred_ld1
+        c = sigma_inv @ np.ones_like(pred_ld1)
+        d = a * np.sum(c) - np.dot(b, b)
 
-        # Calculate optimal weights for each utility target in u_vec
         for u in u_vec:
-            w_opt = ((c * u - b) / d) @ sigma_inv @ pred_ld1 + ((a - b * u) / d) @ sigma_inv @ np.ones_like(c)
-            mv_opt_all.append(pd.DataFrame({'id': data_sub['id'], 'eom': d, 'u': u, 'w': w_opt}))
+            w = ((np.sum(c) * u - np.sum(b)) / d) * (sigma_inv @ pred_ld1) + \
+                ((a - np.sum(b) * u) / d) * (sigma_inv @ np.ones_like(pred_ld1))
+
+            df_w = pd.DataFrame({
+                'id': common_ids,
+                'eom': pd.to_datetime(d),
+                'u': u * 12,
+                'w': w
+            })
+            mv_opt_all.append(df_w)
 
     mv_opt_all_df = pd.concat(mv_opt_all, ignore_index=True)
 
-    # Calculate portfolio weights and performance
-    mv_w = w_fun(data, dates, mv_opt_all_df[['id', 'eom', 'w']], wealth)
-    mv_pf = pf_ts_fun(mv_w, data, wealth)
-    mv_pf['type'] = "MV-Risky"
+    mv_results = []
+    for u_val in mv_opt_all_df['u'].unique():
+        w_sel = mv_opt_all_df[mv_opt_all_df['u'] == u_val].copy()
+        w_sel = w_sel.drop(columns=['u'])
 
-    return {"w": mv_w, "pf": mv_pf}
+        data_subset = data_rel[data_rel['id'].astype(str).isin(w_sel['id'].astype(str))]
+        w = w_fun(data_subset, dates, w_sel, wealth)
+        pf = pf_ts_fun(w, data_subset, wealth)
+
+        pf['u'] = u_val
+        mv_results.append(pf)
+
+    return pd.concat(mv_results, ignore_index=True)
 
 
 def static_val_fun(data, dates, cov_list, lambda_list, wealth, cov_type,
