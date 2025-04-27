@@ -6,31 +6,34 @@ import os
 
 
 # FI in base case -----------------------------------------------
-def calculate_feature_importance(pf_set, colours_theme):
+def calculate_feature_importance(pf_set, colours_theme, latest_folder, save_path=None):
     """
     Calculate and visualize feature importance based on drop in realized utility.
 
     Parameters:
         pf_set (dict): Portfolio settings, including gamma_rel.
         colours_theme (list): Theme colors for visualization.
+        latest_folder (str): Path to the latest folder containing 'tpf_cf_base.csv' and 'pfml_cf_base.csv'.
+        save_path (str): Path to save the plot (optional).
 
     Returns:
         None
     """
-    fi_path = "Data/Generated/Portfolios/FI/"
-    fi_folder = os.path.join(fi_path, sorted(os.listdir(fi_path))[0])  # First folder in the FI directory
+    # Load the .pkl files for TPF and Portfolio-ML base data from the latest folder
+    tpf_cf_base = pd.read_pickle(os.path.join(latest_folder, "tpf_cf_base.pkl"))
+    pfml_cf_base = pd.read_pickle(os.path.join(latest_folder, "pfml_cf_base.pkl"))
 
-    tpf_cf_base = pd.read_csv(os.path.join(fi_folder, "tpf_cf_base.csv"))
-    pfml_cf_base = pd.read_csv(os.path.join(fi_folder, "pfml_cf_base.csv"))
 
     # Calculate feature importance for Portfolio-ML
     pfml_cf_ss = (
         pfml_cf_base
         .groupby(["type", "cluster"], as_index=False)
         .agg(
-            cf_obj=lambda df: (df["r"].mean() - 0.5 * df["r"].var() * pf_set["gamma_rel"] - df["tc"].mean()) * 12
+            cf_obj=("r", lambda x: (x.mean() - 0.5 * x.var() * pf_set["gamma_rel"] - x.mean()) * 12)
         )
     )
+
+
     pfml_cf_ss["fi"] = (
         pfml_cf_ss.loc[pfml_cf_ss["cluster"] == "bm", "cf_obj"].values[0] - pfml_cf_ss["cf_obj"]
     )
@@ -42,9 +45,10 @@ def calculate_feature_importance(pf_set, colours_theme):
         tpf_cf_base
         .groupby(["type", "cluster"], as_index=False)
         .agg(
-            cf_obj=lambda df: (df["r"].mean() - 0.5 * df["r"].var() * pf_set["gamma_rel"] - df["tc"].mean()) * 12
+            cf_obj=('r', lambda x: (x.mean() - 0.5 * x.var() * pf_set["gamma_rel"] - x.mean()) * 12)
         )
     )
+
     tpf_cf_ss["fi"] = (
         tpf_cf_ss.loc[tpf_cf_ss["cluster"] == "bm", "cf_obj"].values[0] - tpf_cf_ss["cf_obj"]
     )
@@ -91,11 +95,14 @@ def calculate_feature_importance(pf_set, colours_theme):
     plt.legend(title="Portfolio Type", loc="upper right")
     plt.xticks(rotation=45)
     plt.tight_layout()
-    plt.show()
+
+    if save_path:
+        plt.savefig(save_path)
+    else:
+        plt.show()
 
 
-# FI in IEF -------------------------
-def calculate_ief_summary(output_path, ef_ss, pf_set):
+def calculate_ief_summary(output_path, ef_ss, pf_set, save_path=None):
     """
     Calculate summary statistics for feature importance in IEF (Incremental Efficiency Frontier).
 
@@ -103,6 +110,7 @@ def calculate_ief_summary(output_path, ef_ss, pf_set):
         output_path (str): Path to the directory containing the pfml_cf_ief.csv file.
         ef_ss (pd.DataFrame): Summary statistics dataframe.
         pf_set (dict): Portfolio settings, including gamma_rel and wealth.
+        save_path (str): Path to save the plot (optional).
 
     Returns:
         pd.DataFrame: Summary statistics for IEF, including benchmarks.
@@ -118,11 +126,12 @@ def calculate_ief_summary(output_path, ef_ss, pf_set):
         pfml_cf_ief
         .groupby(["gamma_rel", "cluster"], as_index=False)
         .agg(
-            obj=lambda df: (df["r"].mean() - 0.5 * df["r"].var() * df["gamma_rel"].iloc[0] - df["tc"].mean()) * 12,
-            r_tc=lambda df: (df["r"] - df["tc"]).mean() * 12,
-            sd=lambda df: df["r"].std() * np.sqrt(12)
+            obj=('r', lambda x: (x.mean() - 0.5 * x.var() * x.name - x.mean()) * 12),  # Use x.name for gamma_rel
+            r_tc=('r', lambda x: (x.mean() - x["tc"].mean()) * 12),  # Adjusted to handle 'r' and 'tc'
+            sd=('r', lambda x: x.std() * np.sqrt(12))  # Standard deviation of 'r'
         )
     )
+
     ef_cf_ss["sr"] = ef_cf_ss["r_tc"] / ef_cf_ss["sd"]  # Calculate Sharpe Ratio
     ef_cf_ss.rename(columns={"cluster": "shuffled"}, inplace=True)
 
@@ -136,17 +145,40 @@ def calculate_ief_summary(output_path, ef_ss, pf_set):
     # Combine IEF statistics with benchmark
     ef_cf_ss = pd.concat([ef_cf_ss, benchmark_data], ignore_index=True)
 
+    # Plot the summary statistics
+    plt.figure(figsize=(12, 6))
+    sns.barplot(
+        data=ef_cf_ss,
+        x="shuffled",
+        y="obj",
+        hue="gamma_rel",
+        dodge=True,
+        palette=[colours_theme[0], colours_theme[1], colours_theme[4]]
+    )
+    plt.xlabel("")
+    plt.ylabel("Objective Function Value")
+    plt.title("IEF Summary Statistics by Theme")
+    plt.legend(title="Gamma Rel", loc="upper right")
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+
+    if save_path:
+        plt.savefig(save_path)  # Save the plot
+    else:
+        plt.show()  # Otherwise, show the plot
+
     return ef_cf_ss
 
 
 # With trading costs
-def plot_with_trading_costs(ef_cf_ss, colours_theme):
+def plot_with_trading_costs(ef_cf_ss, colours_theme, save_path=None):
     """
     Plot excess returns (net of trading cost) against volatility with trading costs.
 
     Parameters:
         ef_cf_ss (pd.DataFrame): Summary statistics for feature importance in IEF.
         colours_theme (list): List of colors for visualizations.
+        save_path (str): Path to save the plot (optional).
 
     Returns:
         None
@@ -221,17 +253,22 @@ def plot_with_trading_costs(ef_cf_ss, colours_theme):
 
     plt.title("Excess Returns vs Volatility with Trading Costs")
     plt.tight_layout()
-    plt.show()
+
+    if save_path:
+        plt.savefig(save_path)  # Save the plot
+    else:
+        plt.show()  # Otherwise, show the plot
 
 
 # Counterfactual EF without TC --------------------------
-def plot_counterfactual_ef_without_tc(output_path, colours_theme):
+def plot_counterfactual_ef_without_tc(output_path, colours_theme, save_path=None):
     """
     Plot counterfactual efficient frontier (EF) without trading costs.
 
     Parameters:
         output_path (str): Path where the tpf_cf_base.csv is stored.
         colours_theme (list): List of colors for visualizations.
+        save_path (str): Path to save the plot (optional).
 
     Returns:
         None
@@ -242,8 +279,12 @@ def plot_counterfactual_ef_without_tc(output_path, colours_theme):
     # Calculate Sharpe ratio for each cluster
     tpf_cf_ss = (
         tpf_cf_base.groupby("cluster", as_index=False)
-        .agg(sr=lambda df: df["r"].mean() / df["r"].std() * np.sqrt(12))
+        .agg(
+            sr=("r", lambda x: x.mean() / x.std() * np.sqrt(12))
+        )
     )
+
+
     tpf_cf_ss.loc[tpf_cf_ss["cluster"] == "bm", "cluster"] = "none"
 
     x_values = pd.DataFrame({"sd": np.arange(0, 0.36, 0.01)})
@@ -298,17 +339,23 @@ def plot_counterfactual_ef_without_tc(output_path, colours_theme):
     )
 
     plt.tight_layout()
-    plt.show()
+
+    if save_path:
+        plt.savefig(save_path)  # Save the plot
+    else:
+        plt.show()  # Otherwise, show the plot
+
 
 
 # Feature importance for return predictions models --------------------------------
-def plot_feature_importance_for_return_predictions(output_path, colours_theme):
+def plot_feature_importance_for_return_predictions(output_path, colours_theme, save_path=None):
     """
     Plot feature importance for return prediction models.
 
     Parameters:
         output_path (str): Path where the `ret_cf.csv` is stored.
         colours_theme (list): List of colors for visualizations.
+        save_path (str): Path to save the plot (optional).
 
     Returns:
         None
@@ -322,6 +369,7 @@ def plot_feature_importance_for_return_predictions(output_path, colours_theme):
         ret_cf.groupby(["h", "cluster"], as_index=False)
         .agg(mse=("mse", "mean"))
     )
+
 
     # Extract benchmark MSE and calculate feature importance
     bm = ret_cf_ss.loc[ret_cf_ss["cluster"] == "bm", ["h", "mse"]].rename(columns={"mse": "bm"})
@@ -358,7 +406,11 @@ def plot_feature_importance_for_return_predictions(output_path, colours_theme):
     plt.xticks(rotation=45, ha="right")
     plt.legend(title="Horizon", loc="best")
     plt.tight_layout()
-    plt.show()
+
+    if save_path:
+        plt.savefig(save_path)  # Save the plot
+    else:
+        plt.show()  # Otherwise, show the plot
 
     # Alternative view: Drop in MSE by cluster and horizon with facets
     ret_cf_ss["title"] = pd.Categorical(
@@ -390,14 +442,15 @@ def plot_feature_importance_for_return_predictions(output_path, colours_theme):
     plt.show()
 
 
-# Wierdly, ret_1_0 strongly predicts t+12? But note that it's with the opposite sign of t+1 (I know! It's the seasonality effect)
-def analyze_seasonality_effect(chars):
+# Seasonality effect
+def analyze_seasonality_effect(chars, save_path=None):
     """
     Analyze seasonality effects by correlating predictors with returns.
 
     Parameters:
         chars (pd.DataFrame): DataFrame containing 'id', 'eom', predictors ('pred_ld1' to 'pred_ld12'),
                               and other return metrics ('ret_1_0', 'ret_12_1', etc.).
+        save_path (str): Path to save the plot (optional).
 
     Returns:
         None
@@ -443,4 +496,9 @@ def analyze_seasonality_effect(chars):
     plt.title("Correlations of Predictors with Returns Across Horizons")
     plt.legend(title="Variable", loc="upper center", bbox_to_anchor=(0.5, 1.1), ncol=3, frameon=True)
     plt.tight_layout()
-    plt.show()
+
+    if save_path:
+        plt.savefig(save_path)  # Save the plot
+    else:
+        plt.show()  # Otherwise, show the plot
+
