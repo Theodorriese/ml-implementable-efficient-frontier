@@ -220,7 +220,8 @@ mkt = base_case["mkt"]
 
 # -------------------- 9) Implementable  Efficient Frontier --------------------
 print("Running initial IEF script...")
-run_ief(chars, dates_oos, pf_set, wealth, barra_cov, market_data, risk_free, settings, output_path)
+ef_all_ss, ef_ss = run_ief(chars, dates_oos, pf_set, wealth, barra_cov, market_data, risk_free, settings, latest_folder, output_path)
+
 
 # -------------------- 10) PORTFOLIO WEIGHTS ANALYSIS --------------------
 print("Analyzing portfolio weights...")
@@ -243,29 +244,29 @@ print("Calculating feature importance...")
 # Calculate and plot feature importance
 calculate_feature_importance(pf_set, colours_theme, latest_folder, save_path=f"{output_path}/feature_importance_demo.png")
 
-# -------------------- 13) IEF SUMMARY --------------------
-print("Calculating IEF summary...")
+# # -------------------- 13) IEF SUMMARY --------------------
+# print("Calculating IEF summary...")
 
-# Calculate summary statistics for IEF and save the plot
-ief_summary = calculate_ief_summary(output_path, ef_ss, pf_set, save_path=f"{output_path}/ief_summary.png")
+# # Calculate summary statistics for IEF and save the plot
+# ief_summary = calculate_ief_summary(latest_folder, ef_ss, pf_set, save_path=f"{output_path}/ief_summary.png")
 
-# -------------------- 14) PLOT WITH TRADING COSTS --------------------
-print("Plotting excess returns vs volatility with trading costs...")
+# # -------------------- 14) PLOT WITH TRADING COSTS --------------------
+# print("Plotting excess returns vs volatility with trading costs...")
 
-# Plot excess returns vs volatility and save the plot
-plot_with_trading_costs(ef_cf_ss, colours_theme, save_path=f"{output_path}/excess_returns_vs_volatility_with_tc.png")
+# # Plot excess returns vs volatility and save the plot
+# plot_with_trading_costs(ef_cf_ss, colours_theme, save_path=f"{output_path}/excess_returns_vs_volatility_with_tc.png")
 
 # -------------------- 15) COUNTERFACTUAL EF WITHOUT TRADING COSTS --------------------
 print("Plotting counterfactual efficient frontier without trading costs...")
 
 # Plot counterfactual efficient frontier without trading costs and save the plot
-plot_counterfactual_ef_without_tc(output_path, colours_theme, save_path=f"{output_path}/counterfactual_ef_without_tc.png")
+plot_counterfactual_ef_without_tc(latest_folder, colours_theme, save_path=f"{output_path}/counterfactual_ef_without_tc.png")
 
 # -------------------- 16) FEATURE IMPORTANCE FOR RETURN PREDICTION MODELS --------------------
 print("Plotting feature importance for return prediction models...")
 
 # Plot feature importance for return prediction models and save the plot
-plot_feature_importance_for_return_predictions(output_path, colours_theme, save_path=f"{output_path}/feature_importance_return_predictions.png")
+plot_feature_importance_for_return_predictions(latest_folder, colours_theme, save_path=f"{output_path}/feature_importance_return_predictions.png")
 
 # -------------------- 17) ANALYZE SEASONALITY EFFECT --------------------
 print("Analyzing seasonality effect...")

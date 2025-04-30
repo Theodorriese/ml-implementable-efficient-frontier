@@ -632,17 +632,17 @@ def mv_risky_fun(data, cov_list, wealth, dates, gam, u_vec):
     Mean-variance efficient portfolios of risky assets.
     """
     data_rel = data[(data['valid']) & (data['eom'].isin(dates))].copy()
-    data_rel = data_rel[['id', 'eom', 'me', 'tr_ld1', 'pred_ld1', 'lambda']].sort_values(by=['id', 'eom'])
+    data_rel = data_rel[['id', 'eom', 'me', 'tr_ld1', 'pred_ld1', 'ret_ld1', 'lambda']].sort_values(by=['id', 'eom'])
 
     data_split = {date: group for date, group in data_rel.groupby('eom')}
     mv_opt_all = []
 
-    for d in dates:
-        data_sub = data_split.get(d, pd.DataFrame())
+    for date in dates:
+        data_sub = data_split.get(date, pd.DataFrame())
         if data_sub.empty:
             continue
 
-        sigma_data = cov_list.get(d)
+        sigma_data = cov_list.get(date)
         if sigma_data is None or "fct_cov" not in sigma_data:
             continue
 
@@ -675,7 +675,7 @@ def mv_risky_fun(data, cov_list, wealth, dates, gam, u_vec):
 
             df_w = pd.DataFrame({
                 'id': common_ids,
-                'eom': pd.to_datetime(d),
+                'eom': date,
                 'u': u * 12,
                 'w': w
             })

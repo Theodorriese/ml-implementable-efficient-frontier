@@ -102,50 +102,59 @@ def calculate_feature_importance(pf_set, colours_theme, latest_folder, save_path
         plt.show()
 
 
+def calc_group_stats(group):
+    """
+    Helper function for calculate_ief_summary function.
+    """
+    gamma = group["gamma_rel"].iloc[0]
+    r = group["r"]
+    tc = group["tc"]
+    r_mean = r.mean()
+    r_var = r.var()
+    tc_mean = tc.mean()
+    r_net = r_mean - tc_mean
+    sd_annual = r.std() * np.sqrt(12)
+
+    return pd.Series({
+        "gamma_rel": gamma,
+        "obj": (r_mean - 0.5 * r_var * gamma - tc_mean) * 12,
+        "r_tc_annual": r_net * 12,
+        "sd_annual": sd_annual,
+        "sr_net": (r_net / r.std()) * np.sqrt(12) if r.std() != 0 else np.nan
+    })
+
+
+
 def calculate_ief_summary(output_path, ef_ss, pf_set, save_path=None):
     """
     Calculate summary statistics for feature importance in IEF (Incremental Efficiency Frontier).
-
-    Parameters:
-        output_path (str): Path to the directory containing the pfml_cf_ief.csv file.
-        ef_ss (pd.DataFrame): Summary statistics dataframe.
-        pf_set (dict): Portfolio settings, including gamma_rel and wealth.
-        save_path (str): Path to save the plot (optional).
-
-    Returns:
-        pd.DataFrame: Summary statistics for IEF, including benchmarks.
     """
-    # Define the file path for pfml_cf_ief.csv
     file_path = os.path.join(output_path, "pfml_cf_ief.csv")
-
-    # Read the data
     pfml_cf_ief = pd.read_csv(file_path)
 
-    # Calculate summary statistics for IEF clusters
+    # Compute per-cluster stats
     ef_cf_ss = (
         pfml_cf_ief
-        .groupby(["gamma_rel", "cluster"], as_index=False)
-        .agg(
-            obj=('r', lambda x: (x.mean() - 0.5 * x.var() * x.name - x.mean()) * 12),  # Use x.name for gamma_rel
-            r_tc=('r', lambda x: (x.mean() - x["tc"].mean()) * 12),  # Adjusted to handle 'r' and 'tc'
-            sd=('r', lambda x: x.std() * np.sqrt(12))  # Standard deviation of 'r'
-        )
+        .groupby("cluster")
+        .apply(calc_group_stats)
+        .reset_index()
+        .rename(columns={"cluster": "shuffled"})
     )
 
-    ef_cf_ss["sr"] = ef_cf_ss["r_tc"] / ef_cf_ss["sd"]  # Calculate Sharpe Ratio
-    ef_cf_ss.rename(columns={"cluster": "shuffled"}, inplace=True)
-
-    # Filter and add benchmark data from ef_ss
-    benchmark_data = ef_ss.loc[
-        ef_ss["wealth_end"] == pf_set["wealth"],
-        ["gamma_rel", "obj", "r_tc", "sd", "sr"]
-    ].copy()
+    # Append benchmark data
+    benchmark_data = ef_ss[["gamma_rel", "obj", "r_tc_annual", "sd_annual", "sr_net"]].copy()
     benchmark_data["shuffled"] = "none"
 
-    # Combine IEF statistics with benchmark
     ef_cf_ss = pd.concat([ef_cf_ss, benchmark_data], ignore_index=True)
 
-    # Plot the summary statistics
+    # Optional: sort x-axis so 'none' is last
+    ef_cf_ss['shuffled'] = pd.Categorical(
+        ef_cf_ss['shuffled'],
+        categories=sorted(ef_cf_ss['shuffled'].unique(), key=lambda x: (x != 'none', x)),
+        ordered=True
+    )
+
+    # Plot
     plt.figure(figsize=(12, 6))
     sns.barplot(
         data=ef_cf_ss,
@@ -153,7 +162,6 @@ def calculate_ief_summary(output_path, ef_ss, pf_set, save_path=None):
         y="obj",
         hue="gamma_rel",
         dodge=True,
-        palette=[colours_theme[0], colours_theme[1], colours_theme[4]]
     )
     plt.xlabel("")
     plt.ylabel("Objective Function Value")
@@ -163,11 +171,13 @@ def calculate_ief_summary(output_path, ef_ss, pf_set, save_path=None):
     plt.tight_layout()
 
     if save_path:
-        plt.savefig(save_path)  # Save the plot
+        plt.savefig(save_path)
+        print(f"Saved to {save_path}")
     else:
-        plt.show()  # Otherwise, show the plot
+        plt.show()
 
     return ef_cf_ss
+
 
 
 # With trading costs
@@ -266,15 +276,15 @@ def plot_counterfactual_ef_without_tc(output_path, colours_theme, save_path=None
     Plot counterfactual efficient frontier (EF) without trading costs.
 
     Parameters:
-        output_path (str): Path where the tpf_cf_base.csv is stored.
+        output_path (str): Path where the tpf_cf_base.pkl is stored.
         colours_theme (list): List of colors for visualizations.
         save_path (str): Path to save the plot (optional).
 
     Returns:
         None
     """
-    tpf_cf_base_path = os.path.join(output_path, "tpf_cf_base.csv")
-    tpf_cf_base = pd.read_csv(tpf_cf_base_path)
+    tpf_cf_base_path = os.path.join(output_path, "tpf_cf_base.pkl")
+    tpf_cf_base = pd.read_pickle(tpf_cf_base_path)
 
     # Calculate Sharpe ratio for each cluster
     tpf_cf_ss = (
