@@ -9,7 +9,7 @@ from g_base_analysis import (
     compute_and_plot_performance_time_series, compute_probability_of_outperformance,
     compute_and_plot_portfolio_statistics_over_time, compute_and_plot_correlation_matrix,
     plot_apple_vs_xerox, plot_optimal_hyperparameters, compute_ar1_plot,
-    process_features_with_sufficient_coverage
+    process_features_with_sufficient_coverage,
 )
 from g_economic_intuition import (
     combine_portfolio_weights,
@@ -28,6 +28,7 @@ from i1_Main import (settings, pf_set, features, pf_order, pf_order_new, main_ty
                      cluster_order, feat_excl)
 from g_implementable_efficient_frontier import run_ief
 
+from g_alpha_analysis import plot_alpha_decay_cumulative_continuous, plot_alpha_decay_rolling_tstat
 
 # # -------------------- CONFIGURATION (local) --------------------
 # data_path = r"C:\Master"
@@ -113,10 +114,16 @@ tpf = base_case["tpf"]
 factor_ml = base_case["factor_ml"]
 mkt = base_case["mkt"]
 
+# 0) Extra plots
+features=["market_equity", "prc", "dolvol_126d", "ami_126d"]
+plot_alpha_decay_cumulative_continuous(chars, features, output_path)
+plot_alpha_decay_rolling_tstat(chars, features, output_path)
+print("Done")
+
 # # Combine portfolios
 # pfs = combine_portfolios(pfml, static, bm_pfs, pf_order, gamma_rel)
 
-# # 2) Compute portfolio summary
+# # Compute portfolio summary
 # pf_summary, filtered_pfs = compute_portfolio_summary(pfs, main_types, pf_order_new, gamma_rel)
 # pf_summary.to_csv(os.path.join(output_path, "portfolio_summary.csv"), index=False)
 # print('Portfolio summary created')
@@ -274,3 +281,4 @@ print("Analyzing seasonality effect...")
 # Analyze seasonality effect and save the plot
 analyze_seasonality_effect(chars, save_path=f"{output_path}/seasonality_effect.png")
 
+print("Done.")
