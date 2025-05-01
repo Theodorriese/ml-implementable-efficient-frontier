@@ -28,7 +28,12 @@ from i1_Main import (settings, pf_set, features, pf_order, pf_order_new, main_ty
                      cluster_order, feat_excl)
 from g_implementable_efficient_frontier import run_ief
 
-from g_alpha_analysis import plot_alpha_decay_cumulative_continuous, plot_alpha_decay_rolling_tstat
+
+from g_alpha_analysis import (
+    plot_alpha_decay_cumulative_continuous,
+    plot_alpha_decay_rolling_tstat,
+    compute_signal_rank_stability
+)
 
 # # -------------------- CONFIGURATION (local) --------------------
 # data_path = r"C:\Master"
@@ -115,10 +120,15 @@ factor_ml = base_case["factor_ml"]
 mkt = base_case["mkt"]
 
 # 0) Extra plots
-features=["market_equity", "dolvol_126d", "ami_126d", "seas_1_1an"]
+features=["market_equity", "dolvol_126d", "ami_126d", "prc",
+         "rmax1_21d", "rmax5_21d", "beta_dimson_21d"]
+# features = features[:30]
+
 plot_alpha_decay_cumulative_continuous(chars, features, output_path)
 plot_alpha_decay_rolling_tstat(chars, features, output_path)
-print("Done")
+compute_signal_rank_stability(chars, features, output_path)
+
+print("Done with the alphas")
 
 # # Combine portfolios
 # pfs = combine_portfolios(pfml, static, bm_pfs, pf_order, gamma_rel)
