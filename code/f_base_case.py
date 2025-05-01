@@ -28,6 +28,7 @@ def benchmark_portfolios(chars, barra_cov, wealth, dates_oos, pf_set, settings, 
     # mkt = pd.read_pickle(os.path.join(base_path, "mkt.pkl"))
     # ew = pd.read_pickle(os.path.join(base_path, "ew.pkl"))
     # rw = pd.read_pickle(os.path.join(base_path, "rw.pkl"))
+    # mv = pd.read_pickle(os.path.join(base_path, "mv.pkl"))
 
     print("Generating Markowitz-ML Portfolio...")
     tpf = tpf_implement(chars, cov_list=barra_cov, wealth=wealth, dates=dates_oos, gam=pf_set["gamma_rel"])
