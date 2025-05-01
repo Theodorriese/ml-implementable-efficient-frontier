@@ -1,7 +1,11 @@
 import pandas as pd
+import os
+from joblib import Parallel, delayed
+from multiprocessing import cpu_count
+
 from a_portfolio_choice_functions import pfml_cf_fun
 from i1_Main import pf_set, features
-import os
+
 
 
 def load_pfml(output_path):
@@ -20,6 +24,9 @@ def load_pfml(output_path):
     return pd.read_pickle(file_path)
 
 
+from joblib import Parallel, delayed
+from multiprocessing import cpu_count
+
 def implement_pfml_cf_ief(chars, barra_cov, wealth, dates_oos, risk_free, settings, pf_set, lambda_list,
                           output_path, cluster_labels):
     """
@@ -28,15 +35,11 @@ def implement_pfml_cf_ief(chars, barra_cov, wealth, dates_oos, risk_free, settin
     print("Implementing Portfolio-ML - IEF...")
 
     pfml = load_pfml(output_path)
-
     ief_cf_clusters = ["quality", "value", "momentum", "short_term_reversal"]
     gamma_rel = pf_set["gamma_rel"]
 
-    pfml_cf_base = []
-
-    for cf_cluster in ief_cf_clusters:
+    def process_cluster(cf_cluster):
         print(f"Processing cluster: {cf_cluster}")
-
         cluster_result = pfml_cf_fun(
             data=chars[chars["valid"] == True],
             cf_cluster=cf_cluster,
@@ -55,15 +58,25 @@ def implement_pfml_cf_ief(chars, barra_cov, wealth, dates_oos, risk_free, settin
             features=features,
             cluster_labels=cluster_labels
         )
-
         cluster_result["gamma_rel"] = gamma_rel
-        pfml_cf_base.append(cluster_result)
+        return cluster_result
+
+    if settings.get("multi_process", False):
+        print("Using multiprocessing for IEF clusters...")
+        num_cores = max(1, int(cpu_count() * 0.75))
+        pfml_cf_base = Parallel(n_jobs=num_cores)(
+            delayed(process_cluster)(cf_cluster) for cf_cluster in ief_cf_clusters
+        )
+    else:
+        print("Using single-core processing for IEF clusters...")
+        pfml_cf_base = [process_cluster(cf_cluster) for cf_cluster in ief_cf_clusters]
 
     pfml_cf_ief_combined = pd.concat(pfml_cf_base, axis=0)
     pfml_cf_ief_combined.to_csv(os.path.join(output_path, "pfml_cf_ief.csv"), index=False)
     print(f"✅ Saved PFML-IEF results to {output_path}/pfml_cf_ief.csv")
 
     return pfml_cf_ief_combined
+
 
 
 def run_feature_importance_ief(chars, barra_cov, wealth, dates_oos, risk_free, settings, pf_set, lambda_list,

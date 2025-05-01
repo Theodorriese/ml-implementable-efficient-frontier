@@ -3,29 +3,21 @@ import pandas as pd
 import numpy as np
 import pickle
 from tqdm import tqdm
+from joblib import Parallel, delayed
+from multiprocessing import cpu_count
 from a_return_prediction_functions import rff
-
 
 def run_feature_importance_ret(chars, cluster_labels, features, settings, output_path, model_folder):
     """
-    Estimate counterfactual predictions for return prediction models.
-
-    Parameters:
-        chars (pd.DataFrame): Characteristics data.
-        cluster_labels (pd.DataFrame): Cluster definitions, with 'cluster' and 'characteristic' columns.
-        features (list): List of features used in prediction.
-        settings (dict): Settings dict with 'seed_no'.
-        output_path (str): Where to save output CSV.
-        model_folder (str): Folder with model_[h].pkl files.
+    Estimate counterfactual predictions for return prediction models (multiprocessed over horizons).
     """
-    results = []
-
-    for h in tqdm(range(1, 13), desc="Processing Horizons", unit="horizon"):
+    # Again
+    def process_horizon(h):
         model_path = os.path.join(model_folder, f'model_{h}.pkl')
 
         if not os.path.exists(model_path):
             print(f"Model file not found for horizon {h}: {model_path}")
-            continue
+            return None
 
         with open(model_path, 'rb') as file:
             model = pickle.load(file)
@@ -43,6 +35,7 @@ def run_feature_importance_ret(chars, cluster_labels, features, settings, output
         ret_cf_data = ret_cf_data.dropna(subset=['ret_pred'])
 
         clusters = sorted(cluster_labels['cluster'].unique())
+        summaries = []
 
         for cls in ['bm'] + clusters:
             np.random.seed(settings['seed_no'])
@@ -52,21 +45,16 @@ def run_feature_importance_ret(chars, cluster_labels, features, settings, output
             else:
                 cf = ret_cf_data.copy()
                 cf = cf.drop(columns=['pred'], errors='ignore')
-
                 cf['id_shuffle'] = cf.groupby('eom')['id'].transform(
                     lambda x: x.sample(frac=1, random_state=settings['seed_no']).values
                 )
-
-                cls_chars = (
-                    cluster_labels[
-                        (cluster_labels['cluster'] == cls) &
-                        (cluster_labels['characteristic'].isin(features))
-                    ]['characteristic'].tolist()
-                )
+                cls_chars = cluster_labels[
+                    (cluster_labels['cluster'] == cls) &
+                    (cluster_labels['characteristic'].isin(features))
+                ]['characteristic'].tolist()
 
                 cols = ['id', 'eom'] + cls_chars
                 chars_data = cf[cols].copy().rename(columns={'id': 'id_shuffle'})
-
                 cf = cf.drop(columns=cls_chars, errors='ignore')
                 cf = pd.merge(cf, chars_data, on=['id_shuffle', 'eom'], how='left')
 
@@ -91,7 +79,24 @@ def run_feature_importance_ret(chars, cluster_labels, features, settings, output
             ).reset_index()
             summary['h'] = h
             summary = summary.dropna(subset=['mse'])
-            results.append(summary)
+            summaries.append(summary)
+
+        return pd.concat(summaries, ignore_index=True)
+
+    # Run in parallel across horizons
+    print("Running Counterfactual Estimation...")
+    if settings.get("multi_process", False):
+        print("Using multiprocessing for horizons...")
+        num_cores = max(1, int(cpu_count() * 0.75))
+        results = Parallel(n_jobs=num_cores)(
+            delayed(process_horizon)(h) for h in tqdm(range(1, 13), desc="Processing Horizons", unit="horizon")
+        )
+    else:
+        print("Using single-core processing for horizons...")
+        results = [process_horizon(h) for h in tqdm(range(1, 13), desc="Processing Horizons", unit="horizon")]
+
+    # Filter out None (e.g., missing model files)
+    results = [res for res in results if res is not None]
 
     ret_cf = pd.concat(results, ignore_index=True)
     output_file = os.path.join(output_path, "ret_cf.csv")

@@ -1,5 +1,7 @@
 import pandas as pd
 from tqdm import tqdm
+from joblib import Parallel, delayed
+from multiprocessing import cpu_count
 from a_portfolio_choice_functions import tpf_cf_fun, pfml_cf_fun
 
 
@@ -46,10 +48,10 @@ def implement_portfolio_ml_base(chars, output_path, dates_oos, barra_cov, settin
     print("Implementing Portfolio-ML Base Case...")
     clusters = sorted(cluster_labels['cluster'].unique())
     cf_clusters = ["bm"] + clusters
-    pfml_cf_base = []
 
-    for cf_cluster in tqdm(cf_clusters, desc="Processing Clusters (Portfolio-ML)", unit="cluster"):
-        cluster_result = pfml_cf_fun(
+    # I know bad syntax with nested func but it works for now - can be rewritten later
+    def process_cluster(cf_cluster):
+        return pfml_cf_fun(
             data=chars[chars["valid"] == True],
             cf_cluster=cf_cluster,
             pfml_base=pfml,
@@ -68,7 +70,15 @@ def implement_portfolio_ml_base(chars, output_path, dates_oos, barra_cov, settin
             cluster_labels=cluster_labels
         )
 
-        pfml_cf_base.append(cluster_result)
+    if settings.get("multi_process", False):
+        print("Using multiprocessing across clusters...")
+        num_cores = max(1, int(cpu_count() * 0.75))
+        pfml_cf_base = Parallel(n_jobs=num_cores)(
+            delayed(process_cluster)(cf_cluster) for cf_cluster in cf_clusters
+        )
+    else:
+        print("Using single-core processing across clusters...")
+        pfml_cf_base = [process_cluster(cf_cluster) for cf_cluster in tqdm(cf_clusters, desc="Processing Clusters", unit="cluster")]
 
     pfml_cf_base_combined = pd.concat(pfml_cf_base, axis=0)
     pfml_cf_base_combined.to_pickle(f"{output_path}/pfml_cf_base.pkl")
@@ -81,18 +91,18 @@ def run_feature_importance_base(chars, er_models, cluster_labels, barra_cov, set
     Main function to execute implementations for Markowitz-ML and Portfolio-ML.
     """
     # Implement Markowitz-ML Base Case
-    print("Running Markowitz-ML Base Case...")
-    implement_markowitz_ml_base(
-        chars=chars,
-        er_models=er_models,
-        cluster_labels=cluster_labels,
-        dates_oos=dates_oos,
-        barra_cov=barra_cov,
-        settings=settings,
-        tpf_cf_wealth=tpf_cf_wealth,
-        features=features,
-        output_path=output_path,
-    )
+    # print("Running Markowitz-ML Base Case...")
+    # implement_markowitz_ml_base(
+    #     chars=chars,
+    #     er_models=er_models,
+    #     cluster_labels=cluster_labels,
+    #     dates_oos=dates_oos,
+    #     barra_cov=barra_cov,
+    #     settings=settings,
+    #     tpf_cf_wealth=tpf_cf_wealth,
+    #     features=features,
+    #     output_path=output_path,
+    # )
 
     # Implement Portfolio-ML Base Case
     print("Running Portfolio-ML Base Case...")

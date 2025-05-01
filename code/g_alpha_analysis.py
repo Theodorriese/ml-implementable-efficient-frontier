@@ -9,26 +9,22 @@ from sklearn.linear_model import LinearRegression
 
 def plot_alpha_decay_cumulative_continuous(chars, features, output_path):
     """
-    Plot cumulative alpha returns using cross-sectional regression (standardized inputs).
+    Plot cumulative alpha returns using cross-sectional regression (features already standardized).
 
-    Each month's alpha is the slope from regressing returns on the z-scored feature.
+    Each month's alpha is the slope from regressing returns on the standardized feature.
     """
     chars = chars.sort_values(by=["eom", "id"])
     alpha_df = []
 
     for feature in features:
-        # Standardize feature within month
-        chars["signal_std"] = chars.groupby("eom")[feature].transform(
-            lambda x: (x - x.mean()) / x.std(ddof=0) if x.std(ddof=0) > 0 else np.nan
-        )
-
-        # Run monthly regression: ret_ld1 ~ z(feature)
+        # Use already standardized feature directly
         monthly_alpha = []
         for date, group in chars.groupby("eom"):
-            if group["signal_std"].notna().sum() >= 10 and group["ret_ld1"].notna().sum() >= 10:
-                X = group[["signal_std"]].values
-                y = group["ret_ld1"].values
-                model = LinearRegression().fit(X, y)
+            x = group[[feature]].values
+            y = group["ret_ld1"].values
+            mask = np.isfinite(x).flatten() & np.isfinite(y)
+            if mask.sum() >= 10:
+                model = LinearRegression().fit(x[mask], y[mask])
                 alpha = model.coef_[0]
             else:
                 alpha = np.nan
@@ -56,11 +52,12 @@ def plot_alpha_decay_cumulative_continuous(chars, features, output_path):
     plt.savefig(save_path, dpi=300)
     plt.close()
 
-    # Optional summary table
+    # Summary table
     summary = alpha_matrix.mean().to_frame("mean_alpha")
     summary["std"] = alpha_matrix.std()
     summary["t_stat"] = summary["mean_alpha"] / summary["std"] * np.sqrt(alpha_matrix.notna().sum())
     return summary
+
 
 
 def plot_alpha_decay_rolling_tstat(chars, features, output_path, window=24):

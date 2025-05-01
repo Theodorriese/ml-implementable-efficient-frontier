@@ -115,7 +115,7 @@ factor_ml = base_case["factor_ml"]
 mkt = base_case["mkt"]
 
 # 0) Extra plots
-features=["market_equity", "prc", "dolvol_126d", "ami_126d"]
+features=["market_equity", "dolvol_126d", "ami_126d", "seas_1_1an"]
 plot_alpha_decay_cumulative_continuous(chars, features, output_path)
 plot_alpha_decay_rolling_tstat(chars, features, output_path)
 print("Done")
