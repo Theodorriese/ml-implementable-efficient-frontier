@@ -213,8 +213,8 @@ ar1_plot = compute_ar1_plot(
 ar1_plot.savefig(os.path.join(output_path, "ar1_plot.png"), bbox_inches="tight", dpi=300)
 
 
-# -------------------- 8) Coverage plot --------------------
-data, coverage = process_features_with_sufficient_coverage(features, feat_excl, settings, data_path)
+# # -------------------- 8) Coverage plot --------------------
+# data, coverage = process_features_with_sufficient_coverage(features, feat_excl, settings, data_path)
 
 
 # -------------------- 9) Implementable  Efficient Frontier --------------------
