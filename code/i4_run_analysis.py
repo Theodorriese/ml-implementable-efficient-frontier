@@ -28,7 +28,6 @@ from i1_Main import (settings, pf_set, features, pf_order, pf_order_new, main_ty
                      cluster_order, feat_excl)
 from g_implementable_efficient_frontier import run_ief
 
-
 from g_alpha_analysis import (
     plot_alpha_decay_cumulative_continuous,
     plot_alpha_decay_rolling_tstat,
