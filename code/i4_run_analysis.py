@@ -49,20 +49,6 @@ output_path = "/work/frontier_ml_europa/data/Analysis"
 latest_folder = "/work/frontier_ml_europa/data/Portfolios/demo"
 model_folder = "/work/frontier_ml_europa/Outputs"
 
-# # -------------------- CONFIGURATION (23Y outputs) --------------------
-# data_path = r"C:\Master"
-# base_path = r"C:\Master\Results_storage\23Y_US_Results_2000_2023_140425\Data\Portfolios"
-# output_path = r"C:\Master\Results_storage\23Y_US_Results_2000_2023_140425\Data\Analysis"
-# latest_folder = r"C:\Master\Results_storage\23Y_US_Results_2000_2023_140425\Data\Portfolios\demo"
-# model_folder = r"C:\Master\Results_storage\23Y_US_Results_2000_2023_140425\Data\Outputs"
-
-# # -------------------- CONFIGURATION (36Y outputs) --------------------
-# data_path = r"C:\Master"
-# base_path = r"C:\Master\Results_storage\36Y_US_Results_150425\Data\Portfolios"
-# output_path = r"C:\Master\Results_storage\36Y_US_Results_150425\Data\Analysis"
-# latest_folder = r"C:\Master\Results_storage\36Y_US_Results_150425\Data\Portfolios\demo"
-# model_folder = r"C:\Master\Results_storage\36Y_US_Results_150425\Data\Outputs"
-
 if not os.path.exists(output_path):
     os.makedirs(output_path)
 
@@ -99,11 +85,9 @@ risk_free = load_risk_free(data_path)
 wealth_path = os.path.join(data_path, "wealth_processed.pkl")
 wealth = pd.read_pickle(wealth_path)
 
-# Extract dates
+# Extract dates and configuration parameters
 dates_oos = dates_data["dates_oos"]
 dates_hp = dates_data["dates_hp"]
-
-# Configuration parameters
 gamma_rel = pf_set["gamma_rel"]
 colours_theme = ["blue", "green", "red", "orange", "purple", "brown"]
 
