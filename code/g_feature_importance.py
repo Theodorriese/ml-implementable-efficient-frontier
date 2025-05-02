@@ -3,6 +3,7 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 import os
+import matplotlib.ticker as mtick
 
 
 # FI in base case -----------------------------------------------
@@ -13,91 +14,81 @@ def calculate_feature_importance(pf_set, colours_theme, latest_folder, save_path
     Parameters:
         pf_set (dict): Portfolio settings, including gamma_rel.
         colours_theme (list): Theme colors for visualization.
-        latest_folder (str): Path to the latest folder containing 'tpf_cf_base.csv' and 'pfml_cf_base.csv'.
-        save_path (str): Path to save the plot (optional).
-
-    Returns:
-        None
+        latest_folder (str): Path to folder with 'tpf_cf_base.pkl' and 'pfml_cf_base.pkl'.
+        save_path (str): Optional path to save plots.
     """
-    # Load the .pkl files for TPF and Portfolio-ML base data from the latest folder
+
+    # Load base data
     tpf_cf_base = pd.read_pickle(os.path.join(latest_folder, "tpf_cf_base.pkl"))
     pfml_cf_base = pd.read_pickle(os.path.join(latest_folder, "pfml_cf_base.pkl"))
 
-
-    # Calculate feature importance for Portfolio-ML
-    pfml_cf_ss = (
-        pfml_cf_base
-        .groupby(["type", "cluster"], as_index=False)
-        .agg(
-            cf_obj=("r", lambda x: (x.mean() - 0.5 * x.var() * pf_set["gamma_rel"] - x.mean()) * 12)
-        )
+    # Portfolio-ML
+    pfml_cf_ss = pfml_cf_base.groupby(["type", "cluster"], as_index=False).agg(
+        cf_obj=("r", lambda x: (x.mean() - 0.5 * x.var() * pf_set["gamma_rel"] - x.mean()) * 12)
     )
-
-
-    pfml_cf_ss["fi"] = (
-        pfml_cf_ss.loc[pfml_cf_ss["cluster"] == "bm", "cf_obj"].values[0] - pfml_cf_ss["cf_obj"]
-    )
+    pfml_cf_ss["fi"] = pfml_cf_ss.loc[pfml_cf_ss["cluster"] == "bm", "cf_obj"].values[0] - pfml_cf_ss["cf_obj"]
     pfml_cf_ss["wealth"] = 1e10
     pfml_cf_ss = pfml_cf_ss[["type", "cluster", "fi", "wealth"]]
 
-    # Calculate feature importance for Tangency Portfolio
-    tpf_cf_ss = (
-        tpf_cf_base
-        .groupby(["type", "cluster"], as_index=False)
-        .agg(
-            cf_obj=('r', lambda x: (x.mean() - 0.5 * x.var() * pf_set["gamma_rel"] - x.mean()) * 12)
-        )
+    # Tangency Portfolio (Markowitz)
+    tpf_cf_ss = tpf_cf_base.groupby(["type", "cluster"], as_index=False).agg(
+        cf_obj=("r", lambda x: (x.mean() - 0.5 * x.var() * pf_set["gamma_rel"] - x.mean()) * 12)
     )
-
-    tpf_cf_ss["fi"] = (
-        tpf_cf_ss.loc[tpf_cf_ss["cluster"] == "bm", "cf_obj"].values[0] - tpf_cf_ss["cf_obj"]
-    )
+    tpf_cf_ss["fi"] = tpf_cf_ss.loc[tpf_cf_ss["cluster"] == "bm", "cf_obj"].values[0] - tpf_cf_ss["cf_obj"]
     tpf_cf_ss["wealth"] = 0
     tpf_cf_ss = tpf_cf_ss[["type", "cluster", "fi", "wealth"]]
 
-    # Combine Portfolio-ML and Tangency Portfolio data
+    # Combine
     feature_importance = pd.concat([pfml_cf_ss, tpf_cf_ss], ignore_index=True)
+    feature_importance = feature_importance[feature_importance["cluster"] != "bm"]
 
-    # Process feature importance
-    feature_importance = (
-        feature_importance
-        .loc[feature_importance["cluster"] != "bm"]
-        .assign(
-            sort_var=lambda df: df.groupby("cluster")["fi"].transform(
-                lambda x: x.sum() if df["type"].eq("Portfolio-ML").any() else 0
-            ),
-            cluster=lambda df: df["cluster"]
+    # Clean formatting
+    feature_importance = feature_importance.assign(
+        sort_var=lambda df: df.groupby("cluster")["fi"].transform(
+            lambda x: x.sum() if df["type"].eq("Portfolio-ML").any() else 0
+        ),
+        cluster=lambda df: df["cluster"]
             .str.replace("_", " ")
             .str.replace("short term", "short-term")
             .str.title(),
-            type=lambda df: pd.Categorical(
-                df["type"],
-                categories=["Portfolio-ML", "Multiperiod-ML*", "Markowitz-ML", "Expected 1m Return"],
-                ordered=True
-            )
+        type=lambda df: pd.Categorical(
+            df["type"],
+            categories=["Portfolio-ML", "Static-ML*", "Markowitz-ML"],
+            ordered=True
         )
     )
-    feature_importance = feature_importance.loc[feature_importance["type"] != "Expected 1m Return"]
 
-    # Plot feature importance
-    plt.figure(figsize=(12, 6))
-    sns.barplot(
-        data=feature_importance,
-        x="cluster",
-        y="fi",
-        hue="type",
-        dodge=True,
-        palette=[colours_theme[0], colours_theme[1], colours_theme[4]]
-    )
-    plt.xlabel("")
-    plt.ylabel("Drop in realized utility from permuting theme features")
-    plt.title("Feature Importance by Theme")
-    plt.legend(title="Portfolio Type", loc="upper right")
-    plt.xticks(rotation=45)
-    plt.tight_layout()
+    # Filter and rank
+    ml_data = feature_importance[feature_importance["type"] == "Portfolio-ML"].copy()
+    ml_data["type"] = ml_data["type"].cat.remove_unused_categories()
+    ml_data = ml_data.sort_values("fi")
+
+    marko_data = feature_importance[feature_importance["type"] == "Markowitz-ML"].copy()
+    marko_data["type"] = marko_data["type"].cat.remove_unused_categories()
+    marko_data = marko_data.set_index("cluster").reindex(ml_data["cluster"]).reset_index()
+
+    # Plot
+    fig, axes = plt.subplots(1, 2, figsize=(14, 7), sharey=True)
+
+    # Portfolio-ML plot
+    axes[0].barh(ml_data["cluster"], ml_data["fi"], color="royalblue")
+    axes[0].set_title("Portfolio–ML")
+    axes[0].set_xlabel("Drop in realized utility")
+    axes[0].invert_yaxis()
+    axes[0].ticklabel_format(style='plain', axis='x')
+
+    # Markowitz-ML plot
+    axes[1].barh(marko_data["cluster"], marko_data["fi"], color="purple")
+    axes[1].set_title("Markowitz–ML")
+    axes[1].set_xlabel("Drop in realized utility")
+    axes[1].ticklabel_format(style='plain', axis='x')
+
+    # Layout
+    fig.suptitle("Feature Importance by Theme", fontsize=16)
+    plt.tight_layout(rect=[0, 0, 1, 0.94])
 
     if save_path:
-        plt.savefig(save_path)
+        plt.savefig(save_path.replace(".png", "_ranked_fi.png"))
     else:
         plt.show()
 
@@ -122,7 +113,6 @@ def calc_group_stats(group):
         "sd_annual": sd_annual,
         "sr_net": (r_net / r.std()) * np.sqrt(12) if r.std() != 0 else np.nan
     })
-
 
 
 def calculate_ief_summary(output_path, ef_ss, pf_set, save_path=None):
@@ -294,7 +284,6 @@ def plot_counterfactual_ef_without_tc(output_path, colours_theme, save_path=None
         )
     )
 
-
     tpf_cf_ss.loc[tpf_cf_ss["cluster"] == "bm", "cluster"] = "none"
 
     x_values = pd.DataFrame({"sd": np.arange(0, 0.36, 0.01)})
@@ -335,7 +324,13 @@ def plot_counterfactual_ef_without_tc(output_path, colours_theme, save_path=None
     )
 
     plt.xlim(0, 0.25)
-    plt.ylim(0, 0.55)
+
+    # Dynamically set y-axis based on the data
+    y_min = cf_ef_markowitz["ret"].min()
+    y_max = cf_ef_markowitz["ret"].max()
+    y_margin = 0.05 * (y_max - y_min)
+    plt.ylim(y_min - y_margin, y_max + y_margin)
+
     plt.xlabel("Volatility")
     plt.ylabel("Excess returns")
     plt.title("Counterfactual Efficient Frontier Without Trading Costs")
@@ -351,10 +346,9 @@ def plot_counterfactual_ef_without_tc(output_path, colours_theme, save_path=None
     plt.tight_layout()
 
     if save_path:
-        plt.savefig(save_path)  # Save the plot
+        plt.savefig(save_path)
     else:
-        plt.show()  # Otherwise, show the plot
-
+        plt.show()
 
 
 # Feature importance for return predictions models --------------------------------
@@ -371,23 +365,20 @@ def plot_feature_importance_for_return_predictions(output_path, colours_theme, s
         None
     """
     ret_cf_path = os.path.join(output_path, "ret_cf.csv")
-
     ret_cf = pd.read_csv(ret_cf_path)
 
-    # Calculate MSE for each horizon and cluster
+    # Calculate mean MSE per horizon and cluster
     ret_cf_ss = (
         ret_cf.groupby(["h", "cluster"], as_index=False)
         .agg(mse=("mse", "mean"))
     )
 
-
-    # Extract benchmark MSE and calculate feature importance
-    bm = ret_cf_ss.loc[ret_cf_ss["cluster"] == "bm", ["h", "mse"]].rename(columns={"mse": "bm"})
-    ret_cf_ss = ret_cf_ss.loc[ret_cf_ss["cluster"] != "bm"]
-    ret_cf_ss = ret_cf_ss.merge(bm, on="h", how="left")
+    # Extract benchmark MSE and compute feature importance
+    bm = ret_cf_ss[ret_cf_ss["cluster"] == "bm"][["h", "mse"]].rename(columns={"mse": "bm"})
+    ret_cf_ss = ret_cf_ss[ret_cf_ss["cluster"] != "bm"].merge(bm, on="h", how="left")
     ret_cf_ss["fi"] = ret_cf_ss["mse"] - ret_cf_ss["bm"]
 
-    # Modify cluster names
+    # Format cluster names
     ret_cf_ss["cluster"] = (
         ret_cf_ss["cluster"]
         .str.replace("_", " ")
@@ -395,11 +386,18 @@ def plot_feature_importance_for_return_predictions(output_path, colours_theme, s
         .str.title()
     )
 
-    # Normalize feature importance by horizon and create sorting variable
+    # Normalize feature importance within each horizon
     ret_cf_ss["fi"] = ret_cf_ss.groupby("h")["fi"].transform(lambda x: x / x.max())
-    ret_cf_ss["sort_var"] = ret_cf_ss.groupby("cluster")["fi"].transform(lambda x: x[ret_cf_ss["h"] == 1].iloc[0])
 
-    # Plot feature importance by cluster and horizon
+    # Get sorting variable based on horizon == 1
+    sort_map = (
+        ret_cf_ss[ret_cf_ss["h"] == 1]
+        .set_index("cluster")["fi"]
+        .to_dict()
+    )
+    ret_cf_ss["sort_var"] = ret_cf_ss["cluster"].map(sort_map)
+
+    # Plot
     plt.figure(figsize=(12, 6))
     sns.barplot(
         data=ret_cf_ss,
@@ -414,42 +412,15 @@ def plot_feature_importance_for_return_predictions(output_path, colours_theme, s
     plt.ylabel("Drop in MSE from permuting theme features (% of max)")
     plt.title("Feature Importance for Return Prediction Models")
     plt.xticks(rotation=45, ha="right")
+    plt.gca().yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
     plt.legend(title="Horizon", loc="best")
     plt.tight_layout()
 
     if save_path:
-        plt.savefig(save_path)  # Save the plot
+        plt.savefig(save_path)
     else:
-        plt.show()  # Otherwise, show the plot
+        plt.show()
 
-    # Alternative view: Drop in MSE by cluster and horizon with facets
-    ret_cf_ss["title"] = pd.Categorical(
-        "Horizon: " + ret_cf_ss["h"].astype(str) + " month",
-        categories=["Horizon: " + str(i) + " month" for i in range(1, 13)],
-        ordered=True
-    )
-
-    plt.figure(figsize=(14, 8))
-    g = sns.FacetGrid(
-        ret_cf_ss,
-        col="title",
-        col_wrap=4,
-        sharex=False,
-        sharey=False,
-        height=4,
-        aspect=1.2
-    )
-    g.map_dataframe(
-        sns.barplot,
-        x="cluster",
-        y="fi",
-        color=colours_theme[0]
-    )
-    g.set_axis_labels("", "Drop in MSE from permuting theme features (% of max)")
-    g.set_titles("{col_name}")
-    g.set_xticklabels(rotation=45, horizontalalignment="right")
-    plt.tight_layout()
-    plt.show()
 
 
 # Seasonality effect

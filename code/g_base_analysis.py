@@ -2,6 +2,7 @@ import os
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 from matplotlib.ticker import ScalarFormatter
 import seaborn as sns
 from matplotlib.dates import DateFormatter
@@ -169,9 +170,9 @@ def compute_and_plot_performance_time_series(pfs, main_types, start_date, end_da
         'type': main_types * 3,
         'value': 0,
         'metric': (
-            ['cumret'] * len(main_types)
-            + ['cumret_tc'] * len(main_types)
-            + ['cumret_tc_risk'] * len(main_types)
+                ['cumret'] * len(main_types)
+                + ['cumret_tc'] * len(main_types)
+                + ['cumret_tc_risk'] * len(main_types)
         )
     })
     ts_data = pd.concat([ts_data, initial_values], ignore_index=True)
@@ -218,7 +219,6 @@ def compute_and_plot_performance_time_series(pfs, main_types, start_date, end_da
         # ax.set_xlim(pd.Timestamp(start_date), pd.Timestamp(end_date))
         pad_months = 12  # Have added 12 months for padding
         ax.set_xlim(pd.Timestamp(start_date) - pd.DateOffset(months=pad_months), pd.Timestamp(end_date))
-
 
         # Set manually specified y-axis limits
         if metric in ylims:
@@ -338,11 +338,16 @@ def compute_and_plot_portfolio_statistics_over_time(pfml, tpf, static, factor_ml
     """
 
     # Combine portfolio weights
-    pfml_weights = pfml["w"].copy(); pfml_weights["type"] = "Portfolio-ML"
-    tpf_weights = tpf["w"].copy(); tpf_weights["type"] = "Markowitz-ML"
+    pfml_weights = pfml["w"].copy();
+    pfml_weights["type"] = "Portfolio-ML"
+    tpf_weights = tpf["w"].copy();
+    tpf_weights["type"] = "Markowitz-ML"
     # mp_weights = mp["w"].copy(); mp_weights["type"] = "Multiperiod-ML*"
-    static_weights = static["w"].copy(); static_weights["type"] = "Static-ML*"; static_weights.drop(columns=["pred_ld1"], inplace=True)
-    factor_ml_weights = factor_ml["w"].copy(); factor_ml_weights["type"] = "Factor-ML"
+    static_weights = static["w"].copy();
+    static_weights["type"] = "Static-ML*";
+    static_weights.drop(columns=["pred_ld1"], inplace=True)
+    factor_ml_weights = factor_ml["w"].copy();
+    factor_ml_weights["type"] = "Factor-ML"
 
     combined_weights = pd.concat(
         [pfml_weights, tpf_weights, static_weights, factor_ml_weights],
@@ -544,7 +549,7 @@ def plot_apple_vs_xerox(pfml, static, tpf, factor_ml, mkt,
         plt.grid(True, which="both", linestyle="--", linewidth=0.5)
 
     plt.tight_layout()
-    fig = plt.gcf() # saves figure
+    fig = plt.gcf()  # saves figure
     plt.show()
 
     return fig
@@ -617,7 +622,7 @@ def process_portfolio_tuning_data(static, pfml, start_year):
         (static["rank"] == 1) &
         (static["eom_ret"].dt.year >= start_year) &
         (static["eom_ret"].dt.month == 12)
-    ][["eom_ret", "k", "g", "u"]].copy()
+        ][["eom_ret", "k", "g", "u"]].copy()
     static_hps["type"] = "Static-ML*"
     static_hps["horizon"] = "Static-ML"
     static_hps.rename(columns={"g": "eta"}, inplace=True)
@@ -640,20 +645,17 @@ def process_portfolio_tuning_data(static, pfml, start_year):
 def plot_hyperparameter_trends(data, colours_theme):
     """
     Plot the trends for hyperparameters over time in a 3x3 grid.
-
-    Parameters:
-        data (pd.DataFrame): Data containing hyperparameter trends.
-        colours_theme (list): List of colors for the plot.
-
-    Returns:
-        None
     """
+    import matplotlib.pyplot as plt
+    import matplotlib.dates as mdates
 
-    # Define the plot grid (3 rows x 3 columns)
+    # Ensure datetime type
+    data["eom_ret"] = pd.to_datetime(data["eom_ret"])
+
     fig, axes = plt.subplots(3, 3, figsize=(15, 12), sharex=True)
     fig.suptitle("Optimal Hyper-Parameters Over Time", fontsize=16, y=0.93)
 
-    # Create a dictionary to map each combination to a specific subplot
+    # Subplot mapping
     combination_mapping = {
         "Return t+1: log(lambda)": (0, 0),
         "Return t+1: p": (0, 1),
@@ -666,7 +668,6 @@ def plot_hyperparameter_trends(data, colours_theme):
         "Return t+12: eta": (2, 2)
     }
 
-    # Plot each combination in its respective subplot
     for comb_name, group in data.groupby("comb_name"):
         if comb_name not in combination_mapping:
             continue
@@ -674,23 +675,30 @@ def plot_hyperparameter_trends(data, colours_theme):
         row, col = combination_mapping[comb_name]
         ax = axes[row, col]
 
-        # Plot the scatter plot for this particular combination
-        ax.scatter(group["eom_ret"], group["value"], alpha=0.75, color=colours_theme[0])
+        if group["name"].iloc[0] == "log(lambda)":
+            zero_mask = group["value"] == "zero"
+            non_zero = group[~zero_mask].copy()
+            non_zero["value"] = non_zero["value"].astype(float)
 
-        # Set titles and labels
+            ax.scatter(non_zero["eom_ret"], non_zero["value"], alpha=0.75, color=colours_theme[0])
+            if zero_mask.any():
+                ax.scatter(group.loc[zero_mask, "eom_ret"], [-12] * zero_mask.sum(), marker='x', color='red')
+        else:
+            ax.scatter(group["eom_ret"], group["value"], alpha=0.75, color=colours_theme[0])
+
         ax.set_title(comb_name, fontsize=12)
         ax.grid(True, linestyle="--", linewidth=0.5)
 
+        # Format x-axis to show years only
+        ax.xaxis.set_major_locator(mdates.YearLocator())
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
+
         if col == 0:
             ax.set_ylabel("Optimal Hyper-Parameter")
-
         if row == 2:
             ax.set_xlabel("End of Month")
 
-    # Adjust the layout
     plt.tight_layout(rect=[0, 0, 1, 0.95])
-
-    # plt.subplots_adjust(top=0.93)
     fig_hyper = plt.gcf()
     plt.show()
     return fig_hyper
@@ -706,6 +714,12 @@ def plot_portfolio_tuning_results(data):
     Returns:
         Figure
     """
+    import matplotlib.pyplot as plt
+    import matplotlib.dates as mdates
+
+    # Ensure datetime formatting
+    data["eom_ret"] = pd.to_datetime(data["eom_ret"])
+
     fig, axes = plt.subplots(2, 3, figsize=(15, 8), sharex=True)
     fig.suptitle("Portfolio Tuning Results Over Time", fontsize=16, y=0.93)
 
@@ -726,6 +740,11 @@ def plot_portfolio_tuning_results(data):
         ax.scatter(group["eom_ret"], group["value"], alpha=0.75, color="steelblue")
         ax.set_title(comb_name, fontsize=12)
         ax.grid(True, linestyle="--", linewidth=0.5)
+
+        # Format x-axis to show years only
+        ax.xaxis.set_major_locator(mdates.YearLocator())
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
+
         if col == 0:
             ax.set_ylabel("Optimal Hyper-Parameter")
         if row == 1:
@@ -735,7 +754,6 @@ def plot_portfolio_tuning_results(data):
     fig_tuning = plt.gcf()
     plt.show()
     return fig_tuning
-
 
 
 def plot_optimal_hyperparameters(model_folder, static, pfml, colours_theme, start_year):
@@ -751,20 +769,25 @@ def plot_optimal_hyperparameters(model_folder, static, pfml, colours_theme, star
 
     # Combine hyperparameter data
     combined_data = pd.concat([data_1, data_6, data_12], ignore_index=True)
-    combined_data["log(lambda)"] = np.log(combined_data["lambda"])
     combined_data = combined_data.rename(columns={"g": "eta"})
 
+    # Handle log(lambda), avoiding -inf for lambda=0
+    combined_data["log_lambda"] = combined_data["lambda"].apply(lambda x: "zero" if x == 0 else np.log(x))
+
     # Reshape the DataFrame to a long format
-    melted_data = combined_data.melt(
+    melted_data = pd.melt(
+        combined_data,
         id_vars=["horizon", "eom_ret"],
-        value_vars=["log(lambda)", "p", "eta"],
+        value_vars=["log_lambda", "p", "eta"],
         var_name="name",
         value_name="value"
     )
 
+    # For labeling consistency
+    melted_data["name"] = melted_data["name"].replace({"log_lambda": "log(lambda)"})
     melted_data["comb_name"] = melted_data["horizon"] + ": " + melted_data["name"]
 
-    # Reorder 'comb_name' levels (Multiperiod-ML removed)
+    # Define order
     desired_order = [
         "Return t+1: log(lambda)", "Return t+1: p", "Return t+1: eta",
         "Return t+6: log(lambda)", "Return t+6: p", "Return t+6: eta",
@@ -772,6 +795,7 @@ def plot_optimal_hyperparameters(model_folder, static, pfml, colours_theme, star
     ]
     melted_data["comb_name"] = pd.Categorical(melted_data["comb_name"], categories=desired_order, ordered=True)
 
+    # Plotting
     fig_hyper = plot_hyperparameter_trends(melted_data, colours_theme)
     tuning_data = process_portfolio_tuning_data(static, pfml, start_year)
     fig_tuning = plot_portfolio_tuning_results(tuning_data)
@@ -812,7 +836,7 @@ def compute_ar1_plot(chars, features, cluster_labels, output_path):
             ~chars["var"].isin([0.5]) &
             chars["var"].notna() &
             chars["var_l1"].notna()
-        ].copy()
+            ].copy()
 
         # Group by ID and ensure at least 60 observations
         valid_subset["n"] = valid_subset.groupby("id")["id"].transform("size")
@@ -852,7 +876,7 @@ def compute_ar1_plot(chars, features, cluster_labels, output_path):
     unique_themes = ar1_df["pretty_name"].cat.categories
     palette = sns.color_palette("tab10", n_colors=len(unique_themes))
     theme_colors = dict(zip(unique_themes, palette))
-    
+
     # Plot AR1
     ax = sns.barplot(
         data=ar1_df,

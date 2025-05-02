@@ -9,11 +9,12 @@ from g_base_analysis import (
     compute_and_plot_performance_time_series, compute_probability_of_outperformance,
     compute_and_plot_portfolio_statistics_over_time, compute_and_plot_correlation_matrix,
     plot_apple_vs_xerox, plot_optimal_hyperparameters, compute_ar1_plot,
-    process_features_with_sufficient_coverage,
+    process_features_with_sufficient_coverage
 )
 from g_economic_intuition import (
     combine_portfolio_weights,
     calculate_and_plot_weight_differences,
+    calculate_and_plot_weight_differences_rel,
     portfolio_analysis
 )
 from g_feature_importance import (
@@ -102,16 +103,16 @@ tpf = base_case["tpf"]
 factor_ml = base_case["factor_ml"]
 mkt = base_case["mkt"]
 
-# 0) Extra plots
-features=["market_equity", "dolvol_126d", "ami_126d", "prc",
-         "rmax1_21d", "rmax5_21d", "beta_dimson_21d"]
-# features = features[:30]
+# # 0) Extra plots
+# features=["market_equity", "dolvol_126d", "ami_126d", "prc",
+#          "rmax1_21d", "rmax5_21d", "beta_dimson_21d"]
+# # features = features[:30]
 
-plot_alpha_decay_cumulative_continuous(chars, features, output_path)
-plot_alpha_decay_rolling_tstat(chars, features, output_path)
-compute_signal_rank_stability(chars, features, output_path)
+# plot_alpha_decay_cumulative_continuous(chars, features, output_path)
+# plot_alpha_decay_rolling_tstat(chars, features, output_path)
+# compute_signal_rank_stability(chars, features, output_path)
 
-print("Done with the alphas")
+# print("Done with the alphas")
 
 # Combine portfolios
 pfs = combine_portfolios(pfml, static, bm_pfs, pf_order, gamma_rel)
@@ -176,7 +177,7 @@ print("Generating plot...")
 
 liquid_id = 22111 # 22111 is Johnson and Johnson
 illiquid_id = 27983 # 27983 is Xerox
-start_year = 2010
+start_year_liquid = 2018
 
 apple_vs_xerox = plot_apple_vs_xerox(
     pfml=pfml,
@@ -187,7 +188,7 @@ apple_vs_xerox = plot_apple_vs_xerox(
     pfs=pfs,
     liquid_id=liquid_id,
     illiquid_id=illiquid_id,
-    start_year=start_year
+    start_year=start_year_liquid
 )
 apple_vs_xerox.savefig(os.path.join(output_path, "apple_vs_xerox.png"), bbox_inches="tight", dpi=300)
 
@@ -231,6 +232,14 @@ weights_combined = combine_portfolio_weights(static, pfml, mkt, tpf, chars, date
 # Calculate and plot weight differences
 calculate_and_plot_weight_differences(weights_combined, settings, save_path=f"{output_path}/weight_differences.png")
 
+# For Static vs Portfolio
+calculate_and_plot_weight_differences_rel(weights_combined, ["Portfolio-ML", "Markowitz-ML"],
+                                     settings, save_path=f"{output_path}/weight_differences._rel1.png")
+
+calculate_and_plot_weight_differences_rel(weights_combined, ["Portfolio-ML", "Static-ML*"],
+                                     settings, save_path=f"{output_path}/weight_differences_rel2.png")
+
+
 # -------------------- 11) Perform Portfolio Analysis --------------------
 print("Performing portfolio analysis...")
 
@@ -261,16 +270,16 @@ print("Plotting counterfactual efficient frontier without trading costs...")
 # Plot counterfactual efficient frontier without trading costs and save the plot
 plot_counterfactual_ef_without_tc(latest_folder, colours_theme, save_path=f"{output_path}/counterfactual_ef_without_tc.png")
 
-# -------------------- 16) FEATURE IMPORTANCE FOR RETURN PREDICTION MODELS --------------------
-print("Plotting feature importance for return prediction models...")
+# # -------------------- 16) FEATURE IMPORTANCE FOR RETURN PREDICTION MODELS --------------------
+# print("Plotting feature importance for return prediction models...")
 
-# Plot feature importance for return prediction models and save the plot
-plot_feature_importance_for_return_predictions(latest_folder, colours_theme, save_path=f"{output_path}/feature_importance_return_predictions.png")
+# # Plot feature importance for return prediction models and save the plot
+# plot_feature_importance_for_return_predictions(latest_folder, colours_theme, save_path=f"{output_path}/feature_importance_return_predictions.png")
 
-# -------------------- 17) ANALYZE SEASONALITY EFFECT --------------------
-print("Analyzing seasonality effect...")
+# # -------------------- 17) ANALYZE SEASONALITY EFFECT --------------------
+# print("Analyzing seasonality effect...")
 
-# Analyze seasonality effect and save the plot
-analyze_seasonality_effect(chars, save_path=f"{output_path}/seasonality_effect.png")
+# # Analyze seasonality effect and save the plot
+# analyze_seasonality_effect(chars, save_path=f"{output_path}/seasonality_effect.png")
 
-print("Done.")
+# print("Done.")

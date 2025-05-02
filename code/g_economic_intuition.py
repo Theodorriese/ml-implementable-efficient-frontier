@@ -3,11 +3,11 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 from scipy.stats import spearmanr
+from matplotlib.ticker import LogLocator, NullFormatter
 
 
-# How do weigths differ for PF-ML, Market, and Markowitz
-
-def combine_portfolio_weights(static, pfml, mkt, tpf, chars, date):
+# How do weigths differ
+def combine_portfolio_weights_OLD(static, pfml, mkt, tpf, chars, date):
     """
     Combine portfolio weights for Static-ML, Portfolio-ML, Market, and Markowitz-ML on a given date.
 
@@ -46,21 +46,53 @@ def combine_portfolio_weights(static, pfml, mkt, tpf, chars, date):
     return weights
 
 
+def combine_portfolio_weights(static, pfml, mkt, tpf, chars, date):
+    date = pd.to_datetime(date)
+
+    def extract_weights(source, label):
+        df = source["w"].loc[source["w"]["eom"] == date].copy()
+        df["type"] = label
+        return df
+
+    # Extract and label each portfolio type
+    static_df = extract_weights(static, "Static-ML*")
+    pfml_df = extract_weights(pfml, "Portfolio-ML")
+    mkt_df = extract_weights(mkt, "Market")
+    tpf_df = extract_weights(tpf, "Markowitz-ML")
+
+    # Ensure all have the same columns (take intersection or union as needed)
+    common_cols = list(set(static_df.columns) & set(pfml_df.columns) & set(mkt_df.columns) & set(tpf_df.columns))
+    weights = pd.concat([
+        static_df[common_cols],
+        pfml_df[common_cols],
+        mkt_df[common_cols],
+        tpf_df[common_cols]
+    ], ignore_index=True)
+
+    # Enrich with dolvol (merge cleanly)
+    weights["id"] = weights["id"].astype(str)
+    chars["id"] = chars["id"].astype(str)
+    weights = weights.merge(chars[["id", "eom", "dolvol"]], on=["id", "eom"], how="left")
+
+    # Filter only fully observed rows (optional)
+    weights["n"] = weights.groupby(["id", "eom"])["id"].transform("size")
+    weights = weights[weights["n"] == weights["n"].max()]
+
+    return weights
+
+
 def calculate_and_plot_weight_differences(weights, settings, save_path=None):
     """
-    Analyze and visualize weight differences across portfolio types.
+    Analyze and visualize weight differences across portfolio types with dollar volume context.
 
     Parameters:
         weights (pd.DataFrame): Combined weights dataframe.
         settings (dict): Settings dictionary containing `seed_no`.
         save_path (str): Path to save the plot (optional).
-
-    Returns:
-        None
     """
-    # Set random seed and sample 100 IDs
+    # Set random seed and sample IDs
     np.random.seed(settings["seed_no"])
-    sample_ids = np.random.choice(weights["id"].unique(), size=100, replace=False)
+    sample_ids = np.random.choice(weights["id"].unique(), size=70, replace=False)
 
     # Calculate Spearman correlation for each portfolio type
     cor_results = weights.groupby("type").apply(
@@ -68,47 +100,168 @@ def calculate_and_plot_weight_differences(weights, settings, save_path=None):
     )
     print(cor_results)
 
-    # Plot absolute weights vs. dollar volume rank for sampled IDs
-    subset = weights.loc[(weights["id"].isin(sample_ids)) & (weights["type"].isin(["Markowitz-ML", "Portfolio-ML"]))]
+    # Filter subset for barplot
+    subset = weights.loc[
+        (weights["id"].isin(sample_ids)) &
+        (weights["type"].isin(["Portfolio-ML", "Static-ML*"]))
+        ]
 
-    subset = subset.sort_values("dolvol", ascending=False)
-    plt.figure(figsize=(10, 6))
+    # Get average dolvol per ID and sort descending
+    avg_dolvol = (
+        subset.groupby("id")["dolvol"]
+        .mean()
+        .sort_values(ascending=False)
+    )
+
+    # Ensure consistent ID ordering
+    ordered_ids = avg_dolvol.index.astype(str).tolist()
+    subset["id"] = subset["id"].astype(str)
+    subset["id"] = pd.Categorical(subset["id"], categories=ordered_ids, ordered=True)
+
+    # Plot
+    fig, ax1 = plt.subplots(figsize=(14, 6))
+
     sns.barplot(
         data=subset,
         x="id",
         y="w",
         hue="type",
-        estimator=np.sum
+        estimator=np.sum,
+        ax=ax1
     )
-    plt.xticks(rotation=90)
-    plt.xlabel("ID")
-    plt.ylabel("Absolute Portfolio Weight")
-    plt.title("Portfolio Weights by Dollar Volume Rank")
-    plt.legend(title="Type")
-    plt.tight_layout()
 
+    ax1.set_xlabel("ID")
+    ax1.set_ylabel("Absolute Portfolio Weight")
+    ax1.set_title("Portfolio Weights by Dollar Volume Rank")
+    ax1.legend(title="Type")
+    ax1.tick_params(axis="x", rotation=90)
+    ax1.grid(False)
+
+    # Secondary axis for log-scaled dollar volume
+    ax2 = ax1.twinx()
+    ax2.set_yscale("log")
+    ax2.set_ylabel("Dollar Volume (Millions, log scale)")
+    ax2.plot(
+        range(len(avg_dolvol)),
+        avg_dolvol.values / 1e6,
+        "o",
+        color="gray",
+        markersize=4
+    )
+    ax2.yaxis.set_major_locator(LogLocator(base=10.0))
+    ax2.yaxis.set_minor_formatter(NullFormatter())
+    ax2.tick_params(axis="y", which="minor", length=0)
+
+    plt.tight_layout()
     if save_path:
         plt.savefig(save_path)
     else:
         plt.show()
 
-    # Add dollar volume rank and plot
+    # Add dollar volume rank and plot regression by type
     weights["dolvol_rank"] = weights.groupby("type")["dolvol"].rank()
-    sns.lmplot(
+
+    g = sns.lmplot(
         data=weights,
         x="dolvol_rank",
         y="w",
         hue="type",
         col="type",
-        col_wrap=3,
+        col_wrap=2,  # Change from 3 to 2 for 2x2 layout
         facet_kws={"sharey": False},
         scatter_kws={"s": 10},
         line_kws={"color": "red"}
     )
+    g.set_axis_labels("Dollar Volume Rank", "Portfolio Weight")
+    g.fig.tight_layout()
+
+    if save_path:
+        g.savefig(save_path.replace(".png", "_rank.png"))
+    else:
+        plt.show()
+
+
+def calculate_and_plot_weight_differences_rel(weights, types_to_compare, settings, save_path=None):
+    """
+    Analyze and visualize relative weight differences across specified portfolio types.
+
+    Parameters:
+        weights (pd.DataFrame): Combined weights dataframe.
+        types_to_compare (list): List of two portfolio types to compare (e.g. ["Portfolio-ML", "Markowitz-ML"]).
+        settings (dict): Settings dictionary containing 'seed_no'.
+        save_path (str): Optional path to save the figure.
+    """
+
+    # Randomly sample 70 IDs
+    np.random.seed(settings["seed_no"])
+    sample_ids = np.random.choice(weights["id"].unique(), size=70, replace=False)
+
+    # Filter subset for selected portfolio types and sampled IDs
+    subset = weights.loc[
+        (weights["id"].isin(sample_ids)) & (weights["type"].isin(types_to_compare))
+        ].copy()
+
+    # Calculate average dollar volume and order IDs by it
+    avg_dolvol = (
+        subset.groupby("id")["dolvol"]
+        .mean()
+        .sort_values(ascending=True)
+    )
+    ordered_ids = avg_dolvol.index.astype(str).tolist()
+    subset["id"] = subset["id"].astype(str)
+    subset["id"] = pd.Categorical(subset["id"], categories=ordered_ids, ordered=True)
+
+    # Normalize weights within each type to get relative weights
+    subset["w_rel"] = subset.groupby("type")["w"].transform(lambda x: x / x.abs().sum())
+
+    # Create bar plot
+    fig, ax1 = plt.subplots(figsize=(14, 6))
+
+    sns.barplot(
+        data=subset,
+        x="id",
+        y="w_rel",
+        hue="type",
+        hue_order=types_to_compare,  # Enforces legend and color order
+        estimator=np.sum,
+        ax=ax1
+    )
+
+    ax1.set_xlabel("ID")
+    ax1.set_ylabel("Relative Portfolio Weight")
+    ax1.set_title(f"Relative Portfolio Weights by Dollar Volume Rank: {types_to_compare[0]} vs {types_to_compare[1]}")
+    ax1.tick_params(axis="x", rotation=90)
+    ax1.grid(False)
+
+    ax1.legend(
+        title="Type",
+        loc="upper center",
+        bbox_to_anchor=(0.5, 0.98),
+        borderaxespad=0.0,
+        ncol=len(types_to_compare)
+    )
+
+    # Add secondary axis for dollar volume (log scale)
+    ax2 = ax1.twinx()
+    ax2.set_yscale("log")
+    ax2.set_ylabel("Dollar Volume (Millions, log scale)")
+    ax2.plot(
+        range(len(avg_dolvol)),
+        avg_dolvol.values / 1e6,
+        "o",
+        color="gray",
+        markersize=4
+    )
+
+    # Clean up ticks to only show major log labels
+    ax2.yaxis.set_major_locator(LogLocator(base=10.0))
+    ax2.yaxis.set_minor_formatter(NullFormatter())
+    ax2.tick_params(axis="y", which="minor", length=0)
+
     plt.tight_layout()
 
     if save_path:
-        plt.savefig(save_path.replace(".png", "_rank.png"))
+        plt.savefig(save_path)
     else:
         plt.show()
 
@@ -126,10 +279,8 @@ def portfolio_analysis(static, pfml, mkt, tpf, chars, colours_theme, save_path=N
         chars (pd.DataFrame): Characteristics data containing 'id', 'eom', and 'dolvol'.
         colours_theme (list): List of colors for visualizations.
         save_path (str): Path to save the plot (optional).
-
-    Returns:
-        None
     """
+
     # Combine weights from all portfolio types
     weights = pd.concat([
         static["w"].assign(type="Static-ML*"),
@@ -138,22 +289,29 @@ def portfolio_analysis(static, pfml, mkt, tpf, chars, colours_theme, save_path=N
         tpf["w"].assign(type="Markowitz-ML")
     ], ignore_index=True)
 
-    # Drop the existing 'dolvol' to make space for the new one getting merged
+    # Drop old 'dolvol' column if present
     weights.drop(columns=["dolvol"], inplace=True, errors="ignore")
 
-    # Merge with characteristics data to bring in the 'dolvol' from 'chars'
+    # Ensure 'id' is the same type before merging
+    weights["id"] = weights["id"].astype(str)
+    chars["id"] = chars["id"].astype(str)
+
+    # Merge in dollar volume info
     weights = weights.merge(chars[["id", "eom", "dolvol"]], on=["id", "eom"], how="left")
+
+    # Normalize weights within each portfolio (type + eom)
+    weights["w_rel"] = weights.groupby(["type", "eom"])["w"].transform(lambda x: x / x.abs().sum())
 
     # Filter for consistent observation counts
     weights["n"] = weights.groupby(["id", "eom"])["id"].transform("size")
     weights = weights[weights["n"] == weights["n"].max()]
 
-    # Create dollar volume portfolios
+    # Create dollar volume sorted portfolios (deciles)
     weights["dv_pf"] = weights.groupby(["type", "eom"])["dolvol"].rank(pct=True).apply(lambda x: np.ceil(x * 10))
 
-    # Average absolute weights by type, eom, and dv_pf
+    # Average relative weights by type, eom, and dv_pf
     avg_weights = (
-        weights.groupby(["type", "eom", "dv_pf"])["w"]
+        weights.groupby(["type", "eom", "dv_pf"])["w_rel"]
         .apply(lambda x: np.mean(np.abs(x)))
         .reset_index(name="w_abs")
     )
@@ -164,15 +322,15 @@ def portfolio_analysis(static, pfml, mkt, tpf, chars, colours_theme, save_path=N
         .reset_index()
     )
 
-    # Filter for relevant portfolio types
+    # Filter for selected portfolio types
     filtered_weights = avg_weights_by_pf[avg_weights_by_pf["type"].isin(["Markowitz-ML", "Portfolio-ML", "Market"])]
 
-    # Plot average absolute weights by dollar volume portfolios
+    # Plot average relative weights
     plt.figure(figsize=(12, 6))
     sns.barplot(data=filtered_weights, x="dv_pf", y="w_abs", hue="type", palette=colours_theme[:3])
     plt.xlabel("Dollar volume sorted portfolios (1=low)")
-    plt.ylabel("Average Absolute Weight")
-    plt.title("Average Absolute Weights by Dollar Volume Portfolios")
+    plt.ylabel("Average Relative Weight")
+    plt.title("Average Relative Weights by Dollar Volume Portfolios")
     plt.legend(title="Portfolio Type")
     plt.tight_layout()
 
@@ -181,36 +339,39 @@ def portfolio_analysis(static, pfml, mkt, tpf, chars, colours_theme, save_path=N
     else:
         plt.show()
 
-    # Add long/short classification
+    # Classify long vs short positions
     weights["long"] = np.where(weights["w"] >= 0, "Long positions", "Short positions")
 
-    # Calculate average weights for long and short positions
+    # Calculate average relative weights for long/short
     long_short_weights = (
-        weights.groupby(["type", "eom", "dv_pf", "long"])["w"]
+        weights.groupby(["type", "eom", "dv_pf", "long"])["w_rel"]
         .mean()
-        .reset_index(name="w_abs")
+        .reset_index(name="w_rel_avg")
     )
 
     avg_long_short_weights = (
-        long_short_weights.groupby(["type", "dv_pf", "long"])["w_abs"]
+        long_short_weights.groupby(["type", "dv_pf", "long"])["w_rel_avg"]
         .mean()
         .reset_index()
     )
 
-    # Filter for relevant portfolio types
-    filtered_long_short_weights = avg_long_short_weights[
-        avg_long_short_weights["type"].isin(["Markowitz-ML", "Portfolio-ML", "Market"])]
+    # List of portfolio types to plot separately
+    long_short_types = ["Markowitz-ML", "Portfolio-ML", "Static-ML*"]
 
-    # Plot long/short weights by dollar volume portfolios
-    plt.figure(figsize=(12, 6))
-    sns.barplot(data=filtered_long_short_weights, x="dv_pf", y="w_abs", hue="long", palette=colours_theme[:2])
-    plt.xlabel("Dollar volume sorted portfolios (1=low)")
-    plt.ylabel("Average Stock Weight")
-    plt.title("Long/Short Weights by Dollar Volume Portfolios")
-    plt.legend(title="")
-    plt.tight_layout()
+    for pf_type in long_short_types:
+        pf_data = avg_long_short_weights[avg_long_short_weights["type"] == pf_type]
 
-    if save_path:
-        plt.savefig(save_path.replace(".png", "_long_short.png"))
-    else:
-        plt.show()
+        plt.figure(figsize=(12, 6))
+        sns.barplot(data=pf_data, x="dv_pf", y="w_rel_avg", hue="long", palette=colours_theme[:2])
+        plt.xlabel("Dollar volume sorted portfolios (1=low)")
+        plt.ylabel("Average Relative Weight")
+        plt.title(f"Long/Short Relative Weights by Dollar Volume: {pf_type}")
+        plt.legend(title="")
+        plt.tight_layout()
+
+        if save_path:
+            file_tag = pf_type.lower().replace("-", "").replace("*", "").replace(" ", "_")
+            plt.savefig(save_path.replace(".png", f"_{file_tag}_long_short.png"))
+        else:
+            plt.show()
+
