@@ -878,7 +878,7 @@ def compute_ar1_plot(chars, features, cluster_labels, output_path):
 
 
 # Features with sufficient coverage ------------------
-def process_features_with_sufficient_coverage(features, feat_excl, settings):
+def process_features_with_sufficient_coverage(features, feat_excl, settings, data_path):
     """
     Processes the dataset by filtering and computing features with sufficient coverage.
 
@@ -901,9 +901,9 @@ def process_features_with_sufficient_coverage(features, feat_excl, settings):
 
     # Load the data
     data = pd.read_csv(
-        os.path.join(r"C:\Master\Raw_data_folders_usa_eu\full_us_data_1986_2023", "usa.csv"), # OBS manual folder
-        usecols=list(set(ids + features_all)),  # Load required columns
-        dtype={"eom": str, "sic": str}  # Define column data types
+        os.path.join(data_path, "usa.csv"),
+        usecols=list(set(ids + features_all)),
+        dtype={"eom": str, "sic": str}
     )
 
     # The rest of the code remains the same
