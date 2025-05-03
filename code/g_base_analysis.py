@@ -5,7 +5,8 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from matplotlib.ticker import ScalarFormatter
 import seaborn as sns
-from matplotlib.dates import DateFormatter
+from matplotlib.dates import YearLocator, DateFormatter
+from matplotlib.ticker import MaxNLocator
 from scipy.stats import norm
 from tqdm import tqdm
 import math
@@ -555,107 +556,76 @@ def plot_apple_vs_xerox(pfml, static, tpf, factor_ml, mkt,
     return fig
 
 
+
+
+
+
+
+
+
+
+
+
+
 # Optimal Hyper-parameters ----------------------------
 def load_model_hyperparameters(model_path, horizon_label):
-    """
-    Load and process hyperparameters for a given model.
-
-    Parameters:
-        model_path (str): Path to the model file.
-        horizon_label (str): Label indicating the prediction horizon.
-
-    Returns:
-        pd.DataFrame: Processed hyperparameter data.
-    """
     model = pd.read_pickle(model_path)
     processed_data = []
 
     for entry in model.values():
-        # Ensure the entry is valid
         if not isinstance(entry, dict) or "pred" not in entry or "opt_hps" not in entry:
             continue
 
-        # Extract prediction data and hyperparameters
         pred = entry["pred"].copy()
         opt_hps = entry["opt_hps"]
-
-        # Create eom_ret as the last day of the following month
         pred["eom_ret"] = pd.to_datetime(pred["eom"]) + pd.DateOffset(months=1)
         pred["eom_ret"] = pred["eom_ret"] + pd.offsets.MonthEnd(0)
-
-        # Extract unique `eom_ret` values
         unique_eom_ret = pred[["eom_ret"]].drop_duplicates().reset_index(drop=True)
-
-        # Add hyperparameters as columns to `unique_eom_ret`
         unique_eom_ret["lambda"] = opt_hps["lambda"]
         unique_eom_ret["p"] = opt_hps["p"]
         unique_eom_ret["g"] = opt_hps["g"]
-
-        # Add horizon label
         unique_eom_ret["horizon"] = horizon_label
-
-        # Append to the processed data list
         processed_data.append(unique_eom_ret)
 
-    # Combine all processed entries into one DataFrame
     return pd.concat(processed_data, ignore_index=True)
 
 
 def process_portfolio_tuning_data(static, pfml, start_year):
-    """
-    Process portfolio tuning data for Static-ML and Portfolio-ML.
-
-    Parameters:
-        static (pd.DataFrame): Tuning results for Static-ML.
-        pfml (pd.DataFrame): Tuning results for Portfolio-ML.
-        start_year (int): Starting year filter.
-
-    Returns:
-        pd.DataFrame: Combined and reshaped hyperparameter data.
-    """
-    required_columns_pfml = {"eom_ret", "l", "p", "g"}
-    if not required_columns_pfml.issubset(pfml.columns):
-        raise ValueError("pfml DataFrame is missing required columns.")
-
-    # ---- Static-ML ----
     static_hps = static[
         (static["rank"] == 1) &
         (static["eom_ret"].dt.year >= start_year) &
         (static["eom_ret"].dt.month == 12)
-        ][["eom_ret", "k", "g", "u"]].copy()
+    ][["eom_ret", "k", "g", "u"]].copy()
     static_hps["type"] = "Static-ML*"
-    static_hps["horizon"] = "Static-ML"
-    static_hps.rename(columns={"g": "eta"}, inplace=True)
+    static_hps = static_hps.rename(columns={"g": "v"})
+    static_hps["log(lambda)"] = static_hps["v"].apply(lambda x: "zero" if x == 0 else np.log(x))
+    static_hps = static_hps.drop(columns="v")
+    static_long = static_hps.melt(id_vars=["type", "eom_ret"], var_name="name", value_name="value")
 
-    # ---- Portfolio-ML ----
-    pfml_hps = pfml[pfml["eom_ret"].dt.year >= start_year][["eom_ret", "l", "p", "g"]].copy()
+    pfml_hps = pfml[pfml["eom_ret"].dt.year >= start_year].copy()
     pfml_hps["type"] = "Portfolio-ML"
-    pfml_hps["log(lambda)"] = np.log(pfml_hps["l"])
-    pfml_hps = pfml_hps.drop(columns="l")
-    pfml_hps.rename(columns={"g": "eta"}, inplace=True)
+    pfml_hps["log(lambda)"] = pfml_hps["l"].apply(lambda x: "zero" if x == 0 else np.log(x))
+    pfml_hps = pfml_hps.rename(columns={"g": "eta"})
+    pfml_hps = pfml_hps[["type", "eom_ret", "log(lambda)", "p", "eta"]]
+    pfml_long = pfml_hps.melt(id_vars=["type", "eom_ret"], var_name="name", value_name="value")
 
-    static_long = static_hps.melt(id_vars=["type", "eom_ret", "horizon"])
-    pfml_long = pfml_hps.melt(id_vars=["type", "eom_ret"])
-    combined_hps = pd.concat([static_long, pfml_long], ignore_index=True)
-    combined_hps["comb_name"] = combined_hps["type"] + ": " + combined_hps["variable"]
+    df = pd.concat([pfml_long, static_long], ignore_index=True)
+    df["comb_name"] = df["type"] + ": " + df["name"]
 
-    return combined_hps
+    facet_levels = (
+        [f"Portfolio-ML: {x}" for x in ["log(lambda)", "p", "eta"]] +
+        [f"Static-ML*: {x}" for x in ["k", "u", "log(lambda)"]]
+    )
+    df["comb_name"] = pd.Categorical(df["comb_name"], categories=facet_levels, ordered=True)
+    df = df.sort_values(by=["type", "eom_ret"])
+    return df
 
 
 def plot_hyperparameter_trends(data, colours_theme):
-    """
-    Plot the trends for hyperparameters over time in a 3x3 grid.
-    """
-    import matplotlib.pyplot as plt
-    import matplotlib.dates as mdates
-
-    # Ensure datetime type
     data["eom_ret"] = pd.to_datetime(data["eom_ret"])
-
     fig, axes = plt.subplots(3, 3, figsize=(15, 12), sharex=True)
     fig.suptitle("Optimal Hyper-Parameters Over Time", fontsize=16, y=0.93)
 
-    # Subplot mapping
     combination_mapping = {
         "Return t+1: log(lambda)": (0, 0),
         "Return t+1: p": (0, 1),
@@ -671,7 +641,6 @@ def plot_hyperparameter_trends(data, colours_theme):
     for comb_name, group in data.groupby("comb_name"):
         if comb_name not in combination_mapping:
             continue
-
         row, col = combination_mapping[comb_name]
         ax = axes[row, col]
 
@@ -679,7 +648,6 @@ def plot_hyperparameter_trends(data, colours_theme):
             zero_mask = group["value"] == "zero"
             non_zero = group[~zero_mask].copy()
             non_zero["value"] = non_zero["value"].astype(float)
-
             ax.scatter(non_zero["eom_ret"], non_zero["value"], alpha=0.75, color=colours_theme[0])
             if zero_mask.any():
                 ax.scatter(group.loc[zero_mask, "eom_ret"], [-12] * zero_mask.sum(), marker='x', color='red')
@@ -687,11 +655,8 @@ def plot_hyperparameter_trends(data, colours_theme):
             ax.scatter(group["eom_ret"], group["value"], alpha=0.75, color=colours_theme[0])
 
         ax.set_title(comb_name, fontsize=12)
-        ax.grid(True, linestyle="--", linewidth=0.5)
-
-        # Format x-axis to show years only
-        ax.xaxis.set_major_locator(mdates.YearLocator())
-        ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
+        ax.xaxis.set_major_locator(MaxNLocator(nbins=5, integer=True, prune='both'))
+        ax.xaxis.set_major_formatter(DateFormatter('%Y'))
 
         if col == 0:
             ax.set_ylabel("Optimal Hyper-Parameter")
@@ -705,21 +670,7 @@ def plot_hyperparameter_trends(data, colours_theme):
 
 
 def plot_portfolio_tuning_results(data):
-    """
-    Plot Static-ML and Portfolio-ML tuning results.
-
-    Parameters:
-        data (pd.DataFrame): Processed tuning data.
-
-    Returns:
-        Figure
-    """
-    import matplotlib.pyplot as plt
-    import matplotlib.dates as mdates
-
-    # Ensure datetime formatting
     data["eom_ret"] = pd.to_datetime(data["eom_ret"])
-
     fig, axes = plt.subplots(2, 3, figsize=(15, 8), sharex=True)
     fig.suptitle("Portfolio Tuning Results Over Time", fontsize=16, y=0.93)
 
@@ -728,8 +679,8 @@ def plot_portfolio_tuning_results(data):
         "Portfolio-ML: p": (0, 1),
         "Portfolio-ML: eta": (0, 2),
         "Static-ML*: k": (1, 0),
-        "Static-ML*: eta": (1, 1),
-        "Static-ML*: u": (1, 2)
+        "Static-ML*: u": (1, 1),
+        "Static-ML*: log(lambda)": (1, 2)
     }
 
     for comb_name, group in data.groupby("comb_name"):
@@ -737,13 +688,20 @@ def plot_portfolio_tuning_results(data):
             continue
         row, col = combination_mapping[comb_name]
         ax = axes[row, col]
-        ax.scatter(group["eom_ret"], group["value"], alpha=0.75, color="steelblue")
-        ax.set_title(comb_name, fontsize=12)
-        ax.grid(True, linestyle="--", linewidth=0.5)
 
-        # Format x-axis to show years only
-        ax.xaxis.set_major_locator(mdates.YearLocator())
-        ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
+        if group["name"].iloc[0] == "log(lambda)":
+            zero_mask = group["value"] == "zero"
+            non_zero = group[~zero_mask].copy()
+            non_zero["value"] = non_zero["value"].astype(float)
+            ax.scatter(non_zero["eom_ret"], non_zero["value"], alpha=0.75, color="steelblue")
+            if zero_mask.any():
+                ax.scatter(group.loc[zero_mask, "eom_ret"], [-12] * zero_mask.sum(), marker='x', color='red')
+        else:
+            ax.scatter(group["eom_ret"], group["value"], alpha=0.75, color="steelblue")
+
+        ax.set_title(comb_name, fontsize=12)
+        ax.xaxis.set_major_locator(MaxNLocator(nbins=5, integer=True, prune='both'))
+        ax.xaxis.set_major_formatter(DateFormatter('%Y'))
 
         if col == 0:
             ax.set_ylabel("Optimal Hyper-Parameter")
@@ -757,24 +715,14 @@ def plot_portfolio_tuning_results(data):
 
 
 def plot_optimal_hyperparameters(model_folder, static, pfml, colours_theme, start_year):
-    """
-    Main function to plot optimal hyperparameters and portfolio tuning results.
-    Returns:
-        Tuple: (figure for hyperparameter trends, figure for portfolio tuning)
-    """
-    # Load and process hyperparameters for each horizon
     data_1 = load_model_hyperparameters(f"{model_folder}/model_1.pkl", "Return t+1")
     data_6 = load_model_hyperparameters(f"{model_folder}/model_6.pkl", "Return t+6")
     data_12 = load_model_hyperparameters(f"{model_folder}/model_12.pkl", "Return t+12")
 
-    # Combine hyperparameter data
     combined_data = pd.concat([data_1, data_6, data_12], ignore_index=True)
     combined_data = combined_data.rename(columns={"g": "eta"})
-
-    # Handle log(lambda), avoiding -inf for lambda=0
     combined_data["log_lambda"] = combined_data["lambda"].apply(lambda x: "zero" if x == 0 else np.log(x))
 
-    # Reshape the DataFrame to a long format
     melted_data = pd.melt(
         combined_data,
         id_vars=["horizon", "eom_ret"],
@@ -783,11 +731,9 @@ def plot_optimal_hyperparameters(model_folder, static, pfml, colours_theme, star
         value_name="value"
     )
 
-    # For labeling consistency
     melted_data["name"] = melted_data["name"].replace({"log_lambda": "log(lambda)"})
     melted_data["comb_name"] = melted_data["horizon"] + ": " + melted_data["name"]
 
-    # Define order
     desired_order = [
         "Return t+1: log(lambda)", "Return t+1: p", "Return t+1: eta",
         "Return t+6: log(lambda)", "Return t+6: p", "Return t+6: eta",
@@ -795,12 +741,27 @@ def plot_optimal_hyperparameters(model_folder, static, pfml, colours_theme, star
     ]
     melted_data["comb_name"] = pd.Categorical(melted_data["comb_name"], categories=desired_order, ordered=True)
 
-    # Plotting
     fig_hyper = plot_hyperparameter_trends(melted_data, colours_theme)
     tuning_data = process_portfolio_tuning_data(static, pfml, start_year)
     fig_tuning = plot_portfolio_tuning_results(tuning_data)
 
     return fig_hyper, fig_tuning
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 # Plot AR ----------------------------

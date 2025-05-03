@@ -43,11 +43,11 @@ from g_alpha_analysis import (
 # model_folder = r"C:\Master\Outputs"
 
 # -------------------- CONFIGURATION --------------------
-data_path = "/work/frontier_ml_europa"
-base_path = "/work/frontier_ml_europa/data/Portfolios"
-output_path = "/work/frontier_ml_europa/data/Analysis"
-latest_folder = "/work/frontier_ml_europa/data/Portfolios/demo"
-model_folder = "/work/frontier_ml_europa/Outputs"
+data_path = "/work/frontier_ml_g10"
+base_path = "/work/frontier_ml_g10/data/Portfolios"
+output_path = "/work/frontier_ml_g10/data/Analysis"
+latest_folder = "/work/frontier_ml_g10/data/Portfolios/demo"
+model_folder = "/work/frontier_ml_g10/Outputs"
 
 if not os.path.exists(output_path):
     os.makedirs(output_path)
@@ -123,85 +123,87 @@ pf_summary.to_csv(os.path.join(output_path, "portfolio_summary.csv"), index=Fals
 print('Portfolio summary created')
 
 
-# -------------------- 1) PERFORMANCE TIME SERIES --------------------
-print("Computing and plotting performance time series...")
+# # -------------------- 1) PERFORMANCE TIME SERIES --------------------
+# print("Computing and plotting performance time series...")
 
-# Dynamically determine start_date and end_date based on pfs['eom_ret']
-start_date = pd.to_datetime(pfs['eom_ret'].min()).strftime('%Y-%m-%d')
-end_date = pd.to_datetime(pfs['eom_ret'].max()).strftime('%Y-%m-%d')
+# # Dynamically determine start_date and end_date based on pfs['eom_ret']
+# start_date = pd.to_datetime(pfs['eom_ret'].min()).strftime('%Y-%m-%d')
+# end_date = pd.to_datetime(pfs['eom_ret'].max()).strftime('%Y-%m-%d')
 
-# Now, plot the performance time series
-performance_fig = compute_and_plot_performance_time_series(
-        filtered_pfs,
-        main_types,
-        start_date,
-        end_date,
-        )
-performance_fig.savefig(os.path.join(output_path, "performance_time_series.png"), bbox_inches="tight", dpi=300)
-
-
-# -------------------- 2) PROBABILITY OF OUTPERFORMANCE --------------------
-print("Computing probability of outperformance...")
-
-prob_outperformance_df = compute_probability_of_outperformance(filtered_pfs, main_types)
-prob_outperformance_df.to_csv(os.path.join(output_path, "probability_of_outperformance.csv"), index=False)
-print("Probability of outperformance saved as csv")
+# # Now, plot the performance time series
+# performance_fig = compute_and_plot_performance_time_series(
+#         filtered_pfs,
+#         main_types,
+#         start_date,
+#         end_date,
+#         )
+# performance_fig.savefig(os.path.join(output_path, "performance_time_series.png"), bbox_inches="tight", dpi=300)
 
 
-# -------------------- 3) PORTFOLIO STATISTICS OVER TIME --------------------
-print("Computing portfolio statistics over time...")
+# # -------------------- 2) PROBABILITY OF OUTPERFORMANCE --------------------
+# print("Computing probability of outperformance...")
 
-portfolio_stats_timeseries = compute_and_plot_portfolio_statistics_over_time(
-    pfml=pfml,
-    tpf=tpf,
-    static=static,
-    factor_ml=factor_ml,
-    pfs=pfs,
-    barra_cov=barra_cov,
-    dates_oos=dates_oos,
-    pf_order=pf_order,
-    main_types=main_types,
-)
-portfolio_stats_timeseries.savefig(os.path.join(output_path, "portfolio_stats_time_series.png"), bbox_inches="tight", dpi=300)
+# prob_outperformance_df = compute_probability_of_outperformance(filtered_pfs, main_types)
+# prob_outperformance_df.to_csv(os.path.join(output_path, "probability_of_outperformance.csv"), index=False)
+# print("Probability of outperformance saved as csv")
 
 
-# -------------------- 4) CORRELATION MATRIX --------------------
-print("Computing and plotting correlation matrix...")
+# # -------------------- 3) PORTFOLIO STATISTICS OVER TIME --------------------
+# print("Computing portfolio statistics over time...")
 
-correlation_matrix = compute_and_plot_correlation_matrix(filtered_pfs, main_types)
-correlation_matrix.to_csv(os.path.join(output_path, "correlation_matrix.csv"))
+# portfolio_stats_timeseries = compute_and_plot_portfolio_statistics_over_time(
+#     pfml=pfml,
+#     tpf=tpf,
+#     static=static,
+#     factor_ml=factor_ml,
+#     pfs=pfs,
+#     barra_cov=barra_cov,
+#     dates_oos=dates_oos,
+#     pf_order=pf_order,
+#     main_types=main_types,
+# )
+# portfolio_stats_timeseries.savefig(os.path.join(output_path, "portfolio_stats_time_series.png"), bbox_inches="tight", dpi=300)
 
 
-# -------------------- 5) APPLE VS. XEROX PLOT --------------------
-print("Generating plot...")
+# # -------------------- 4) CORRELATION MATRIX --------------------
+# print("Computing and plotting correlation matrix...")
 
-liquid_id = 22111 # 22111 is Johnson and Johnson
-illiquid_id = 27983 # 27983 is Xerox
-start_year_liquid = 2018
+# correlation_matrix = compute_and_plot_correlation_matrix(filtered_pfs, main_types)
+# correlation_matrix.to_csv(os.path.join(output_path, "correlation_matrix.csv"))
 
-apple_vs_xerox = plot_apple_vs_xerox(
-    pfml=pfml,
-    static=static,
-    tpf=tpf,
-    factor_ml=factor_ml,
-    mkt=mkt,
-    pfs=pfs,
-    liquid_id=liquid_id,
-    illiquid_id=illiquid_id,
-    start_year=start_year_liquid
-)
-apple_vs_xerox.savefig(os.path.join(output_path, "apple_vs_xerox.png"), bbox_inches="tight", dpi=300)
 
-# -------------------- 6) Optimal Hyper-parameters Plot --------------------
-fig_hyper, fig_tuning = plot_optimal_hyperparameters(
-    model_folder=model_folder,
-    static=static["hps"],
-    pfml=pfml["best_hps"],
-    colours_theme=colours_theme,
-    start_year=start_year
-)
-fig_hyper.savefig(os.path.join(output_path, "optimal_hyperparameters.png"), bbox_inches="tight", dpi=300)
-fig_tuning.savefig(os.path.join(output_path, "portfolio_tuning_results.png"), bbox_inches="tight", dpi=300)
+# # -------------------- 5) APPLE VS. XEROX PLOT --------------------
+# print("Generating plot...")
+
+# liquid_id = 22111 # 22111 is Johnson and Johnson
+# illiquid_id = 27983 # 27983 is Xerox
+# start_year_liquid = 2000
+
+# apple_vs_xerox = plot_apple_vs_xerox(
+#     pfml=pfml,
+#     static=static,
+#     tpf=tpf,
+#     factor_ml=factor_ml,
+#     mkt=mkt,
+#     pfs=pfs,
+#     liquid_id=liquid_id,
+#     illiquid_id=illiquid_id,
+#     start_year=start_year_liquid
+# )
+# apple_vs_xerox.savefig(os.path.join(output_path, "apple_vs_xerox.png"), bbox_inches="tight", dpi=300)
+
+# # -------------------- 6) Optimal Hyper-parameters Plot --------------------
+# start_year = 1996
+
+# fig_hyper, fig_tuning = plot_optimal_hyperparameters(
+#     model_folder=model_folder,
+#     static=static["hps"],
+#     pfml=pfml["best_hps"],
+#     colours_theme=colours_theme,
+#     start_year=start_year
+# )
+# fig_hyper.savefig(os.path.join(output_path, "optimal_hyperparameters.png"), bbox_inches="tight", dpi=300)
+# fig_tuning.savefig(os.path.join(output_path, "portfolio_tuning_results.png"), bbox_inches="tight", dpi=300)
 
 
 # -------------------- 7) Autocorrelation plot --------------------
@@ -227,7 +229,7 @@ ef_all_ss, ef_ss = run_ief(chars, dates_oos, pf_set, wealth, barra_cov, market_d
 print("Analyzing portfolio weights...")
 
 # Combine portfolio weights
-weights_combined = combine_portfolio_weights(static, pfml, mkt, tpf, chars, date="2020-11-30")
+weights_combined = combine_portfolio_weights(static, pfml, mkt, tpf, chars, date="2024-11-30")
 
 # Calculate and plot weight differences
 calculate_and_plot_weight_differences(weights_combined, settings, save_path=f"{output_path}/weight_differences.png")
