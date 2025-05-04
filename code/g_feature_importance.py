@@ -6,84 +6,111 @@ import os
 import matplotlib.ticker as mtick
 
 
-# FI in base case -----------------------------------------------
-def calculate_feature_importance(pf_set, colours_theme, latest_folder, save_path=None):
+from matplotlib import rcParams
+rcParams.update({
+    'font.size': 14,           # Base font size
+    'axes.titlesize': 15,      # Axes title
+    'axes.labelsize': 14,      # Axes labels
+    'xtick.labelsize': 12,     # X tick labels
+    'ytick.labelsize': 12,     # Y tick labels
+    'legend.fontsize': 14,     # Legend text
+    'figure.titlesize': 18     # Figure title
+})
+colours_theme = ["steelblue", "darkorange", "gray"]
+
+
+def calculate_feature_importance(pf_set, latest_folder, save_path=None):
     """
-    Calculate and visualize feature importance based on drop in realized utility.
+    Calculate and visualize feature importance based on drop in realized utility
+    from permuting theme features for Portfolio-ML and Markowitz-ML.
 
     Parameters:
-        pf_set (dict): Portfolio settings, including gamma_rel.
+        pf_set (dict): Portfolio settings, including 'gamma_rel'.
         colours_theme (list): Theme colors for visualization.
         latest_folder (str): Path to folder with 'tpf_cf_base.pkl' and 'pfml_cf_base.pkl'.
-        save_path (str): Optional path to save plots.
+        save_path (str): Optional path to save the plot.
     """
-
-    # Load base data
+    # Load data
     tpf_cf_base = pd.read_pickle(os.path.join(latest_folder, "tpf_cf_base.pkl"))
     pfml_cf_base = pd.read_pickle(os.path.join(latest_folder, "pfml_cf_base.pkl"))
 
-    # Portfolio-ML
-    pfml_cf_ss = pfml_cf_base.groupby(["type", "cluster"], as_index=False).agg(
-        cf_obj=("r", lambda x: (x.mean() - 0.5 * x.var() * pf_set["gamma_rel"] - x.mean()) * 12)
+    # --- Compute cf_obj for Portfolio-ML (includes transaction cost) ---
+    pfml_cf_ss = (
+        pfml_cf_base
+        .groupby(["type", "cluster"], as_index=False)
+        .agg(r_mean=("r", "mean"), r_var=("r", "var"), tc_mean=("tc", "mean"))
     )
-    pfml_cf_ss["fi"] = pfml_cf_ss.loc[pfml_cf_ss["cluster"] == "bm", "cf_obj"].values[0] - pfml_cf_ss["cf_obj"]
+    pfml_cf_ss["cf_obj"] = (
+        pfml_cf_ss["r_mean"]
+        - 0.5 * pf_set["gamma_rel"] * pfml_cf_ss["r_var"]
+        - pfml_cf_ss["tc_mean"]
+    ) * 12
+
+    bm_cf = pfml_cf_ss.loc[pfml_cf_ss["cluster"] == "bm", "cf_obj"].values[0]
+    pfml_cf_ss["fi"] = bm_cf - pfml_cf_ss["cf_obj"]
     pfml_cf_ss["wealth"] = 1e10
     pfml_cf_ss = pfml_cf_ss[["type", "cluster", "fi", "wealth"]]
 
-    # Tangency Portfolio (Markowitz)
-    tpf_cf_ss = tpf_cf_base.groupby(["type", "cluster"], as_index=False).agg(
-        cf_obj=("r", lambda x: (x.mean() - 0.5 * x.var() * pf_set["gamma_rel"] - x.mean()) * 12)
+    # --- Compute cf_obj for Tangency Portfolio (Markowitz) ---
+    tpf_cf_ss = (
+        tpf_cf_base
+        .groupby(["type", "cluster"], as_index=False)
+        .agg(r_mean=("r", "mean"), r_var=("r", "var"), tc_mean=("tc", "mean"))
     )
-    tpf_cf_ss["fi"] = tpf_cf_ss.loc[tpf_cf_ss["cluster"] == "bm", "cf_obj"].values[0] - tpf_cf_ss["cf_obj"]
+    tpf_cf_ss["cf_obj"] = (
+        tpf_cf_ss["r_mean"]
+        - 0.5 * pf_set["gamma_rel"] * tpf_cf_ss["r_var"]
+        - 0  # <-- explicitly ignore transaction costs
+    ) * 12
+
+    bm_cf_tpf = tpf_cf_ss.loc[tpf_cf_ss["cluster"] == "bm", "cf_obj"].values[0]
+    tpf_cf_ss["fi"] = bm_cf_tpf - tpf_cf_ss["cf_obj"]
     tpf_cf_ss["wealth"] = 0
     tpf_cf_ss = tpf_cf_ss[["type", "cluster", "fi", "wealth"]]
 
-    # Combine
-    feature_importance = pd.concat([pfml_cf_ss, tpf_cf_ss], ignore_index=True)
-    feature_importance = feature_importance[feature_importance["cluster"] != "bm"]
+    # --- Combine and clean ---
+    df = pd.concat([pfml_cf_ss, tpf_cf_ss], ignore_index=True)
+    df = df[df["cluster"] != "bm"]
 
-    # Clean formatting
-    feature_importance = feature_importance.assign(
-        sort_var=lambda df: df.groupby("cluster")["fi"].transform(
-            lambda x: x.sum() if df["type"].eq("Portfolio-ML").any() else 0
-        ),
-        cluster=lambda df: df["cluster"]
-            .str.replace("_", " ")
-            .str.replace("short term", "short-term")
-            .str.title(),
-        type=lambda df: pd.Categorical(
-            df["type"],
-            categories=["Portfolio-ML", "Static-ML*", "Markowitz-ML"],
-            ordered=True
-        )
+    # Clean and format clusters
+    df["cluster"] = (
+        df["cluster"]
+        .str.replace("_", " ", regex=False)
+        .str.replace("short term", "short-term", regex=False)
+        .str.title()
     )
 
-    # Filter and rank
-    ml_data = feature_importance[feature_importance["type"] == "Portfolio-ML"].copy()
-    ml_data["type"] = ml_data["type"].cat.remove_unused_categories()
-    ml_data = ml_data.sort_values("fi")
+    # Set factor levels for portfolio types
+    df["type"] = pd.Categorical(
+        df["type"],
+        categories=["Portfolio-ML", "Multiperiod-ML*", "Markowitz-ML"],
+        ordered=True
+    )
 
-    marko_data = feature_importance[feature_importance["type"] == "Markowitz-ML"].copy()
-    marko_data["type"] = marko_data["type"].cat.remove_unused_categories()
-    marko_data = marko_data.set_index("cluster").reindex(ml_data["cluster"]).reset_index()
+    # --- Sort clusters by Portfolio-ML feature importance ---
+    sort_order = (
+        df[df["type"] == "Portfolio-ML"]
+        .set_index("cluster")["fi"]
+        .sort_values()
+    )
+    df["cluster"] = pd.Categorical(df["cluster"], categories=sort_order.index.tolist(), ordered=True)
 
-    # Plot
+    # --- Plot ---
     fig, axes = plt.subplots(1, 2, figsize=(14, 7), sharey=True)
 
     # Portfolio-ML plot
-    axes[0].barh(ml_data["cluster"], ml_data["fi"], color="royalblue")
-    axes[0].set_title("Portfolio–ML")
+    pfml_plot = df[df["type"] == "Portfolio-ML"]
+    axes[0].barh(pfml_plot["cluster"], pfml_plot["fi"], color=colours_theme[0])
+    axes[0].set_title("Portfolio-ML")
     axes[0].set_xlabel("Drop in realized utility")
     axes[0].invert_yaxis()
-    axes[0].ticklabel_format(style='plain', axis='x')
 
     # Markowitz-ML plot
-    axes[1].barh(marko_data["cluster"], marko_data["fi"], color="purple")
-    axes[1].set_title("Markowitz–ML")
+    marko_plot = df[df["type"] == "Markowitz-ML"]
+    axes[1].barh(marko_plot["cluster"], marko_plot["fi"], color=colours_theme[2])
+    axes[1].set_title("Markowitz-ML")
     axes[1].set_xlabel("Drop in realized utility")
-    axes[1].ticklabel_format(style='plain', axis='x')
 
-    # Layout
     fig.suptitle("Feature Importance by Theme", fontsize=16)
     plt.tight_layout(rect=[0, 0, 1, 0.94])
 
@@ -91,6 +118,7 @@ def calculate_feature_importance(pf_set, colours_theme, latest_folder, save_path
         plt.savefig(save_path.replace(".png", "_ranked_fi.png"))
     else:
         plt.show()
+
 
 
 def calc_group_stats(group):

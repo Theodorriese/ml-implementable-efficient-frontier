@@ -4,48 +4,22 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from scipy.stats import spearmanr
 from matplotlib.ticker import LogLocator, NullFormatter
+import os
+
+from matplotlib import rcParams
+rcParams.update({
+    'font.size': 14,           # Base font size
+    'axes.titlesize': 15,      # Axes title
+    'axes.labelsize': 14,      # Axes labels
+    'xtick.labelsize': 12,     # X tick labels
+    'ytick.labelsize': 12,     # Y tick labels
+    'legend.fontsize': 14,     # Legend text
+    'figure.titlesize': 18     # Figure title
+})
+colours_theme = ["steelblue", "darkorange", "gray"]
 
 
 # How do weigths differ
-def combine_portfolio_weights_OLD(static, pfml, mkt, tpf, chars, date):
-    """
-    Combine portfolio weights for Static-ML, Portfolio-ML, Market, and Markowitz-ML on a given date.
-
-    Parameters:
-        static (pd.DataFrame): Static-ML portfolio data containing weights.
-        pfml (pd.DataFrame): Portfolio-ML portfolio data containing weights.
-        mkt (pd.DataFrame): Market portfolio data containing weights.
-        tpf (pd.DataFrame): Tangency portfolio data containing weights.
-        chars (pd.DataFrame): Characteristics data containing 'id', 'eom', and 'dolvol'.
-        date (str): The target date for combining weights ('YYYY-MM-DD').
-
-    Returns:
-        pd.DataFrame: A combined DataFrame of portfolio weights and characteristics.
-    """
-    # Combine weights from all portfolio types
-    date = pd.to_datetime(date)
-    weights = pd.concat([
-        static["w"].loc[static["w"]["eom"] == date].assign(type="Static-ML*"),
-        pfml["w"].loc[pfml["w"]["eom"] == date].assign(type="Portfolio-ML"),
-        mkt["w"].loc[mkt["w"]["eom"] == date].assign(type="Market"),
-        tpf["w"].loc[tpf["w"]["eom"] == date].assign(type="Markowitz-ML")
-    ], ignore_index=True)
-
-    # Drop the existing 'dolvol' to make space for the new one getting merged
-    weights.drop(columns=["dolvol"], inplace=True, errors="ignore")
-
-    # Merge with characteristics data to bring in the 'dolvol' from 'chars'
-    weights["id"] = weights["id"].astype(str)
-    chars["id"] = chars["id"].astype(str)
-    weights = weights.merge(chars[["id", "eom", "dolvol"]], on=["id", "eom"], how="left")
-
-    # Filter for consistent observation counts
-    weights["n"] = weights.groupby(["id", "eom"])["id"].transform("size")
-    weights = weights[weights["n"] == weights["n"].max()]
-
-    return weights
-
-
 def combine_portfolio_weights(static, pfml, mkt, tpf, chars, date):
     date = pd.to_datetime(date)
 
@@ -181,25 +155,29 @@ def calculate_and_plot_weight_differences(weights, settings, save_path=None):
         plt.show()
 
 
-def calculate_and_plot_weight_differences_rel(weights, types_to_compare, settings, save_path=None):
+def calculate_and_plot_weight_differences_rel(weights, types_to_compare, settings, save_path=None, sample_ids=None):
     """
-    Analyze and visualize relative weight differences across specified portfolio types.
+    Analyze and visualize relative weight differences across specified portfolio types,
+    replacing IDs with numeric labels and exporting the ID map if saving.
 
     Parameters:
         weights (pd.DataFrame): Combined weights dataframe.
         types_to_compare (list): List of two portfolio types to compare (e.g. ["Portfolio-ML", "Markowitz-ML"]).
         settings (dict): Settings dictionary containing 'seed_no'.
-        save_path (str): Optional path to save the figure.
+        save_path (str): Optional path to save the figure (CSV is saved with the same base name).
+        sample_ids (list): Optional list of IDs to use instead of random sampling.
     """
+    import os
 
-    # Randomly sample 70 IDs
-    np.random.seed(settings["seed_no"])
-    sample_ids = np.random.choice(weights["id"].unique(), size=70, replace=False)
+    # Use provided IDs or sample new ones
+    if sample_ids is None:
+        np.random.seed(settings["seed_no"])
+        sample_ids = np.random.choice(weights["id"].unique(), size=70, replace=False)
 
-    # Filter subset for selected portfolio types and sampled IDs
+    # Filter subset
     subset = weights.loc[
         (weights["id"].isin(sample_ids)) & (weights["type"].isin(types_to_compare))
-        ].copy()
+    ].copy()
 
     # Calculate average dollar volume and order IDs by it
     avg_dolvol = (
@@ -207,27 +185,34 @@ def calculate_and_plot_weight_differences_rel(weights, types_to_compare, setting
         .mean()
         .sort_values(ascending=True)
     )
-    ordered_ids = avg_dolvol.index.astype(str).tolist()
-    subset["id"] = subset["id"].astype(str)
-    subset["id"] = pd.Categorical(subset["id"], categories=ordered_ids, ordered=True)
+    ordered_ids = avg_dolvol.index.tolist()
 
-    # Normalize weights within each type to get relative weights
+    # Create numeric labels
+    id_mapping = pd.DataFrame({
+        "stock_number": range(1, len(ordered_ids) + 1),
+        "id": ordered_ids
+    })
+    id_dict = dict(zip(ordered_ids, id_mapping["stock_number"]))
+
+    # Apply numeric labels
+    subset["stock_number"] = subset["id"].map(id_dict)
+
+    # Normalize weights within each type
     subset["w_rel"] = subset.groupby("type")["w"].transform(lambda x: x / x.abs().sum())
 
-    # Create bar plot
+    # Create plot
     fig, ax1 = plt.subplots(figsize=(14, 6))
-
     sns.barplot(
         data=subset,
-        x="id",
+        x="stock_number",
         y="w_rel",
         hue="type",
-        hue_order=types_to_compare,  # Enforces legend and color order
+        hue_order=types_to_compare,
         estimator=np.sum,
         ax=ax1
     )
 
-    ax1.set_xlabel("ID")
+    ax1.set_xlabel("Stock")
     ax1.set_ylabel("Relative Portfolio Weight")
     ax1.set_title(f"Relative Portfolio Weights by Dollar Volume Rank: {types_to_compare[0]} vs {types_to_compare[1]}")
     ax1.tick_params(axis="x", rotation=90)
@@ -241,19 +226,18 @@ def calculate_and_plot_weight_differences_rel(weights, types_to_compare, setting
         ncol=len(types_to_compare)
     )
 
-    # Add secondary axis for dollar volume (log scale)
+    # Add secondary y-axis for dollar volume
     ax2 = ax1.twinx()
     ax2.set_yscale("log")
     ax2.set_ylabel("Dollar Volume (Millions, log scale)")
     ax2.plot(
-        range(len(avg_dolvol)),
-        avg_dolvol.values / 1e6,
+        subset.drop_duplicates("stock_number").sort_values("stock_number")["stock_number"],
+        avg_dolvol.loc[ordered_ids].values / 1e6,
         "o",
         color="gray",
         markersize=4
     )
 
-    # Clean up ticks to only show major log labels
     ax2.yaxis.set_major_locator(LogLocator(base=10.0))
     ax2.yaxis.set_minor_formatter(NullFormatter())
     ax2.tick_params(axis="y", which="minor", length=0)
@@ -262,8 +246,11 @@ def calculate_and_plot_weight_differences_rel(weights, types_to_compare, setting
 
     if save_path:
         plt.savefig(save_path)
+        base, _ = os.path.splitext(save_path)
+        id_mapping.to_csv(base + "_id_map.csv", index=False)
     else:
         plt.show()
+
 
 
 # Portfolio analysis ---------------------------------------------

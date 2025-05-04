@@ -17,9 +17,9 @@ config_params = {
     "gamma_rel": pf_set["gamma_rel"],
     "industry_cov": settings["cov_set"]["industries"],
     "update_base": False,
-    "update_fi_base": False,
+    "update_fi_base": True,
     "update_fi_ief": False,
-    "update_fi_ret": True,
+    "update_fi_ret": False,
 }
 
 # Print config for verification
@@ -196,25 +196,24 @@ dates_m1, dates_m2, dates_oos, dates_hp, hp_years = (
 print("Loaded portfolio data from latest folder.")
 
 # -------------------------- Step 4: Run Base Case ------------------------------
-if config_params["update_base"]:
-    print("Running Base Case...")
+# if config_params["update_base"]:
+#     print("Running Base Case...")
 
-    run_f_base_case(
-        chars=portfolio_data["chars"],
-        barra_cov=barra_cov,
-        wealth=wealth,
-        dates_oos=dates_oos,
-        pf_set=pf_set,
-        settings=settings,
-        config_params=config_params,
-        lambda_list=portfolio_data["lambda_list"],
-        risk_free=risk_free,
-        features=features,
-        dates_m2=dates_m2,
-        dates_hp=dates_hp,
-        hp_years=hp_years,
-        output_path=output_path
-    )
+#     run_f_base_case(
+#         chars=portfolio_data["chars"],
+#         barra_cov=barra_cov,
+#         wealth=wealth,
+#         dates_oos=dates_oos,
+#         pf_set=pf_set,
+#         settings=settings,
+#         lambda_list=portfolio_data["lambda_list"],
+#         risk_free=risk_free,
+#         features=features,
+#         dates_m2=dates_m2,
+#         dates_hp=dates_hp,
+#         hp_years=hp_years,
+#         output_path=output_path
+#     )
 
 
 # ----------------- Step 5: Run the feature importance scripts -----------------
@@ -229,7 +228,7 @@ if config_params.get('update_fi_base', True):
         barra_cov=barra_cov,
         settings=settings,
         pf_set=pf_set,
-        tpf_cf_wealth=wealth,
+        tpf_cf_wealth=0,
         wealth=wealth,
         risk_free=risk_free,
         lambda_list=portfolio_data['lambda_list'],
@@ -256,9 +255,8 @@ if config_params.get('update_fi_ief', True):
         cluster_labels=cluster_labels
     )
 
-
 # ---------------- Feature importance - Expected return models ---------------- #
-if config_params.get('update_fi_ret', True):
+if config_params.get('update_cf', True):
     print("Running Counterfactual Estimation...")
 
     run_feature_importance_ret(
@@ -269,6 +267,7 @@ if config_params.get('update_fi_ret', True):
         output_path=output_path,
         model_folder=get_from_path_model
     )
+
 
 # -------------------- Finalization --------------------
 print(f"Portfolio construction script completed")

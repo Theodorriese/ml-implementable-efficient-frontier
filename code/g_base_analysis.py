@@ -12,6 +12,17 @@ from tqdm import tqdm
 import math
 from a_general_functions import create_cov
 
+from matplotlib import rcParams
+rcParams.update({
+    'font.size': 14,           # Base font size
+    'axes.titlesize': 15,      # Axes title
+    'axes.labelsize': 14,      # Axes labels
+    'xtick.labelsize': 12,     # X tick labels
+    'ytick.labelsize': 12,     # Y tick labels
+    'legend.fontsize': 14,     # Legend text
+    'figure.titlesize': 18     # Figure title
+})
+colours_theme = ["steelblue", "darkorange", "gray"]
 
 # Load base case portfolios -----------
 def load_base_case_portfolios(base_path):
@@ -556,17 +567,6 @@ def plot_apple_vs_xerox(pfml, static, tpf, factor_ml, mkt,
     return fig
 
 
-
-
-
-
-
-
-
-
-
-
-
 # Optimal Hyper-parameters ----------------------------
 def load_model_hyperparameters(model_path, horizon_label):
     model = pd.read_pickle(model_path)
@@ -598,9 +598,8 @@ def process_portfolio_tuning_data(static, pfml, start_year):
     ][["eom_ret", "k", "g", "u"]].copy()
     static_hps["type"] = "Static-ML*"
     static_hps = static_hps.rename(columns={"g": "v"})
-    static_hps["log(lambda)"] = static_hps["v"].apply(lambda x: "zero" if x == 0 else np.log(x))
-    static_hps = static_hps.drop(columns="v")
     static_long = static_hps.melt(id_vars=["type", "eom_ret"], var_name="name", value_name="value")
+
 
     pfml_hps = pfml[pfml["eom_ret"].dt.year >= start_year].copy()
     pfml_hps["type"] = "Portfolio-ML"
@@ -614,8 +613,9 @@ def process_portfolio_tuning_data(static, pfml, start_year):
 
     facet_levels = (
         [f"Portfolio-ML: {x}" for x in ["log(lambda)", "p", "eta"]] +
-        [f"Static-ML*: {x}" for x in ["k", "u", "log(lambda)"]]
+        [f"Static-ML*: {x}" for x in ["k", "u", "v"]]
     )
+
     df["comb_name"] = pd.Categorical(df["comb_name"], categories=facet_levels, ordered=True)
     df = df.sort_values(by=["type", "eom_ret"])
     return df
@@ -650,7 +650,7 @@ def plot_hyperparameter_trends(data, colours_theme):
             non_zero["value"] = non_zero["value"].astype(float)
             ax.scatter(non_zero["eom_ret"], non_zero["value"], alpha=0.75, color=colours_theme[0])
             if zero_mask.any():
-                ax.scatter(group.loc[zero_mask, "eom_ret"], [-12] * zero_mask.sum(), marker='x', color='red')
+                ax.scatter(group.loc[zero_mask, "eom_ret"], [0] * zero_mask.sum(), marker='x', color='red')
         else:
             ax.scatter(group["eom_ret"], group["value"], alpha=0.75, color=colours_theme[0])
 
@@ -658,10 +658,8 @@ def plot_hyperparameter_trends(data, colours_theme):
         ax.xaxis.set_major_locator(MaxNLocator(nbins=5, integer=True, prune='both'))
         ax.xaxis.set_major_formatter(DateFormatter('%Y'))
 
-        if col == 0:
-            ax.set_ylabel("Optimal Hyper-Parameter")
-        if row == 2:
-            ax.set_xlabel("End of Month")
+    fig.supxlabel("End of Month", fontsize=14)
+    fig.supylabel("Optimal Hyper-Parameter", fontsize=14)
 
     plt.tight_layout(rect=[0, 0, 1, 0.95])
     fig_hyper = plt.gcf()
@@ -680,7 +678,7 @@ def plot_portfolio_tuning_results(data):
         "Portfolio-ML: eta": (0, 2),
         "Static-ML*: k": (1, 0),
         "Static-ML*: u": (1, 1),
-        "Static-ML*: log(lambda)": (1, 2)
+        "Static-ML*: v": (1, 2)
     }
 
     for comb_name, group in data.groupby("comb_name"):
@@ -689,13 +687,13 @@ def plot_portfolio_tuning_results(data):
         row, col = combination_mapping[comb_name]
         ax = axes[row, col]
 
-        if group["name"].iloc[0] == "log(lambda)":
+        if comb_name == "Portfolio-ML: log(lambda)":
             zero_mask = group["value"] == "zero"
             non_zero = group[~zero_mask].copy()
             non_zero["value"] = non_zero["value"].astype(float)
             ax.scatter(non_zero["eom_ret"], non_zero["value"], alpha=0.75, color="steelblue")
             if zero_mask.any():
-                ax.scatter(group.loc[zero_mask, "eom_ret"], [-12] * zero_mask.sum(), marker='x', color='red')
+                ax.scatter(group.loc[zero_mask, "eom_ret"], [0] * zero_mask.sum(), marker='x', color='red')
         else:
             ax.scatter(group["eom_ret"], group["value"], alpha=0.75, color="steelblue")
 
@@ -703,15 +701,14 @@ def plot_portfolio_tuning_results(data):
         ax.xaxis.set_major_locator(MaxNLocator(nbins=5, integer=True, prune='both'))
         ax.xaxis.set_major_formatter(DateFormatter('%Y'))
 
-        if col == 0:
-            ax.set_ylabel("Optimal Hyper-Parameter")
-        if row == 1:
-            ax.set_xlabel("End of Month")
+    fig.supxlabel("End of Month", fontsize=14)
+    fig.supylabel("Optimal Hyper-Parameter", fontsize=14)
 
     plt.tight_layout(rect=[0, 0, 1, 0.95])
     fig_tuning = plt.gcf()
     plt.show()
     return fig_tuning
+
 
 
 def plot_optimal_hyperparameters(model_folder, static, pfml, colours_theme, start_year):

@@ -1,5 +1,6 @@
 import os
 import pandas as pd
+import numpy as np
 from b_prepare_data import (load_cluster_labels,
     load_market_data,
     load_risk_free
@@ -89,7 +90,7 @@ wealth = pd.read_pickle(wealth_path)
 dates_oos = dates_data["dates_oos"]
 dates_hp = dates_data["dates_hp"]
 gamma_rel = pf_set["gamma_rel"]
-colours_theme = ["blue", "green", "red", "orange", "purple", "brown"]
+colours_theme = ["steelblue", "darkorange", "gray"]
 
 
 # -------------------- LOAD DATA --------------------
@@ -192,67 +193,81 @@ print('Portfolio summary created')
 # )
 # apple_vs_xerox.savefig(os.path.join(output_path, "apple_vs_xerox.png"), bbox_inches="tight", dpi=300)
 
-# # -------------------- 6) Optimal Hyper-parameters Plot --------------------
-# start_year = 1996
+# -------------------- 6) Optimal Hyper-parameters Plot --------------------
+start_year = 1996
 
-# fig_hyper, fig_tuning = plot_optimal_hyperparameters(
-#     model_folder=model_folder,
-#     static=static["hps"],
-#     pfml=pfml["best_hps"],
-#     colours_theme=colours_theme,
-#     start_year=start_year
-# )
-# fig_hyper.savefig(os.path.join(output_path, "optimal_hyperparameters.png"), bbox_inches="tight", dpi=300)
-# fig_tuning.savefig(os.path.join(output_path, "portfolio_tuning_results.png"), bbox_inches="tight", dpi=300)
-
-
-# -------------------- 7) Autocorrelation plot --------------------
-ar1_plot = compute_ar1_plot(
-    chars=chars,
-    features=features,
-    cluster_labels=cluster_labels,
-    output_path=output_path
+fig_hyper, fig_tuning = plot_optimal_hyperparameters(
+    model_folder=model_folder,
+    static=static["hps"],
+    pfml=pfml["best_hps"],
+    colours_theme=colours_theme,
+    start_year=start_year
 )
-ar1_plot.savefig(os.path.join(output_path, "ar1_plot.png"), bbox_inches="tight", dpi=300)
+fig_hyper.savefig(os.path.join(output_path, "optimal_hyperparameters.png"), bbox_inches="tight", dpi=300)
+fig_tuning.savefig(os.path.join(output_path, "portfolio_tuning_results.png"), bbox_inches="tight", dpi=300)
+
+
+# # -------------------- 7) Autocorrelation plot --------------------
+# ar1_plot = compute_ar1_plot(
+#     chars=chars,
+#     features=features,
+#     cluster_labels=cluster_labels,
+#     output_path=output_path
+# )
+# ar1_plot.savefig(os.path.join(output_path, "ar1_plot.png"), bbox_inches="tight", dpi=300)
 
 
 # # -------------------- 8) Coverage plot --------------------
 # data, coverage = process_features_with_sufficient_coverage(features, feat_excl, settings, data_path)
 
 
-# -------------------- 9) Implementable  Efficient Frontier --------------------
-print("Running initial IEF script...")
-ef_all_ss, ef_ss = run_ief(chars, dates_oos, pf_set, wealth, barra_cov, market_data, risk_free, settings, latest_folder, output_path)
+# # -------------------- 9) Implementable  Efficient Frontier --------------------
+# print("Running initial IEF script...")
+# ef_all_ss, ef_ss = run_ief(chars, dates_oos, pf_set, wealth, barra_cov, market_data, risk_free, settings, latest_folder, output_path)
 
 
-# -------------------- 10) PORTFOLIO WEIGHTS ANALYSIS --------------------
-print("Analyzing portfolio weights...")
+# # -------------------- 10) PORTFOLIO WEIGHTS ANALYSIS --------------------
+# print("Analyzing portfolio weights...")
 
-# Combine portfolio weights
-weights_combined = combine_portfolio_weights(static, pfml, mkt, tpf, chars, date="2024-11-30")
+# # Combine portfolio weights
+# weights_combined = combine_portfolio_weights(static, pfml, mkt, tpf, chars, date="2023-11-30")
 
-# Calculate and plot weight differences
-calculate_and_plot_weight_differences(weights_combined, settings, save_path=f"{output_path}/weight_differences.png")
+# NOT RUN
+# # # Calculate and plot weight differences
+# # calculate_and_plot_weight_differences(weights_combined, settings, save_path=f"{output_path}/weight_differences.png")
 
-# For Static vs Portfolio
-calculate_and_plot_weight_differences_rel(weights_combined, ["Portfolio-ML", "Markowitz-ML"],
-                                     settings, save_path=f"{output_path}/weight_differences._rel1.png")
+# # Sample once
+# np.random.seed(settings["seed_no"])
+# my_ids = np.random.choice(weights_combined["id"].unique(), size=70, replace=False)
 
-calculate_and_plot_weight_differences_rel(weights_combined, ["Portfolio-ML", "Static-ML*"],
-                                     settings, save_path=f"{output_path}/weight_differences_rel2.png")
+# # Use for both runs
+# calculate_and_plot_weight_differences_rel(
+#     weights=weights_combined,
+#     types_to_compare=["Portfolio-ML", "Markowitz-ML"],
+#     settings=settings,
+#     sample_ids=my_ids,
+#     save_path=f"{output_path}/rel_weights_1.png"
+# )
 
+# calculate_and_plot_weight_differences_rel(
+#     weights=weights_combined,
+#     types_to_compare=["Portfolio-ML", "Static-ML*"],
+#     settings=settings,
+#     sample_ids=my_ids,
+#     save_path=f"{output_path}/rel_weights_2.png"
+# )
 
-# -------------------- 11) Perform Portfolio Analysis --------------------
-print("Performing portfolio analysis...")
+# # -------------------- 11) Perform Portfolio Analysis --------------------
+# print("Performing portfolio analysis...")
 
-# Perform portfolio analysis
-portfolio_analysis(static, pfml, mkt, tpf, chars, colours_theme, save_path=f"{output_path}/portfolio_analysis.png")
+# # Perform portfolio analysis
+# portfolio_analysis(static, pfml, mkt, tpf, chars, colours_theme, save_path=f"{output_path}/portfolio_analysis.png")
 
 # -------------------- 12) FEATURE IMPORTANCE IN BASE CASE --------------------
 print("Calculating feature importance...")
 
 # Calculate and plot feature importance
-calculate_feature_importance(pf_set, colours_theme, latest_folder, save_path=f"{output_path}/feature_importance_demo.png")
+calculate_feature_importance(pf_set, latest_folder, save_path=f"{output_path}/feature_importance_demo.png")
 
 # # -------------------- 13) IEF SUMMARY --------------------
 # print("Calculating IEF summary...")
