@@ -21,6 +21,22 @@ colours_theme = ["steelblue", "darkorange", "gray"]
 
 # How do weigths differ
 def combine_portfolio_weights(static, pfml, mkt, tpf, chars, date):
+    """
+    Combines portfolio weights from different strategies for a specific date,
+    aligns them, and enriches with liquidity information.
+
+    Parameters:
+        static (dict): Static-ML* portfolio object with weights in 'w'.
+        pfml (dict): Portfolio-ML object with weights in 'w'.
+        mkt (dict): Market portfolio object with weights in 'w'.
+        tpf (dict): Markowitz (Tangency) portfolio object with weights in 'w'.
+        chars (pd.DataFrame): Characteristics data including 'dolvol' and 'eom'.
+        date (str or datetime): Target evaluation date to extract portfolio weights.
+
+    Returns:
+        pd.DataFrame: Combined weights from all portfolio types, enriched with dollar volume and filtered for completeness.
+    """
+
     date = pd.to_datetime(date)
 
     def extract_weights(source, label):

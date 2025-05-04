@@ -79,6 +79,20 @@ def load_market_data(settings):
 
 # Wealth function
 def wealth_func(wealth_end, end, market, risk_free):
+    """
+    Computes cumulative wealth over time based on excess market returns and risk-free rates,
+    ending at a specified wealth value.
+
+    Parameters:
+        wealth_end (float): Target wealth value at the final date.
+        end (datetime.date or str): Final evaluation date for the wealth path.
+        market (pd.DataFrame): DataFrame containing market excess returns (column 'mkt_vw_exc').
+        risk_free (pd.DataFrame): DataFrame with monthly risk-free rates (column 'rf') and 'eom_m' date.
+
+    Returns:
+        pd.DataFrame: Time series of portfolio wealth and corresponding returns, indexed by month-end.
+    """
+
     wealth = pd.merge(
         risk_free.rename(columns={"eom_m": "eom_ret"}),
         market,
@@ -124,6 +138,16 @@ def wealth_func(wealth_end, end, market, risk_free):
 
 # Function to load cluster labels
 def load_cluster_labels(data_path):
+    """
+    Loads and processes cluster label metadata used for feature grouping and directionality.
+
+    Parameters:
+        data_path (str): Path to the directory containing 'Cluster_labels.csv' and 'Factor Details.xlsx'.
+
+    Returns:
+        pd.DataFrame: Cluster label DataFrame with associated feature direction and cleaned names.
+    """
+
     # Load Cluster Labels
     cluster_labels = pd.read_csv(os.path.join(data_path, "Cluster_labels.csv"))
     cluster_labels["cluster"] = cluster_labels["cluster"].str.lower().str.replace(r"\s|-", "_", regex=True)
@@ -200,6 +224,16 @@ def load_monthly_data_USA(data_path, settings, risk_free):
 
 
 def flag_extreme_ret(group):
+    """
+    Flags extreme return values within a group based on 0.1% and 99.9% quantiles.
+
+    Parameters:
+        group (pd.DataFrame): DataFrame containing a 'RET' column of returns.
+
+    Returns:
+        pd.DataFrame: The same group with an 'extreme_ret' boolean column indicating outliers.
+    """
+
     lower = group["RET"].quantile(0.001)
     upper = group["RET"].quantile(0.999)
     group["extreme_ret"] = (group["RET"] < lower) | (group["RET"] > upper)
@@ -339,6 +373,21 @@ def preprocess_chars(data_path, features, settings, data_ret_ld1, wealth):
 
 # Date screen
 def filter_chars(chars, settings):
+    """
+    Filters stock-level characteristic data based on date range and essential data availability,
+    while logging the exclusion percentages for transparency.
+
+    Parameters:
+        chars (pd.DataFrame): DataFrame containing firm characteristics and metadata.
+        settings (dict): Dictionary with 'screens' sub-dict containing 'start' and 'end' date keys.
+
+    Returns:
+        tuple:
+            - pd.DataFrame: Filtered DataFrame.
+            - int: Number of observations before filtering.
+            - float: Total market equity before filtering.
+    """
+
     chars = chars[(chars["eom"] >= settings["screens"]["start"]) &
                   (chars["eom"] <= settings["screens"]["end"])]
 
@@ -371,6 +420,21 @@ def filter_chars(chars, settings):
 
 # Feature screen
 def feature_screen(chars, features, settings, n_start, me_start, run_sub):
+    """
+    Screens dataset based on feature availability threshold and optionally samples a subset of firms.
+
+    Parameters:
+        chars (pd.DataFrame): DataFrame of firm characteristics.
+        features (list): List of feature column names to check for availability.
+        settings (dict): Dictionary containing screen settings (including 'feat_pct' and 'seed').
+        n_start (int): Initial number of observations before feature screening.
+        me_start (float): Initial total market equity before feature screening.
+        run_sub (bool): Whether to randomly sample a subset of firms.
+
+    Returns:
+        pd.DataFrame: Filtered (and optionally sampled) characteristic data.
+    """
+
     # Count available features per row
     feat_available = chars[features].notna().sum(axis=1)
 
@@ -436,6 +500,18 @@ def standardize_features(chars, features, settings):
 
 # Feature imputation
 def impute_features(chars, features, settings):
+    """
+    Imputes missing feature values based on specified settings using either percentile rank fill or median.
+
+    Parameters:
+        chars (pd.DataFrame): DataFrame of firm characteristics.
+        features (list): List of feature column names to impute.
+        settings (dict): Dictionary with 'feat_impute' and 'feat_prank' flags.
+
+    Returns:
+        pd.DataFrame: DataFrame with imputed feature values.
+    """
+
     if settings["feat_impute"]:
         if settings["feat_prank"]:
             # Replace NaNs with 0.5 for all features
@@ -449,6 +525,16 @@ def impute_features(chars, features, settings):
 
 # Industry classification
 def classify_industry(chars):
+    """
+    Classifies firms into Fama-French 12 industry groups based on SIC codes.
+
+    Parameters:
+        chars (pd.DataFrame): DataFrame containing a 'sic' column with SIC industry codes.
+
+    Returns:
+        None: Modifies the input DataFrame in place by adding a new 'ff12' industry classification column.
+    """
+
     chars["ff12"] = np.select(
         [
             chars["sic"].between(100, 999) | chars["sic"].between(2000, 2399) |
@@ -726,7 +812,3 @@ def load_daily_returns_pkl_EU(data_path, chars, risk_free):
     daily.drop(columns=["rf_daily", "PRCCD", "AJEXDI", "TRFD"], inplace=True)
 
     return daily
-
-
-
-

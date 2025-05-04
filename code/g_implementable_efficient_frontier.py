@@ -174,7 +174,22 @@ def generate_mv_risky_ef(chars, barra_cov, wealth_0, dates_oos, pf_set, u_vec):
 
 # 3) Get portfolios
 def load_ief_portfolio_folder(folder_path, gamma_val):
-    """Loads and returns the list of DataFrames for a single IEF folder."""
+    """
+    Loads portfolio performance data from a specified IEF (Incremental Efficiency Frontier) folder,
+    and filters the Static-ML hyperparameter results for a specific configuration.
+
+    Parameters:
+        folder_path (str): Path to the folder containing IEF result files.
+        gamma_val (float): The risk aversion parameter to annotate the portfolios with.
+
+    Returns:
+        list: A list of DataFrames containing:
+              - Benchmark returns (bms),
+              - Static-ML portfolio results,
+              - Portfolio-ML results,
+              - Filtered Static-ML hyperparameter statistics.
+    """
+
     bms = pd.read_csv(os.path.join(folder_path, "bms.csv"))
     bms["eom_ret"] = pd.to_datetime(bms["eom_ret"])
 
@@ -202,9 +217,20 @@ def load_ief_portfolio_folder(folder_path, gamma_val):
 
 def get_ief_portfolios(output_path, settings, pf_set):
     """
-    Reads IEF portfolio data from disk, supporting both single and multi-gamma folder structures.
-    Returns a combined DataFrame of all relevant IEF portfolios and summary stats.
+    Loads and aggregates Incremental Efficiency Frontier (IEF) portfolio results from disk,
+    supporting both single and multiple gamma configurations.
+
+    Parameters:
+        output_path (str): Directory path containing IEF results (can include gamma-specific subfolders).
+        settings (dict): Dictionary of settings, including the 'ief_multi_gamma' flag.
+        pf_set (dict): Portfolio metadata including 'gamma_rel' (used in single-gamma mode).
+
+    Returns:
+        tuple:
+            - pd.DataFrame: Combined portfolio-level data from all sources.
+            - pd.DataFrame: Aggregated summary statistics across portfolio types and gamma values.
     """
+
     all_portfolios = []
 
     if settings.get("ief_multi_gamma", False):
@@ -266,9 +292,19 @@ def get_ief_portfolios(output_path, settings, pf_set):
 
 def build_ief_input(factor_summary, tpf_summary, ief_result, pf_set):
     """
-    Combine IEF summary with Factor-ML and Markowitz-ML summaries for plotting or analysis.
-    Assumes all inputs are at the 'summary' level (i.e., one row per strategy configuration).
+    Combines IEF summary statistics with those from Factor-ML and Markowitz-ML
+    for unified analysis or plotting.
+
+    Parameters:
+        factor_summary (pd.DataFrame): Summary stats for the Factor-ML strategy.
+        tpf_summary (pd.DataFrame): Summary stats for the Markowitz-ML strategy.
+        ief_result (tuple): Tuple containing (full_ief_data, ief_summary).
+        pf_set (dict): Dictionary with configuration info (not directly used here, kept for extensibility).
+
+    Returns:
+        pd.DataFrame: Combined summary statistics for all strategies.
     """
+
     _, ief_summary = ief_result
 
     # Filter only relevant IEF strategies
@@ -304,6 +340,17 @@ def get_indifference_points(ef_all_ss, pf_set):
 
 # 6) Indifference curve generation
 def create_indifference_curves(points, gamma_rel):
+    """
+    Generates indifference curves for a given set of utility levels and a specified risk aversion parameter.
+
+    Parameters:
+        points (pd.DataFrame): DataFrame containing 'obj' column (target utility values).
+        gamma_rel (float): Relative risk aversion parameter.
+
+    Returns:
+        pd.DataFrame: Combined DataFrame of indifference curves with columns ['sd', 'r_tc', 'u'].
+    """
+
     curves = []
     for _, row in points.iterrows():
         u_target = row['obj']
@@ -320,6 +367,21 @@ def create_indifference_curves(points, gamma_rel):
 
 # 7) Plot indifference curves
 def plot_indifference_curves(ax, indifference_curves, ef_all_ss, tpf_ss, factor_ss, output_path):
+    """
+    Plots indifference curves on a given axis and saves the figure to disk.
+
+    Parameters:
+        ax (matplotlib.axes.Axes): Matplotlib axis to plot on.
+        indifference_curves (pd.DataFrame): DataFrame with indifference curves (columns: 'sd', 'r_tc', 'u').
+        ef_all_ss (pd.DataFrame): Combined summary stats (not used in this plot, included for extensibility).
+        tpf_ss (pd.DataFrame): Markowitz-ML summary stats (not used in this plot, included for extensibility).
+        factor_ss (pd.DataFrame): Factor-ML summary stats (not used in this plot, included for extensibility).
+        output_path (str): Directory path to save the plot.
+
+    Returns:
+        None
+    """
+
     for u_val, curve in indifference_curves.groupby('u'):
         ax.plot(curve['sd'], curve['r_tc'], linestyle='dashed', alpha=0.40)
 
@@ -335,6 +397,20 @@ def plot_indifference_curves(ax, indifference_curves, ef_all_ss, tpf_ss, factor_
 
 
 def plot_figure_1A(ef_all_ss, mv_ss, indifference_curves, points, output_path):
+    """
+    Plots Figure 1A: Implementable Efficient Frontier (IEF) with indifference curves and strategy points.
+
+    Parameters:
+        ef_all_ss (pd.DataFrame): Combined summary statistics for all strategies.
+        mv_ss (pd.DataFrame): Markowitz summary statistics (not used directly, included for extensibility).
+        indifference_curves (pd.DataFrame): Indifference curves generated for specific utility levels.
+        points (pd.DataFrame): Key strategies and their summary points (e.g., Static-ML, Portfolio-ML).
+        output_path (str): Directory where the plot will be saved.
+
+    Returns:
+        None: Saves the figure to disk as 'figure_1A.png'.
+    """
+
     fig, ax = plt.subplots(figsize=(10, 6))
 
     # 1. Gross tangency line (Markowitz-ML gross)

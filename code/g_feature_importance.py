@@ -145,8 +145,19 @@ def calc_group_stats(group):
 
 def calculate_ief_summary(output_path, ef_ss, pf_set, save_path=None):
     """
-    Calculate summary statistics for feature importance in IEF (Incremental Efficiency Frontier).
+    Calculates and visualizes summary statistics for the Incremental Efficiency Frontier (IEF)
+    under counterfactual (shuffled) conditions across clusters.
+
+    Parameters:
+        output_path (str): Directory containing the 'pfml_cf_ief.csv' file.
+        ef_ss (pd.DataFrame): Benchmark statistics for the original (non-shuffled) portfolios.
+        pf_set (list): List of portfolio identifiers (not used directly in this function).
+        save_path (str, optional): File path to save the plot. If None, displays the plot interactively.
+
+    Returns:
+        pd.DataFrame: Combined summary statistics of shuffled and benchmark portfolios.
     """
+
     file_path = os.path.join(output_path, "pfml_cf_ief.csv")
     pfml_cf_ief = pd.read_csv(file_path)
 

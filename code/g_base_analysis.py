@@ -24,6 +24,7 @@ rcParams.update({
 })
 colours_theme = ["steelblue", "darkorange", "gray"]
 
+
 # Load base case portfolios -----------
 def load_base_case_portfolios(base_path):
     """
@@ -346,8 +347,23 @@ def compute_expected_risk(dates, cov_list, weights):
 def compute_and_plot_portfolio_statistics_over_time(pfml, tpf, static, factor_ml, pfs, barra_cov, dates_oos,
                                                     pf_order, main_types):
     """
-    Compute and plot portfolio statistics over time: ex-ante volatility, leverage, and turnover.
+    Computes and plots portfolio-level statistics (ex-ante volatility, leverage, turnover) over time.
+
+    Parameters:
+        pfml (dict): Portfolio-ML output with weights in 'w'.
+        tpf (dict): Markowitz (Tangency) portfolio output with weights in 'w'.
+        static (dict): Static-ML* portfolio output with weights in 'w'.
+        factor_ml (dict): Factor-ML portfolio output with weights in 'w'.
+        pfs (pd.DataFrame): Portfolio-level summary statistics including 'inv' and 'turnover'.
+        barra_cov (dict): Dictionary with stock-level factor loadings and covariance information.
+        dates_oos (list): List of out-of-sample evaluation dates.
+        pf_order (list): Desired plotting order for portfolio types.
+        main_types (list): Portfolio types to include in the final plot.
+
+    Returns:
+        matplotlib.figure.Figure: Figure object with portfolio statistics plotted over time.
     """
+
 
     # Combine portfolio weights
     pfml_weights = pfml["w"].copy();
@@ -561,7 +577,7 @@ def plot_apple_vs_xerox(pfml, static, tpf, factor_ml, mkt,
         plt.grid(True, which="both", linestyle="--", linewidth=0.5)
 
     plt.tight_layout()
-    fig = plt.gcf()  # saves figure
+    fig = plt.gcf()
     plt.show()
 
     return fig
@@ -569,6 +585,17 @@ def plot_apple_vs_xerox(pfml, static, tpf, factor_ml, mkt,
 
 # Optimal Hyper-parameters ----------------------------
 def load_model_hyperparameters(model_path, horizon_label):
+    """
+    Loads and processes optimal hyperparameters from a saved model for a given prediction horizon.
+
+    Parameters:
+        model_path (str): Path to the pickled model file.
+        horizon_label (str): Label indicating the prediction horizon (e.g., "Return t+1").
+
+    Returns:
+        pd.DataFrame: DataFrame with columns ['eom_ret', 'lambda', 'p', 'g', 'horizon']
+                      for each time period with available hyperparameters.
+    """
     model = pd.read_pickle(model_path)
     processed_data = []
 
@@ -591,6 +618,20 @@ def load_model_hyperparameters(model_path, horizon_label):
 
 
 def process_portfolio_tuning_data(static, pfml, start_year):
+    """
+    Processes and reshapes hyperparameter tuning results for Static-ML* and Portfolio-ML
+    into a long format suitable for plotting.
+
+    Parameters:
+        static (pd.DataFrame): Static-ML* tuning results with optimal parameters per year-end.
+        pfml (pd.DataFrame): Portfolio-ML tuning results with hyperparameters per month.
+        start_year (int): Year threshold for filtering data (inclusive).
+
+    Returns:
+        pd.DataFrame: Long-form DataFrame with ['type', 'eom_ret', 'name', 'value', 'comb_name'] columns,
+                      ready for faceted plotting.
+    """
+
     static_hps = static[
         (static["rank"] == 1) &
         (static["eom_ret"].dt.year >= start_year) &
@@ -622,6 +663,18 @@ def process_portfolio_tuning_data(static, pfml, start_year):
 
 
 def plot_hyperparameter_trends(data, colours_theme):
+    """
+    Plots the time trends of optimal hyperparameters for different return horizons
+    in a 3x3 grid of subplots.
+
+    Parameters:
+        data (pd.DataFrame): Long-form DataFrame with 'eom_ret', 'name', 'value', and 'comb_name' columns.
+        colours_theme (list): List of color codes for consistent plotting aesthetics.
+
+    Returns:
+        matplotlib.figure.Figure: The generated matplotlib figure showing hyperparameter trends over time.
+    """
+
     data["eom_ret"] = pd.to_datetime(data["eom_ret"])
     fig, axes = plt.subplots(3, 3, figsize=(15, 12), sharex=True)
     fig.suptitle("Optimal Hyper-Parameters Over Time", fontsize=16, y=0.93)
@@ -668,6 +721,17 @@ def plot_hyperparameter_trends(data, colours_theme):
 
 
 def plot_portfolio_tuning_results(data):
+    """
+    Plots optimal hyperparameter tuning results over time for both Portfolio-ML and Static-ML* models.
+
+    Parameters:
+        data (pd.DataFrame): Long-form DataFrame with 'eom_ret', 'name', 'value', and 'comb_name' columns,
+                             including processed tuning data.
+
+    Returns:
+        matplotlib.figure.Figure: The generated matplotlib figure visualizing hyperparameter evolution.
+    """
+
     data["eom_ret"] = pd.to_datetime(data["eom_ret"])
     fig, axes = plt.subplots(2, 3, figsize=(15, 8), sharex=True)
     fig.suptitle("Portfolio Tuning Results Over Time", fontsize=16, y=0.93)
@@ -712,6 +776,22 @@ def plot_portfolio_tuning_results(data):
 
 
 def plot_optimal_hyperparameters(model_folder, static, pfml, colours_theme, start_year):
+    """
+    Loads, processes, and visualizes optimal hyperparameters over time for both Portfolio-ML and Static-ML* models.
+
+    Parameters:
+        model_folder (str): Path to folder containing pickled hyperparameter model files.
+        static (pd.DataFrame): Static-ML* tuning results.
+        pfml (pd.DataFrame): Portfolio-ML tuning results.
+        colours_theme (list): List of colors for plotting.
+        start_year (int): Minimum year for inclusion in the portfolio tuning plot.
+
+    Returns:
+        tuple: A tuple containing:
+            - fig_hyper (matplotlib.figure.Figure): Figure of hyperparameter trends.
+            - fig_tuning (matplotlib.figure.Figure): Figure of portfolio tuning results.
+    """
+
     data_1 = load_model_hyperparameters(f"{model_folder}/model_1.pkl", "Return t+1")
     data_6 = load_model_hyperparameters(f"{model_folder}/model_6.pkl", "Return t+6")
     data_12 = load_model_hyperparameters(f"{model_folder}/model_12.pkl", "Return t+12")
@@ -743,22 +823,6 @@ def plot_optimal_hyperparameters(model_folder, static, pfml, colours_theme, star
     fig_tuning = plot_portfolio_tuning_results(tuning_data)
 
     return fig_hyper, fig_tuning
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 # Plot AR ----------------------------

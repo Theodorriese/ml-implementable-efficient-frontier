@@ -43,6 +43,26 @@ def recursive_ewma_std(series, lambda_, min_obs):
 
 # Main function
 def prepare_cluster_data(chars, cluster_labels, daily, settings, features):
+    """
+    Constructs a full cluster-based risk model including factor returns, covariances, and stock-specific risk,
+    using firm characteristics and daily returns.
+
+    Parameters:
+        chars (pd.DataFrame): Monthly firm characteristics, including size group and cluster features.
+        cluster_labels (pd.DataFrame): Mapping of features to clusters and their expected return directions.
+        daily (pd.DataFrame): Daily returns data with excess returns and end-of-month labels.
+        settings (dict): Dictionary containing model configuration (e.g., half-lives, lookback window).
+        features (list): List of features used to construct cluster exposures.
+
+    Returns:
+        dict: Dictionary with the following keys:
+            - 'cluster_data_d': Daily returns with merged monthly cluster exposures.
+            - 'fct_ret': Estimated daily factor returns from cross-sectional regressions.
+            - 'factor_cov': Estimated factor covariance matrices per month-end.
+            - 'spec_risk': Stock-level specific risk (EWMA residual volatility) by month-end.
+            - 'barra_cov': Stock-level factor loadings, covariances, and idiosyncratic variances per date.
+    """
+
     # 1) Monthly cluster exposures
     cluster_data_m = chars[chars["valid"]].copy()
     cluster_data_m = cluster_data_m[["id", "eom", "size_grp", "ff12"] + features]
