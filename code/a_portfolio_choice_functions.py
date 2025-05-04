@@ -304,7 +304,23 @@ def tpf_implement(data, cov_list, wealth, dates, gam):
 def tpf_cf_fun(data, cf_cluster, er_models, cluster_labels, wealth,
                gamma_rel, cov_list, dates, seed, features):
     """
-    Counterfactual Tangency Portfolio Implementation.
+    Implements a counterfactual tangency portfolio by randomizing feature identifiers
+    within a specified cluster and generating predicted returns using pre-fitted models.
+
+    Parameters:
+        data (pd.DataFrame): Input DataFrame containing stock-level characteristics.
+        cf_cluster (str): Name of the cluster to shuffle features within.
+        er_models (dict): Dictionary of expected return models per horizon.
+        cluster_labels (pd.DataFrame): Mapping of characteristics to clusters.
+        wealth (pd.DataFrame): Wealth time series used for return scaling.
+        gamma_rel (float): Relative risk aversion parameter.
+        cov_list (dict): Dictionary of covariance matrices per date.
+        dates (list): List of evaluation dates.
+        seed (int): Random seed for reproducibility.
+        features (list): List of all feature names used in the model.
+
+    Returns:
+        pd.DataFrame: Portfolio returns and weights from the counterfactual implementation.
     """
     np.random.seed(seed)
 
@@ -629,7 +645,18 @@ def mv_implement(data, cov_list, wealth, dates):
 
 def mv_risky_fun(data, cov_list, wealth, dates, gam, u_vec):
     """
-    Mean-variance efficient portfolios of risky assets.
+    Constructs mean-variance efficient portfolios of risky assets across different utility levels.
+
+    Parameters:
+        data (pd.DataFrame): Input DataFrame with asset-level returns, predictions, and metadata.
+        cov_list (dict): Dictionary of covariance matrices by date.
+        wealth (pd.DataFrame): Time series of portfolio wealth statistics.
+        dates (list): List of evaluation dates for portfolio construction.
+        gam (float): Not used (included for interface consistency).
+        u_vec (list): List of scaled utility targets for portfolio optimization.
+
+    Returns:
+        pd.DataFrame: Combined portfolio performance for each utility level.
     """
     data_rel = data[(data['valid']) & (data['eom'].isin(dates))].copy()
     data_rel = data_rel[['id', 'eom', 'me', 'tr_ld1', 'pred_ld1', 'ret_ld1', 'lambda']].sort_values(by=['id', 'eom'])
@@ -944,6 +971,7 @@ def static_implement(data_tc, cov_list, lambda_list,
 
 def scale_constant(df):
     """Scale a Series or array so that the sum of squares equals 1, unless it's all zero."""
+
     s = np.sum(df ** 2)
     return df * np.sqrt(1.0 / s) if s != 0 else df
 
@@ -971,7 +999,33 @@ def scale_features_v1(df, feat_cons):
 
 def pfml_input_fun(data_tc, cov_list, lambda_list, gamma_rel, wealth, mu, dates, lb, scale,
                    risk_free, features, rff_feat, seed, p_max, g, add_orig, iter, balanced):
-    # Full lookback dates
+    """
+    Prepares input data for Portfolio-ML optimization, including signal construction,
+    feature transformations (e.g., RFF), volatility scaling, and lookback-weighted transformations.
+
+    Parameters:
+        data_tc (pd.DataFrame): Full dataset with features and returns.
+        cov_list (dict): Covariance matrices indexed by date.
+        lambda_list (dict): Transaction cost penalty matrices indexed by date.
+        gamma_rel (float): Relative risk aversion parameter.
+        wealth (pd.DataFrame): Portfolio wealth time series.
+        mu (float): Market return assumption for excess return computation.
+        dates (list): List of evaluation dates.
+        lb (int): Lookback window size (in months).
+        scale (bool): Whether to apply volatility scaling.
+        risk_free (pd.DataFrame): Risk-free rate time series.
+        features (list): List of original feature names.
+        rff_feat (bool): Whether to use Random Fourier Features (RFF).
+        seed (int): Seed for reproducibility of RFF generation.
+        p_max (int): Number of RFF features (must be even).
+        g (float): Bandwidth parameter for RFF transformation.
+        add_orig (bool): Whether to append original features to RFF features.
+        iter (int): Number of iterations for M-matrix calculation.
+        balanced (bool): Whether to normalize features and scale them to unit variance.
+
+    Returns:
+        dict: Dictionary with transformed signal matrices and risk-return components per date.
+    """
 
     dates = [pd.to_datetime(d) for d in dates]
 
@@ -1712,8 +1766,31 @@ def pfml_cf_fun(data, cf_cluster, pfml_base, dates, cov_list, lambda_list, scale
                 orig_feat, gamma_rel, wealth, risk_free, mu, iter, seed,
                 features, cluster_labels):
     """
-    Portfolio-ML implementation with counterfactual inputs.
+    Implements Portfolio-ML with counterfactual feature permutations based on cluster membership,
+    and evaluates resulting portfolios using previously fitted hyperparameters.
+
+    Parameters:
+        data (pd.DataFrame): Dataset with stock-level returns and features.
+        cf_cluster (str): Cluster name for counterfactual permutation ('bm' for baseline).
+        pfml_base (dict): Dictionary containing fitted PF-ML models and hyperparameters.
+        dates (list): List of evaluation dates.
+        cov_list (dict): Covariance matrices per date.
+        lambda_list (dict): Transaction cost penalty matrices per date.
+        scale (bool): Whether to apply volatility scaling to features.
+        orig_feat (bool): Whether original features are included in model fitting.
+        gamma_rel (float): Relative risk aversion parameter.
+        wealth (pd.DataFrame): Time series of wealth data.
+        risk_free (pd.DataFrame): Risk-free rate data.
+        mu (float): Market return assumption for M-function.
+        iter (int): Number of M-function iterations.
+        seed (int): Random seed for reproducibility.
+        features (list): List of features used in the model.
+        cluster_labels (pd.DataFrame): Mapping of characteristics to clusters.
+
+    Returns:
+        pd.DataFrame: Portfolio performance results from the counterfactual analysis.
     """
+
     np.random.seed(seed)
     cf = data.copy()
 
@@ -1800,7 +1877,10 @@ def pfml_cf_fun(data, cf_cluster, pfml_base, dates, cov_list, lambda_list, scale
     return pf_cf
 
 
-# ------------------------- Multiprocessing functions-------------------------
+################################################################################
+# ------------------------- Multiprocessing functions------------------------- #
+################################################################################
+
 # Minimum-variance
 def process_mv_date(d, data_split, cov_list):
     """
