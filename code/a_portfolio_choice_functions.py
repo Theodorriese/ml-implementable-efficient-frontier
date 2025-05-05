@@ -225,7 +225,7 @@ def tpf_implement(data, cov_list, wealth, dates, gam):
     data_split = {date: group for date, group in data_rel.groupby('eom')}
 
     tpf_opt = []
-    for d in dates:
+    for d in tqdm(dates, desc="Processing Dates"):
 
         data_sub = data_split.get(d, pd.DataFrame())
         if data_sub.empty:
@@ -325,63 +325,55 @@ def tpf_cf_fun(data, cf_cluster, er_models, cluster_labels, wealth,
     np.random.seed(seed)
 
     if cf_cluster != "bm":
-        # Drop prediction columns & shuffle IDs
-        cf = data.drop(columns=[col for col in data.columns if col.startswith("pred_ld")]).copy()
-        cf['id_shuffle'] = cf.groupby('eom')['id'].transform(lambda x: np.random.permutation(x))
+        cf = data.drop(columns=[col for col in data.columns if col.startswith("pred_ld")], errors='ignore')
+        cf['id_shuffle'] = cf.groupby('eom')['id'].transform(np.random.permutation)
 
-        # Select characteristics for the cluster
-        chars_sub = cluster_labels.loc[
-            (cluster_labels['cluster'] == cf_cluster) &
-            (cluster_labels['characteristic'].isin(features)), 'characteristic'
-        ]
-
+        chars_sub = cluster_labels.query("cluster == @cf_cluster and characteristic in @features")["characteristic"]
         if chars_sub.empty:
-            raise ValueError(f"Cluster '{cf_cluster}' has no matching characteristics in cluster_labels.")
+            raise ValueError(f"Cluster '{cf_cluster}' has no matching characteristics.")
 
-        # Prepare the shuffled DataFrame
-        chars_data = cf[['id_shuffle', 'eom'] + chars_sub.tolist()].rename(columns={'id_shuffle': 'id'})
+        # Shuffle characteristics
+        shuffle_cols = ['id_shuffle', 'eom'] + chars_sub.tolist()
+        chars_data = cf[shuffle_cols].rename(columns={'id_shuffle': 'id'})
         cf.drop(columns=chars_sub, inplace=True)
-        cf = pd.merge(cf, chars_data, on=['id', 'eom'], how='left')
+        cf = cf.merge(chars_data, on=['id', 'eom'], how='left')
 
-        # Predict expected returns for each model in er_models
-        for model_key, model_dict in er_models.items():
-            for date_key, m_sub in model_dict.items():
-                if all(key in m_sub for key in ['fit', 'W', 'opt_hps', 'pred']):
-                    sub_dates = m_sub['pred']['eom'].unique()
+        # Predict expected returns using pre-fitted models
+        pred_map = {}
+        for model_dict in er_models.values():
+            for m_sub in model_dict.values():
+                if not all(k in m_sub for k in ['fit', 'W', 'opt_hps', 'pred']):
+                    continue
 
-                    # Filter the data for relevant dates
-                    cf_subset = cf.loc[cf['eom'].isin(sub_dates)].copy()
+                sub_dates = m_sub['pred']['eom'].unique()
+                cf_subset = cf[cf['eom'].isin(sub_dates)]
+                if cf_subset.empty:
+                    continue
 
-                    if cf_subset.empty:
-                        continue
+                cf_x = cf_subset[features].to_numpy()
+                if cf_x.size == 0:
+                    continue
 
-                    # Apply RFF Transformation
-                    cf_x = cf_subset[features].to_numpy()
-                    if cf_x.size == 0:
-                        continue
+                rff_out = rff(cf_x, W=m_sub['W'])
+                p = m_sub['opt_hps']['p']
+                X = p ** -0.5 * np.hstack([rff_out['X_cos'], rff_out['X_sin']])
+                pred_vals = m_sub['fit'].predict(X)
 
-                    cf_new_x = rff(cf_x, W=m_sub['W'])
-                    cf_new_x = m_sub['opt_hps']['p'] ** -0.5 * np.hstack([cf_new_x['X_cos'], cf_new_x['X_sin']])
-
-                    # Generate predictions and update the main DataFrame
-                    cf.loc[cf['eom'].isin(sub_dates), 'pred_ld1'] = m_sub['fit'].predict(cf_new_x)
+                cf.loc[cf['eom'].isin(sub_dates), 'pred_ld1'] = pred_vals
 
     else:
-        # Just work with valid data if it's "bm"
         cf = data[data['valid'] == True].copy()
 
-    # Ensure pred_ld1 is not NaN for subsequent calculations
     cf['pred_ld1'] = cf['pred_ld1'].fillna(0)
 
-    # Implement the tangency portfolio on counterfactual data
+    # Run the tangency portfolio implementation
     op = tpf_implement(cf, cov_list, wealth, dates, gamma_rel)
-
     if 'pf' not in op:
-        raise ValueError("Error: `tpf_implement` did not return expected portfolio data.")
+        raise ValueError("tpf_implement did not return expected portfolio data.")
 
-    # Add the cluster label for identification
     op['pf']['cluster'] = cf_cluster
     return op['pf']
+
 
 
 def factor_ml_implement(data, wealth, dates, n_pfs):

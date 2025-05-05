@@ -8,6 +8,7 @@ from sklearn.linear_model import LinearRegression
 from scipy.stats import spearmanr
 from typing import List
 
+
 def plot_alpha_decay_cumulative_continuous(chars, features, output_path):
     """
     Plot cumulative alpha returns using cross-sectional regression (features already standardized).

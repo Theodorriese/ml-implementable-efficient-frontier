@@ -61,7 +61,7 @@ def rff(X, p=None, g=None, W=None):
         dict: Dictionary containing random weights (W), cosine features, and sine features.
     """
     if W is None:
-        np.random.seed(0)  # Ensure reproducibility
+        np.random.seed(0)
         k = X.shape[1]
         cov_matrix = g * np.eye(k)
         W = np.random.multivariate_normal(mean=np.zeros(k), cov=cov_matrix, size=p // 2).T

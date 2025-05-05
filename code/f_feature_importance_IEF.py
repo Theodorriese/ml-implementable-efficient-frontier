@@ -22,8 +22,6 @@ def load_pfml(output_path):
     return pd.read_pickle(file_path)
 
 
-
-
 def implement_pfml_cf_ief(chars, barra_cov, wealth, dates_oos, risk_free, settings, pf_set, lambda_list,
                           output_path, cluster_labels):
     """
@@ -59,7 +57,7 @@ def implement_pfml_cf_ief(chars, barra_cov, wealth, dates_oos, risk_free, settin
 
     if settings.get("multi_process", False):
         print("Using multiprocessing for IEF clusters...")
-        num_cores = max(1, int(cpu_count() -2 ))
+        num_cores = max(1, int(cpu_count() -2))
         pfml_cf_base = Parallel(n_jobs=num_cores)(
             delayed(process_cluster)(cf_cluster) for cf_cluster in ief_cf_clusters
         )

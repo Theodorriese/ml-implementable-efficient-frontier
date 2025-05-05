@@ -167,11 +167,7 @@ def portfolio_ml(chars, barra_cov, lambda_list, features, risk_free, wealth, pf_
     """
     print("Implementing Portfolio-ML...")
 
-    ###############################################################################
-    # BE AWARE OF THIS
     iter = 100
-    ###############################################################################
-
     pfml = pfml_implement(chars, cov_list=barra_cov, lambda_list=lambda_list, features=features, risk_free=risk_free,
                           wealth=wealth, mu=pf_set["mu"], gamma_rel=pf_set["gamma_rel"],
                           dates_full=dates_m2, dates_oos=dates_oos, lb=pf_set["lb_hor"],

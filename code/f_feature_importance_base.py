@@ -8,15 +8,14 @@ from a_portfolio_choice_functions import tpf_cf_fun, pfml_cf_fun
 def implement_markowitz_ml_base(chars, er_models, cluster_labels, dates_oos, barra_cov,
                                  settings, wealth, features, output_path, pf_set):
     """
-    Implement Markowitz-ML Base Case.
+    Implement Markowitz-ML Base Case with optional multiprocessing.
     """
     print("Implementing Markowitz-ML Base Case...")
     clusters = sorted(cluster_labels['cluster'].unique())
     cf_clusters = ["bm"] + clusters
-    tpf_cf_base = []
 
-    for cf_cluster in tqdm(cf_clusters, desc="Processing Clusters (Markowitz-ML)", unit="cluster"):
-        cluster_result = tpf_cf_fun(
+    def process_cluster(cf_cluster):
+        return tpf_cf_fun(
             data=chars[chars["valid"] == True],
             cf_cluster=cf_cluster,
             er_models=er_models,
@@ -28,7 +27,16 @@ def implement_markowitz_ml_base(chars, er_models, cluster_labels, dates_oos, bar
             seed=settings["seed_no"],
             features=features,
         )
-        tpf_cf_base.append(cluster_result)
+
+    if settings.get("multi_process", False):
+        print("Using multiprocessing across clusters...")
+        num_cores = max(1, int(cpu_count() - 2))
+        tpf_cf_base = Parallel(n_jobs=num_cores)(
+            delayed(process_cluster)(cf_cluster) for cf_cluster in cf_clusters
+        )
+    else:
+        print("Using single-core processing across clusters...")
+        tpf_cf_base = [process_cluster(cf_cluster) for cf_cluster in tqdm(cf_clusters, desc="Processing Clusters", unit="cluster")]
 
     tpf_cf_base_combined = pd.concat(tpf_cf_base, axis=0)
     tpf_cf_base_combined.to_pickle(f"{output_path}/tpf_cf_base.pkl")
