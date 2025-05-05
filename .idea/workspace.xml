@@ -4,11 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="001ad656-4e1d-41a9-98d4-c3629915c329" name="Changes" comment="Push">
-      <change afterPath="$PROJECT_DIR$/code/g_plot_splits.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/code/i1_Main.py" beforeDir="false" afterPath="$PROJECT_DIR$/code/i1_Main.py" afterDir="false" />
-    </list>
+    <list default="true" id="001ad656-4e1d-41a9-98d4-c3629915c329" name="Changes" comment="Push" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -347,15 +343,7 @@
       <workItem from="1746426230813" duration="514000" />
       <workItem from="1746429753953" duration="208000" />
       <workItem from="1746436077452" duration="2000" />
-      <workItem from="1746436204878" duration="2190000" />
-    </task>
-    <task id="LOCAL-00148" summary="Push">
-      <option name="closed" value="true" />
-      <created>1744709642311</created>
-      <option name="number" value="00148" />
-      <option name="presentableId" value="LOCAL-00148" />
-      <option name="project" value="LOCAL" />
-      <updated>1744709642311</updated>
+      <workItem from="1746436204878" duration="2975000" />
     </task>
     <task id="LOCAL-00149" summary="Push">
       <option name="closed" value="true" />
@@ -741,7 +729,15 @@
       <option name="project" value="LOCAL" />
       <updated>1746429881737</updated>
     </task>
-    <option name="localTasksCounter" value="197" />
+    <task id="LOCAL-00197" summary="Push">
+      <option name="closed" value="true" />
+      <created>1746442152024</created>
+      <option name="number" value="00197" />
+      <option name="presentableId" value="LOCAL-00197" />
+      <option name="project" value="LOCAL" />
+      <updated>1746442152024</updated>
+    </task>
+    <option name="localTasksCounter" value="198" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -768,7 +764,7 @@
     <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$f_base_case.coverage" NAME="f_base_case Coverage Results" MODIFIED="1744651329398" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />
     <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$x_read_temp.coverage" NAME="x_read_temp Coverage Results" MODIFIED="1739800035893" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />
     <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$b_prepare_data.coverage" NAME="b_prepare_data Coverage Results" MODIFIED="1742995588095" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />
-    <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$g_plot_splits.coverage" NAME="g_plot_splits Coverage Results" MODIFIED="1746437746549" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />
+    <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$g_plot_splits.coverage" NAME="g_plot_splits Coverage Results" MODIFIED="1746442091348" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />
     <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$x_get_weights.coverage" NAME="x_get_weights Coverage Results" MODIFIED="1744640732504" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />
     <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$pkl_to_csv2.coverage" NAME="pkl_to_csv2 Coverage Results" MODIFIED="1743668130554" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />
     <SUITE FILE_PATH="coverage/ml_implementable_efficient_frontier$i3_build_portfolios.coverage" NAME="i3_build_portfolios Coverage Results" MODIFIED="1745146964391" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />

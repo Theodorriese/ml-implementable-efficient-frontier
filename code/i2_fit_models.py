@@ -35,6 +35,11 @@ search_grid = pd.DataFrame({
     "horizon": [[i] for i in range(1, 13)]
 })
 
+# search_grid = pd.DataFrame({
+#     "name": [f"m1"],
+#     "horizon": [[1]]
+# })
+
 
 # -------------------- Run  --------------------
 def prepare_and_fit_models(settings, pf_set, features, output_path):
