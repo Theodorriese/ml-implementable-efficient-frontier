@@ -71,7 +71,6 @@ def benchmark_portfolios(chars, barra_cov, wealth, dates_oos, pf_set, settings, 
 
     pd.to_pickle(mv, os.path.join(output_path, "mv.pkl"))
 
-
     # Filter out any None values to avoid errors
     portfolio_results = [tpf, factor_ml, ew, mkt, rw, mv]
     valid_portfolios = [pf["pf"] for pf in portfolio_results if pf["pf"] is not None]

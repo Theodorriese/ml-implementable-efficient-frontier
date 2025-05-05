@@ -2,10 +2,8 @@ import pandas as pd
 import os
 from joblib import Parallel, delayed
 from multiprocessing import cpu_count
-
 from a_portfolio_choice_functions import pfml_cf_fun
 from i1_Main import pf_set, features
-
 
 
 def load_pfml(output_path):
@@ -24,8 +22,7 @@ def load_pfml(output_path):
     return pd.read_pickle(file_path)
 
 
-from joblib import Parallel, delayed
-from multiprocessing import cpu_count
+
 
 def implement_pfml_cf_ief(chars, barra_cov, wealth, dates_oos, risk_free, settings, pf_set, lambda_list,
                           output_path, cluster_labels):
@@ -36,7 +33,6 @@ def implement_pfml_cf_ief(chars, barra_cov, wealth, dates_oos, risk_free, settin
 
     pfml = load_pfml(output_path)
     ief_cf_clusters = ["quality", "value", "momentum", "short_term_reversal"]
-    gamma_rel = pf_set["gamma_rel"]
 
     def process_cluster(cf_cluster):
         print(f"Processing cluster: {cf_cluster}")
@@ -49,11 +45,11 @@ def implement_pfml_cf_ief(chars, barra_cov, wealth, dates_oos, risk_free, settin
             lambda_list=lambda_list,
             scale=settings["pf_ml"]["scale"],
             orig_feat=settings["pf_ml"]["orig_feat"],
-            gamma_rel=gamma_rel,
+            gamma_rel=pf_set["gamma_rel"],
             wealth=wealth,
             risk_free=risk_free,
             mu=pf_set["mu"],
-            iter=10,
+            iter=100,
             seed=settings["seed_no"],
             features=features,
             cluster_labels=cluster_labels
@@ -63,7 +59,7 @@ def implement_pfml_cf_ief(chars, barra_cov, wealth, dates_oos, risk_free, settin
 
     if settings.get("multi_process", False):
         print("Using multiprocessing for IEF clusters...")
-        num_cores = max(1, int(cpu_count() * 0.75))
+        num_cores = max(1, int(cpu_count() -2 ))
         pfml_cf_base = Parallel(n_jobs=num_cores)(
             delayed(process_cluster)(cf_cluster) for cf_cluster in ief_cf_clusters
         )
@@ -73,7 +69,7 @@ def implement_pfml_cf_ief(chars, barra_cov, wealth, dates_oos, risk_free, settin
 
     pfml_cf_ief_combined = pd.concat(pfml_cf_base, axis=0)
     pfml_cf_ief_combined.to_csv(os.path.join(output_path, "pfml_cf_ief.csv"), index=False)
-    print(f"✅ Saved PFML-IEF results to {output_path}/pfml_cf_ief.csv")
+    print(f"Saved PFML-IEF results to {output_path}/pfml_cf_ief.csv")
 
     return pfml_cf_ief_combined
 

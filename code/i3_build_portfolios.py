@@ -18,8 +18,8 @@ config_params = {
     "industry_cov": settings["cov_set"]["industries"],
     "update_base": False,
     "update_fi_base": True,
-    "update_fi_ief": False,
-    "update_fi_ret": False,
+    "update_fi_ief": True,
+    "update_fi_ret": True,
 }
 
 # Print config for verification
@@ -228,7 +228,6 @@ if config_params.get('update_fi_base', True):
         barra_cov=barra_cov,
         settings=settings,
         pf_set=pf_set,
-        tpf_cf_wealth=0,
         wealth=wealth,
         risk_free=risk_free,
         lambda_list=portfolio_data['lambda_list'],
@@ -256,7 +255,7 @@ if config_params.get('update_fi_ief', True):
     )
 
 # ---------------- Feature importance - Expected return models ---------------- #
-if config_params.get('update_cf', True):
+if config_params.get('update_fi_ret', True):
     print("Running Counterfactual Estimation...")
 
     run_feature_importance_ret(

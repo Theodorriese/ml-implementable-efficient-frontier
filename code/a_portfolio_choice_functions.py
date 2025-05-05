@@ -2238,7 +2238,7 @@ def pfml_input_fun_multi(data_tc, cov_list, lambda_list, gamma_rel, wealth, mu, 
 
         return d, {"reals": reals, "signal_t": signal_t}
 
-    num_cores = max(1, int(cpu_count() * 0.75))
+    num_cores = max(1, int(cpu_count() - 1))
     print(f"🔧 Using all available CPU cores: {num_cores}")
     results = Parallel(n_jobs=num_cores)(
         delayed(process_date)(d) for d in tqdm(dates, desc="Step 4. Computing signals and realizations")

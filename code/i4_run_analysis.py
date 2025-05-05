@@ -193,18 +193,18 @@ print('Portfolio summary created')
 # )
 # apple_vs_xerox.savefig(os.path.join(output_path, "apple_vs_xerox.png"), bbox_inches="tight", dpi=300)
 
-# -------------------- 6) Optimal Hyper-parameters Plot --------------------
-start_year = 1996
+# # -------------------- 6) Optimal Hyper-parameters Plot --------------------
+# start_year = 1996
 
-fig_hyper, fig_tuning = plot_optimal_hyperparameters(
-    model_folder=model_folder,
-    static=static["hps"],
-    pfml=pfml["best_hps"],
-    colours_theme=colours_theme,
-    start_year=start_year
-)
-fig_hyper.savefig(os.path.join(output_path, "optimal_hyperparameters.png"), bbox_inches="tight", dpi=300)
-fig_tuning.savefig(os.path.join(output_path, "portfolio_tuning_results.png"), bbox_inches="tight", dpi=300)
+# fig_hyper, fig_tuning = plot_optimal_hyperparameters(
+#     model_folder=model_folder,
+#     static=static["hps"],
+#     pfml=pfml["best_hps"],
+#     colours_theme=colours_theme,
+#     start_year=start_year
+# )
+# fig_hyper.savefig(os.path.join(output_path, "optimal_hyperparameters.png"), bbox_inches="tight", dpi=300)
+# fig_tuning.savefig(os.path.join(output_path, "portfolio_tuning_results.png"), bbox_inches="tight", dpi=300)
 
 
 # # -------------------- 7) Autocorrelation plot --------------------

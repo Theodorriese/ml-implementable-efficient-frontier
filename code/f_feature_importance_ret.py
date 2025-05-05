@@ -11,7 +11,7 @@ def run_feature_importance_ret(chars, cluster_labels, features, settings, output
     """
     Estimate counterfactual predictions for return prediction models (multiprocessed over horizons).
     """
-    # Again
+    # Again obs, function inside
     def process_horizon(h):
         model_path = os.path.join(model_folder, f'model_{h}.pkl')
 
@@ -87,7 +87,7 @@ def run_feature_importance_ret(chars, cluster_labels, features, settings, output
     print("Running Counterfactual Estimation...")
     if settings.get("multi_process", False):
         print("Using multiprocessing for horizons...")
-        num_cores = max(1, int(cpu_count() * 0.75))
+        num_cores = max(1, int(cpu_count() - 2))
         results = Parallel(n_jobs=num_cores)(
             delayed(process_horizon)(h) for h in tqdm(range(1, 13), desc="Processing Horizons", unit="horizon")
         )

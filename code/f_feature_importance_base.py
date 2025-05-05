@@ -6,7 +6,7 @@ from a_portfolio_choice_functions import tpf_cf_fun, pfml_cf_fun
 
 
 def implement_markowitz_ml_base(chars, er_models, cluster_labels, dates_oos, barra_cov,
-                                settings, tpf_cf_wealth, features, output_path):
+                                 settings, wealth, features, output_path, pf_set):
     """
     Implement Markowitz-ML Base Case.
     """
@@ -23,8 +23,8 @@ def implement_markowitz_ml_base(chars, er_models, cluster_labels, dates_oos, bar
             cluster_labels=cluster_labels,
             dates=dates_oos,
             cov_list=barra_cov,
-            gamma_rel=100,
-            wealth=tpf_cf_wealth,
+            gamma_rel=pf_set["gamma_rel"],
+            wealth=wealth,
             seed=settings["seed_no"],
             features=features,
         )
@@ -35,8 +35,8 @@ def implement_markowitz_ml_base(chars, er_models, cluster_labels, dates_oos, bar
     print(f"Markowitz-ML Base Case results saved to {output_path}/tpf_cf_base.pkl.")
 
 
-def implement_portfolio_ml_base(chars, output_path, dates_oos, barra_cov, settings, pf_set, wealth,
-                                risk_free, lambda_list, features, cluster_labels):
+def implement_portfolio_ml_base(chars, cluster_labels, barra_cov, settings, pf_set,
+                                wealth, risk_free, lambda_list, features, dates_oos, output_path):
     """
     Implement Portfolio-ML Base Case.
     """
@@ -64,7 +64,7 @@ def implement_portfolio_ml_base(chars, output_path, dates_oos, barra_cov, settin
             wealth=wealth,
             risk_free=risk_free,
             mu=pf_set["mu"],
-            iter=10,
+            iter=100,
             seed=settings["seed_no"],
             features=features,
             cluster_labels=cluster_labels
@@ -72,7 +72,7 @@ def implement_portfolio_ml_base(chars, output_path, dates_oos, barra_cov, settin
 
     if settings.get("multi_process", False):
         print("Using multiprocessing across clusters...")
-        num_cores = max(1, int(cpu_count() * 0.75))
+        num_cores = max(1, int(cpu_count() - 2))
         pfml_cf_base = Parallel(n_jobs=num_cores)(
             delayed(process_cluster)(cf_cluster) for cf_cluster in cf_clusters
         )
@@ -85,7 +85,7 @@ def implement_portfolio_ml_base(chars, output_path, dates_oos, barra_cov, settin
     print(f"Portfolio-ML Base Case results saved to {output_path}/pfml_cf_base.pkl.")
 
 
-def run_feature_importance_base(chars, er_models, cluster_labels, barra_cov, settings, pf_set, tpf_cf_wealth,
+def run_feature_importance_base(chars, er_models, cluster_labels, barra_cov, settings, pf_set,
                                 wealth, risk_free, lambda_list, features, dates_oos, output_path):
     """
     Main function to execute implementations for Markowitz-ML and Portfolio-ML.
@@ -99,9 +99,10 @@ def run_feature_importance_base(chars, er_models, cluster_labels, barra_cov, set
         dates_oos=dates_oos,
         barra_cov=barra_cov,
         settings=settings,
-        tpf_cf_wealth=tpf_cf_wealth,
         features=features,
         output_path=output_path,
+        pf_set=pf_set,
+        wealth=wealth,
     )
 
     # Implement Portfolio-ML Base Case
