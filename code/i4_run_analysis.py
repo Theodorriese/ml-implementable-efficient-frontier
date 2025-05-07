@@ -7,10 +7,11 @@ from b_prepare_data import (load_cluster_labels,
 )
 from g_base_analysis import (
     load_base_case_portfolios, combine_portfolios, compute_portfolio_summary,
-    compute_and_plot_performance_time_series, compute_probability_of_outperformance,
+    compute_probability_of_outperformance,
     compute_and_plot_portfolio_statistics_over_time, compute_and_plot_correlation_matrix,
-    plot_apple_vs_xerox, plot_optimal_hyperparameters, compute_ar1_plot,
-    process_features_with_sufficient_coverage
+    plot_liquid_vs_illiquid, plot_optimal_hyperparameters, compute_ar1_plot,
+    process_features_with_sufficient_coverage,
+    ts_plot, ts_plot_manual_ylim
 )
 from g_economic_intuition import (
     combine_portfolio_weights,
@@ -30,11 +31,11 @@ from i1_Main import (settings, pf_set, features, pf_order, pf_order_new, main_ty
                      cluster_order, feat_excl)
 from g_implementable_efficient_frontier import run_ief
 
-from g_alpha_analysis import (
-    plot_alpha_decay_cumulative_continuous,
-    plot_alpha_decay_rolling_tstat,
-    compute_signal_rank_stability
-)
+# from g_alpha_analysis import (
+#     plot_alpha_decay_cumulative_continuous,
+#     plot_alpha_decay_rolling_tstat,
+#     compute_signal_rank_stability
+# )
 
 # # -------------------- CONFIGURATION (local) --------------------
 # data_path = r"C:\Master"
@@ -104,16 +105,16 @@ tpf = base_case["tpf"]
 factor_ml = base_case["factor_ml"]
 mkt = base_case["mkt"]
 
-# # 0) Extra plots
-# features=["market_equity", "dolvol_126d", "ami_126d", "prc",
-#          "rmax1_21d", "rmax5_21d", "beta_dimson_21d"]
-# # features = features[:30]
+# # # 0) Extra plots
+# # features=["market_equity", "dolvol_126d", "ami_126d", "prc",
+# #          "rmax1_21d", "rmax5_21d", "beta_dimson_21d"]
+# # # features = features[:30]
 
-# plot_alpha_decay_cumulative_continuous(chars, features, output_path)
-# plot_alpha_decay_rolling_tstat(chars, features, output_path)
-# compute_signal_rank_stability(chars, features, output_path)
+# # plot_alpha_decay_cumulative_continuous(chars, features, output_path)
+# # plot_alpha_decay_rolling_tstat(chars, features, output_path)
+# # compute_signal_rank_stability(chars, features, output_path)
 
-# print("Done with the alphas")
+# # print("Done with the alphas")
 
 # Combine portfolios
 pfs = combine_portfolios(pfml, static, bm_pfs, pf_order, gamma_rel)
@@ -124,101 +125,108 @@ pf_summary.to_csv(os.path.join(output_path, "portfolio_summary.csv"), index=Fals
 print('Portfolio summary created')
 
 
-# # -------------------- 1) PERFORMANCE TIME SERIES --------------------
-# print("Computing and plotting performance time series...")
+# -------------------- 1) PERFORMANCE TIME SERIES --------------------
+print("Computing and plotting performance time series...")
 
-# # Dynamically determine start_date and end_date based on pfs['eom_ret']
-# start_date = pd.to_datetime(pfs['eom_ret'].min()).strftime('%Y-%m-%d')
-# end_date = pd.to_datetime(pfs['eom_ret'].max()).strftime('%Y-%m-%d')
+# Dynamically determine start_date and end_date based on pfs['eom_ret']
+start_date = pd.to_datetime(pfs['eom_ret'].min()).strftime('%Y-%m-%d')
+end_date = pd.to_datetime(pfs['eom_ret'].max()).strftime('%Y-%m-%d')
 
-# # Now, plot the performance time series
-# performance_fig = compute_and_plot_performance_time_series(
-#         filtered_pfs,
-#         main_types,
-#         start_date,
-#         end_date,
-#         )
-# performance_fig.savefig(os.path.join(output_path, "performance_time_series.png"), bbox_inches="tight", dpi=300)
+ts_plot(
+        filtered_pfs,
+        main_types,
+        start_date,
+        end_date,
+        output_path
+        )
 
-
-# # -------------------- 2) PROBABILITY OF OUTPERFORMANCE --------------------
-# print("Computing probability of outperformance...")
-
-# prob_outperformance_df = compute_probability_of_outperformance(filtered_pfs, main_types)
-# prob_outperformance_df.to_csv(os.path.join(output_path, "probability_of_outperformance.csv"), index=False)
-# print("Probability of outperformance saved as csv")
-
-
-# # -------------------- 3) PORTFOLIO STATISTICS OVER TIME --------------------
-# print("Computing portfolio statistics over time...")
-
-# portfolio_stats_timeseries = compute_and_plot_portfolio_statistics_over_time(
-#     pfml=pfml,
-#     tpf=tpf,
-#     static=static,
-#     factor_ml=factor_ml,
-#     pfs=pfs,
-#     barra_cov=barra_cov,
-#     dates_oos=dates_oos,
-#     pf_order=pf_order,
-#     main_types=main_types,
-# )
-# portfolio_stats_timeseries.savefig(os.path.join(output_path, "portfolio_stats_time_series.png"), bbox_inches="tight", dpi=300)
+ts_plot_manual_ylim(
+        filtered_pfs,
+        main_types,
+        start_date,
+        end_date,
+        output_path
+        )
 
 
-# # -------------------- 4) CORRELATION MATRIX --------------------
-# print("Computing and plotting correlation matrix...")
+# -------------------- 2) PROBABILITY OF OUTPERFORMANCE --------------------
+print("Computing probability of outperformance...")
 
-# correlation_matrix = compute_and_plot_correlation_matrix(filtered_pfs, main_types)
-# correlation_matrix.to_csv(os.path.join(output_path, "correlation_matrix.csv"))
-
-
-# # -------------------- 5) APPLE VS. XEROX PLOT --------------------
-# print("Generating plot...")
-
-# liquid_id = 22111 # 22111 is Johnson and Johnson
-# illiquid_id = 27983 # 27983 is Xerox
-# start_year_liquid = 2000
-
-# apple_vs_xerox = plot_apple_vs_xerox(
-#     pfml=pfml,
-#     static=static,
-#     tpf=tpf,
-#     factor_ml=factor_ml,
-#     mkt=mkt,
-#     pfs=pfs,
-#     liquid_id=liquid_id,
-#     illiquid_id=illiquid_id,
-#     start_year=start_year_liquid
-# )
-# apple_vs_xerox.savefig(os.path.join(output_path, "apple_vs_xerox.png"), bbox_inches="tight", dpi=300)
-
-# # -------------------- 6) Optimal Hyper-parameters Plot --------------------
-# start_year = 1996
-
-# fig_hyper, fig_tuning = plot_optimal_hyperparameters(
-#     model_folder=model_folder,
-#     static=static["hps"],
-#     pfml=pfml["best_hps"],
-#     colours_theme=colours_theme,
-#     start_year=start_year
-# )
-# fig_hyper.savefig(os.path.join(output_path, "optimal_hyperparameters.png"), bbox_inches="tight", dpi=300)
-# fig_tuning.savefig(os.path.join(output_path, "portfolio_tuning_results.png"), bbox_inches="tight", dpi=300)
+prob_outperformance_df = compute_probability_of_outperformance(filtered_pfs, main_types)
+prob_outperformance_df.to_csv(os.path.join(output_path, "probability_of_outperformance.csv"), index=False)
+print("Probability of outperformance saved as csv")
 
 
-# # -------------------- 7) Autocorrelation plot --------------------
-# ar1_plot = compute_ar1_plot(
-#     chars=chars,
-#     features=features,
-#     cluster_labels=cluster_labels,
-#     output_path=output_path
-# )
-# ar1_plot.savefig(os.path.join(output_path, "ar1_plot.png"), bbox_inches="tight", dpi=300)
+# -------------------- 3) PORTFOLIO STATISTICS OVER TIME --------------------
+print("Computing portfolio statistics over time...")
+
+portfolio_stats_timeseries = compute_and_plot_portfolio_statistics_over_time(
+    pfml=pfml,
+    tpf=tpf,
+    static=static,
+    factor_ml=factor_ml,
+    pfs=pfs,
+    barra_cov=barra_cov,
+    dates_oos=dates_oos,
+    pf_order=pf_order,
+    main_types=main_types,
+)
+portfolio_stats_timeseries.savefig(os.path.join(output_path, "portfolio_stats_time_series.png"), bbox_inches="tight", dpi=300)
 
 
-# # -------------------- 8) Coverage plot --------------------
-# data, coverage = process_features_with_sufficient_coverage(features, feat_excl, settings, data_path)
+# -------------------- 4) CORRELATION MATRIX --------------------
+print("Computing and plotting correlation matrix...")
+
+correlation_matrix = compute_and_plot_correlation_matrix(filtered_pfs, main_types)
+correlation_matrix.to_csv(os.path.join(output_path, "correlation_matrix.csv"))
+
+
+# -------------------- 5) LIQUID VS. ILLIQUID PLOT --------------------
+print("Generating plot...")
+
+liquid_id = 10107
+illiquid_id = 27983
+start_year_liquid = 2000
+
+liquid_vs_illiquid = plot_liquid_vs_illiquid(
+    pfml=pfml,
+    static=static,
+    tpf=tpf,
+    factor_ml=factor_ml,
+    mkt=mkt,
+    pfs=pfs,
+    liquid_id=liquid_id,
+    illiquid_id=illiquid_id,
+    start_year=start_year_liquid
+)
+liquid_vs_illiquid.savefig(os.path.join(output_path, "liquid_vs_illiquid.png"), bbox_inches="tight", dpi=300)
+
+# -------------------- 6) Optimal Hyper-parameters Plot --------------------
+start_year = 1996
+
+fig_hyper, fig_tuning = plot_optimal_hyperparameters(
+    model_folder=model_folder,
+    static=static["hps"],
+    pfml=pfml["best_hps"],
+    colours_theme=colours_theme,
+    start_year=start_year
+)
+fig_hyper.savefig(os.path.join(output_path, "optimal_hyperparameters.png"), bbox_inches="tight", dpi=300)
+fig_tuning.savefig(os.path.join(output_path, "portfolio_tuning_results.png"), bbox_inches="tight", dpi=300)
+
+
+# -------------------- 7) Autocorrelation plot --------------------
+ar1_plot = compute_ar1_plot(
+    chars=chars,
+    features=features,
+    cluster_labels=cluster_labels,
+    output_path=output_path
+)
+ar1_plot.savefig(os.path.join(output_path, "ar1_plot.png"), bbox_inches="tight", dpi=300)
+
+
+# -------------------- 8) Coverage plot --------------------
+data, coverage = process_features_with_sufficient_coverage(features, feat_excl, settings, data_path)
 
 
 # # -------------------- 9) Implementable  Efficient Frontier --------------------
@@ -226,42 +234,42 @@ print('Portfolio summary created')
 # ef_all_ss, ef_ss = run_ief(chars, dates_oos, pf_set, wealth, barra_cov, market_data, risk_free, settings, latest_folder, output_path)
 
 
-# # -------------------- 10) PORTFOLIO WEIGHTS ANALYSIS --------------------
-# print("Analyzing portfolio weights...")
+# -------------------- 10) PORTFOLIO WEIGHTS ANALYSIS --------------------
+print("Analyzing portfolio weights...")
 
-# # Combine portfolio weights
-# weights_combined = combine_portfolio_weights(static, pfml, mkt, tpf, chars, date="2023-11-30")
+# Combine portfolio weights
+weights_combined = combine_portfolio_weights(static, pfml, mkt, tpf, chars, date="2023-11-30")
 
 # NOT RUN
-# # # Calculate and plot weight differences
-# # calculate_and_plot_weight_differences(weights_combined, settings, save_path=f"{output_path}/weight_differences.png")
+# # Calculate and plot weight differences
+# calculate_and_plot_weight_differences(weights_combined, settings, save_path=f"{output_path}/weight_differences.png")
 
-# # Sample once
-# np.random.seed(settings["seed_no"])
-# my_ids = np.random.choice(weights_combined["id"].unique(), size=70, replace=False)
+# Sample once
+np.random.seed(settings["seed_no"])
+my_ids = np.random.choice(weights_combined["id"].unique(), size=70, replace=False)
 
-# # Use for both runs
-# calculate_and_plot_weight_differences_rel(
-#     weights=weights_combined,
-#     types_to_compare=["Portfolio-ML", "Markowitz-ML"],
-#     settings=settings,
-#     sample_ids=my_ids,
-#     save_path=f"{output_path}/rel_weights_1.png"
-# )
+# Use for both runs
+calculate_and_plot_weight_differences_rel(
+    weights=weights_combined,
+    types_to_compare=["Portfolio-ML", "Markowitz-ML"],
+    settings=settings,
+    sample_ids=my_ids,
+    save_path=f"{output_path}/rel_weights_1.png"
+)
 
-# calculate_and_plot_weight_differences_rel(
-#     weights=weights_combined,
-#     types_to_compare=["Portfolio-ML", "Static-ML*"],
-#     settings=settings,
-#     sample_ids=my_ids,
-#     save_path=f"{output_path}/rel_weights_2.png"
-# )
+calculate_and_plot_weight_differences_rel(
+    weights=weights_combined,
+    types_to_compare=["Portfolio-ML", "Static-ML*"],
+    settings=settings,
+    sample_ids=my_ids,
+    save_path=f"{output_path}/rel_weights_2.png"
+)
 
-# # -------------------- 11) Perform Portfolio Analysis --------------------
-# print("Performing portfolio analysis...")
+# -------------------- 11) Perform Portfolio Analysis --------------------
+print("Performing portfolio analysis...")
 
-# # Perform portfolio analysis
-# portfolio_analysis(static, pfml, mkt, tpf, chars, colours_theme, save_path=f"{output_path}/portfolio_analysis.png")
+# Perform portfolio analysis
+portfolio_analysis(static, pfml, mkt, tpf, chars, colours_theme, save_path=f"{output_path}/portfolio_analysis.png")
 
 # -------------------- 12) FEATURE IMPORTANCE IN BASE CASE --------------------
 print("Calculating feature importance...")
@@ -269,6 +277,7 @@ print("Calculating feature importance...")
 # Calculate and plot feature importance
 calculate_feature_importance(pf_set, latest_folder, save_path=f"{output_path}/feature_importance_demo.png")
 
+# # NOT RUN
 # # -------------------- 13) IEF SUMMARY --------------------
 # print("Calculating IEF summary...")
 
@@ -287,6 +296,7 @@ print("Plotting counterfactual efficient frontier without trading costs...")
 # Plot counterfactual efficient frontier without trading costs and save the plot
 plot_counterfactual_ef_without_tc(latest_folder, colours_theme, save_path=f"{output_path}/counterfactual_ef_without_tc.png")
 
+# # NOT RUN
 # # -------------------- 16) FEATURE IMPORTANCE FOR RETURN PREDICTION MODELS --------------------
 # print("Plotting feature importance for return prediction models...")
 
@@ -299,4 +309,4 @@ plot_counterfactual_ef_without_tc(latest_folder, colours_theme, save_path=f"{out
 # # Analyze seasonality effect and save the plot
 # analyze_seasonality_effect(chars, save_path=f"{output_path}/seasonality_effect.png")
 
-# print("Done.")
+print("Done.")

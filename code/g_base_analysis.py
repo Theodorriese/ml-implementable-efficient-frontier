@@ -12,6 +12,7 @@ from tqdm import tqdm
 import math
 from a_general_functions import create_cov
 
+
 from matplotlib import rcParams
 rcParams.update({
     'font.size': 14,           # Base font size
@@ -154,20 +155,29 @@ def compute_portfolio_summary(pfs, main_types, pf_order, gamma_rel):
     return pf_summary, pfs_filtered
 
 
-# Performance Time-Series -----------
-def compute_and_plot_performance_time_series(pfs, main_types, start_date, end_date):
+# Portfolio time series --------------
+def ts_plot(pfs, main_types, start_date, end_date, save_path=None):
     """
-    Computes and plots the performance time-series for different portfolio types,
-    producing a single legend above the subplots, no gridlines, and manual y-axis control.
+    Computes and creates three separate performance plots (gross, net of TC, net of TC & risk)
+    with optional saving to disk.
+
+    Parameters:
+        pfs (pd.DataFrame): Performance DataFrame with 'r', 'tc', 'utility_t', 'eom_ret', 'type'.
+        main_types (list): Portfolio types to include.
+        start_date (str): Start date of the plot.
+        end_date (str): End date of the plot.
+        save_path (str or Path, optional): If provided, saves figures as PNGs in this directory.
+
+    Returns:
+        dict: Dictionary with matplotlib figures.
     """
 
-    # Compute cumulative returns
+    pfs = pfs.copy()
     pfs['cumret'] = pfs.groupby('type', observed=True)['r'].cumsum()
     pfs['cumret_tc'] = pfs['r'] - pfs['tc']
     pfs['cumret_tc'] = pfs.groupby('type', observed=True)['cumret_tc'].cumsum()
     pfs['cumret_tc_risk'] = pfs.groupby('type', observed=True)['utility_t'].cumsum()
 
-    # Melt into long format
     ts_data = (
         pfs[pfs['type'].isin(main_types)]
         .melt(
@@ -177,7 +187,6 @@ def compute_and_plot_performance_time_series(pfs, main_types, start_date, end_da
         )
     )
 
-    # Add initial zeros
     initial_values = pd.DataFrame({
         'eom_ret': pd.Timestamp(start_date) - pd.offsets.MonthBegin(),
         'type': main_types * 3,
@@ -192,7 +201,6 @@ def compute_and_plot_performance_time_series(pfs, main_types, start_date, end_da
     ts_data['eom_ret'] = pd.to_datetime(ts_data['eom_ret'])
     ts_data = ts_data.sort_values(by=['type', 'eom_ret', 'metric'])
 
-    # Label mapping
     metric_labels = {
         'cumret': 'Gross Return',
         'cumret_tc': 'Return net of TC',
@@ -204,51 +212,139 @@ def compute_and_plot_performance_time_series(pfs, main_types, start_date, end_da
         categories=list(metric_labels.values())
     )
 
-    # Set up plot
-    sns.set_theme(style="white", context="talk")
-    fig, axes = plt.subplots(1, 3, figsize=(18, 5), sharey=False,
-                             gridspec_kw={'width_ratios': [1.07, 1, 1]})
-
-    # Define manual y-axis ranges for each plot (adjust as needed)
-    ylims = {
-        'Gross Return': (-0.5, 2.5),
-        'Return net of TC': (-0.5, 1.5),
-        'Return net of TC and Risk': (-0.5, 0.75)
-    }
-
-    # Plot
-    for ax, metric in zip(axes, ts_data['metric_pretty'].cat.categories):
+    figures = {}
+    for metric in ts_data['metric_pretty'].cat.categories:
         plot_data = ts_data[ts_data['metric_pretty'] == metric]
+        fig, ax = plt.subplots(figsize=(10, 6))
+
         for portfolio_type in main_types:
             subset = plot_data[plot_data['type'] == portfolio_type]
             ax.plot(subset['eom_ret'], subset['value'], label=portfolio_type, linewidth=2)
 
         ax.set_title(metric)
-        ax.set_xlabel("")
+        ax.set_xlabel("End of Month")
         ax.set_ylabel("Cumulative Performance")
         ax.xaxis.set_major_formatter(DateFormatter('%Y'))
         ax.tick_params(axis='x', rotation=45)
         ax.grid(False)
-        # ax.set_xlim(pd.Timestamp(start_date), pd.Timestamp(end_date))
-        pad_months = 12  # Have added 12 months for padding
+        pad_months = 12
         ax.set_xlim(pd.Timestamp(start_date) - pd.DateOffset(months=pad_months), pd.Timestamp(end_date))
 
-        # Set manually specified y-axis limits
-        if metric in ylims:
-            ax.set_ylim(*ylims[metric])
+        ax.legend(loc='best', frameon=False)
+        fig.tight_layout()
 
-    # Single legend above
-    fig.legend(
-        handles=axes[0].get_lines(),
-        labels=main_types,
-        loc="upper center",
-        ncol=len(main_types),
-        frameon=False,
-        bbox_to_anchor=(0.5, 1.10)
+        figures[metric] = fig
+
+        # Save if path provided
+        if save_path:
+            filename = metric.lower().replace(" ", "_").replace("tc", "tc").replace("&", "and") + ".png"
+            fig.savefig(os.path.join(save_path, filename), bbox_inches="tight")
+
+    return figures
+
+
+
+# Portfolio time series with manual y-axis ----------------
+def ts_plot_manual_ylim(pfs, main_types, start_date, end_date, save_path=None):
+    """
+    Computes and creates three separate performance plots (gross, net of TC, net of TC & risk)
+    with manual y-axis limits and optional saving to disk.
+
+    Parameters:
+        pfs (pd.DataFrame): Performance DataFrame with 'r', 'tc', 'utility_t', 'eom_ret', 'type'.
+        main_types (list): Portfolio types to include.
+        start_date (str): Start date of the plot.
+        end_date (str): End date of the plot.
+        save_path (str or Path, optional): If provided, saves figures as PNGs in this directory.
+
+    Returns:
+        dict: Dictionary with matplotlib figures.
+    """
+
+    pfs = pfs.copy()
+    pfs['cumret'] = pfs.groupby('type', observed=True)['r'].cumsum()
+    pfs['cumret_tc'] = pfs['r'] - pfs['tc']
+    pfs['cumret_tc'] = pfs.groupby('type', observed=True)['cumret_tc'].cumsum()
+    pfs['cumret_tc_risk'] = pfs.groupby('type', observed=True)['utility_t'].cumsum()
+
+    ts_data = (
+        pfs[pfs['type'].isin(main_types)]
+        .melt(
+            id_vars=['type', 'eom_ret'],
+            value_vars=['cumret', 'cumret_tc', 'cumret_tc_risk'],
+            var_name='metric'
+        )
     )
 
-    fig.tight_layout(rect=[0, 0, 1, 0.97])
-    return fig
+    initial_values = pd.DataFrame({
+        'eom_ret': pd.Timestamp(start_date) - pd.offsets.MonthBegin(),
+        'type': main_types * 3,
+        'value': 0,
+        'metric': (
+            ['cumret'] * len(main_types)
+            + ['cumret_tc'] * len(main_types)
+            + ['cumret_tc_risk'] * len(main_types)
+        )
+    })
+    ts_data = pd.concat([ts_data, initial_values], ignore_index=True)
+    ts_data['eom_ret'] = pd.to_datetime(ts_data['eom_ret'])
+    ts_data = ts_data.sort_values(by=['type', 'eom_ret', 'metric'])
+
+    metric_labels = {
+        'cumret': 'Gross Return',
+        'cumret_tc': 'Return net of TC',
+        'cumret_tc_risk': 'Return net of TC and Risk'
+    }
+    ts_data['metric_pretty'] = ts_data['metric'].map(metric_labels)
+    ts_data['metric_pretty'] = pd.Categorical(
+        ts_data['metric_pretty'],
+        categories=list(metric_labels.values())
+    )
+
+    # Define manual y-axis limits
+    y_axis_limits = {
+        'Gross Return': (-0.5, 3.5),
+        'Return net of TC': (-0.5, 1.5),
+        'Return net of TC and Risk': (-0.5, 1.12)
+    }
+
+    figures = {}
+    for metric in ts_data['metric_pretty'].cat.categories:
+        plot_data = ts_data[ts_data['metric_pretty'] == metric]
+        fig, ax = plt.subplots(figsize=(10, 6))
+
+        for portfolio_type in main_types:
+            subset = plot_data[plot_data['type'] == portfolio_type]
+            ax.plot(subset['eom_ret'], subset['value'], label=portfolio_type, linewidth=2)
+
+        ax.set_title(metric)
+        ax.set_xlabel("End of Month")
+        ax.set_ylabel("Cumulative Performance")
+        ax.xaxis.set_major_formatter(DateFormatter('%Y'))
+        ax.tick_params(axis='x', rotation=45)
+        ax.grid(False)
+        pad_months = 12
+        ax.set_xlim(pd.Timestamp(start_date) - pd.DateOffset(months=pad_months), pd.Timestamp(end_date))
+
+        # Set y-axis limit manually
+        if metric in y_axis_limits:
+            ax.set_ylim(y_axis_limits[metric])
+
+        ax.legend(loc='best', frameon=False)
+        fig.tight_layout()
+
+        figures[metric] = fig
+        if save_path:
+            name_map = {
+                'Gross Return': "performance_gross_return",
+                'Return net of TC': "performance_net_tc",
+                'Return net of TC and Risk': "performance_net_tc_risk"
+            }
+            filename = f"{name_map.get(metric, metric.lower().replace(' ', '_'))}_man_y_limit.png"
+            fig.savefig(os.path.join(save_path, filename), bbox_inches="tight")
+
+    return figures
+
 
 
 # Test probability of outperformance ---------------------------------------------------
@@ -477,60 +573,38 @@ def compute_and_plot_correlation_matrix(pfs, main_types):
     return correlation_matrix
 
 
-# Apple vs. Xerox ----------------------------------------------------
-def plot_apple_vs_xerox(pfml, static, tpf, factor_ml, mkt,
+# liquid vs. illiquid ----------------------------------------------------
+def plot_liquid_vs_illiquid(pfml, static, tpf, factor_ml, mkt,
                         pfs, liquid_id, illiquid_id, start_year):
     """
-    Compare portfolio weights for a liquid and illiquid stock across different portfolios over time.
-
-    Parameters:
-    - mp, pfml, static, tpf, factor_ml, mkt: Dictionaries containing DataFrames of portfolio weights.
-    - pfs: DataFrame of additional portfolio statistics.
-    - liquid_id, illiquid_id: Stock IDs for liquid (e.g., Apple) and illiquid (e.g., Xerox) stocks.
-    - start_year: Starting year for the plot.
+    Compare portfolio weights for liquid and illiquid across different portfolios over time.
 
     Returns:
-    - None. Displays the weight comparison plot.
+        matplotlib.figure.Figure
     """
-
     liquid_id = str(liquid_id)
     illiquid_id = str(illiquid_id)
 
-    # Generate position_frames directly, checking if "w" exists before accessing
     position_frames = [
         pfml["w"][pfml["w"]["id"].isin([liquid_id, illiquid_id])].assign(type="Portfolio-ML") if "w" in pfml else None,
-        static["w"][static["w"]["id"].isin([liquid_id, illiquid_id])].assign(
-            type="Static-ML*") if "w" in static else None,
+        static["w"][static["w"]["id"].isin([liquid_id, illiquid_id])].assign(type="Static-ML*") if "w" in static else None,
         tpf["w"][tpf["w"]["id"].isin([liquid_id, illiquid_id])].assign(type="Markowitz-ML") if "w" in tpf else None,
-        factor_ml["w"][factor_ml["w"]["id"].isin([liquid_id, illiquid_id])].assign(
-            type="Factor-ML") if "w" in factor_ml else None,
+        factor_ml["w"][factor_ml["w"]["id"].isin([liquid_id, illiquid_id])].assign(type="Factor-ML") if "w" in factor_ml else None,
         mkt["w"][mkt["w"]["id"].isin([liquid_id, illiquid_id])].assign(type="Market") if "w" in mkt else None,
     ]
 
-    # Remove None entries from the list and concatenate all DataFrames
     positions = pd.concat([frame for frame in position_frames if frame is not None])
 
-    # Define stock type names
     stock_type_map = {
-        "14593": "Apple (liquid)",
-        "27983": "Xerox (illiquid)",
-        "93436": "Tesla",
-        "91103": "Visa",
-        "19561": "Boeing",
-        "10107": "Microsoft",
-        "22111": "Johnson and Johnson (liquid)",
-        "55976": "Walmart (liquid)"
+        "10107": "Microsoft (liquid)",
+        "27983": "Xerox (illiquid)"
     }
     positions["stock_type"] = positions["id"].map(stock_type_map).fillna(positions["id"])
 
-    # Filter data by year
     positions["eom"] = pd.to_datetime(positions["eom"])
     positions = positions[positions["eom"].dt.year >= start_year]
 
-    # Make sure the eom in pfs is end-of-month
     pfs["eom"] = pd.to_datetime(pfs["eom_ret"]) + pd.offsets.MonthEnd(0)
-
-    # Merge with portfolio stats
     positions = pd.merge(
         positions,
         pfs[["type", "eom", "inv"]],
@@ -538,49 +612,44 @@ def plot_apple_vs_xerox(pfml, static, tpf, factor_ml, mkt,
         how="left",
     )
 
-    # Standardize weights per stock type
-    positions["w_z"] = positions.groupby(["type", "id"])["w"].transform(lambda x: (x - x.mean()) / x.std())
-
-    # Ensure correct ordering for plot categories
     positions["type"] = pd.Categorical(
         positions["type"],
-        categories=["Multiperiod-ML*", "Portfolio-ML", "Static-ML*", "Markowitz-ML", "Factor-ML", "Market"],
+        categories=["Portfolio-ML", "Static-ML*", "Markowitz-ML", "Factor-ML", "Market"],
         ordered=True
     )
 
-    # Plotting
-    plt.figure(figsize=(12, 8))
-    unique_types = positions["type"].cat.categories
+    # Plotting with dynamic Y-axis and no grid
+    fig, axes = plt.subplots(2, 3, figsize=(18, 12), sharex=False, sharey=False)
+    axes = axes.flatten()
 
-    for i, portfolio_type in enumerate(unique_types):
+    for i, portfolio_type in enumerate(positions["type"].cat.categories):
         subset = positions[positions["type"] == portfolio_type]
-
         if subset.empty:
-            continue  # Skip if no data for this type
+            continue
 
-        plt.subplot(2, 3, i + 1)
-
-        for stock_type in subset["stock_type"].unique():
+        ax = axes[i]
+        for stock_type in ["Microsoft (liquid)", "Xerox (illiquid)"]:
             stock_data = subset[subset["stock_type"] == stock_type]
-            plt.plot(
-                stock_data["eom"],
-                stock_data["w"],
-                label=f"{stock_type}",
-                alpha=0.8,
-            )
+            if not stock_data.empty:
+                ax.plot(stock_data["eom"], stock_data["w"], label=stock_type, alpha=0.85, linewidth=2)
 
-        plt.axhline(0, color="black", linestyle="--", linewidth=0.8)
-        plt.title(portfolio_type)
-        plt.xlabel("End of Month")
-        plt.ylabel("Portfolio Weight")
-        plt.legend(loc="upper center", fontsize=8)
-        plt.grid(True, which="both", linestyle="--", linewidth=0.5)
+        ax.axhline(0, color="black", linestyle="--", linewidth=0.8)
+        ax.set_title(portfolio_type)
+        ax.set_xlabel("End of Month")
+        ax.set_ylabel("Weight")
+        ax.tick_params(axis='x', rotation=45)
+        ax.grid(False)  # Disable grid
+        ax.legend(fontsize=10)
 
-    plt.tight_layout()
-    fig = plt.gcf()
-    plt.show()
+    for j in range(i + 1, len(axes)):
+        fig.delaxes(axes[j])
+
+    fig.suptitle("Portfolio Weights: Microsoft vs. Xerox", fontsize=16)
+    fig.tight_layout(rect=[0, 0, 1, 0.95])
 
     return fig
+
+
 
 
 # Optimal Hyper-parameters ----------------------------
@@ -826,7 +895,7 @@ def plot_optimal_hyperparameters(model_folder, static, pfml, colours_theme, star
 
 
 # Plot AR ----------------------------
-def compute_ar1_plot(chars, features, cluster_labels, output_path):
+def compute_ar1_plot(chars, features, cluster_labels, output_path=None):
     """
     Compute and plot AR1 (average monthly autocorrelation) for characteristics grouped by clusters.
 
@@ -834,72 +903,75 @@ def compute_ar1_plot(chars, features, cluster_labels, output_path):
         chars (pd.DataFrame): DataFrame containing characteristics data with columns ["id", "eom", "valid"] and features.
         features (list): List of characteristic feature names.
         cluster_labels (pd.DataFrame): DataFrame with columns ["characteristic", "cluster"].
+        output_path (str, optional): If provided, saves the figure to this path.
 
     Returns:
         matplotlib.figure.Figure: AR1 plot figure.
     """
-    # Sort by ID and EOM (end of month)
-    chars = chars.sort_values(by=["id", "eom"]).copy()
-    chars["prev_eom"] = chars.groupby("id")["eom"].shift(1)
-    chars["lag_ok"] = (chars["eom"] == (chars["prev_eom"] + pd.DateOffset(months=1)).apply(
-        lambda x: x + pd.offsets.MonthEnd(0)))
 
-    ar1_results = []
+    # # Sort by ID and EOM (end of month)
+    # chars = chars.sort_values(by=["id", "eom"]).copy()
+    # chars["prev_eom"] = chars.groupby("id")["eom"].shift(1)
+    # chars["lag_ok"] = (chars["eom"] == (chars["prev_eom"] + pd.DateOffset(months=1)).apply(
+    #     lambda x: x + pd.offsets.MonthEnd(0)))
 
-    # Iterate over features to calculate AR1
-    for feature in tqdm(features, desc="Processing features"):
-        chars["var"] = chars[feature]
-        chars["var_l1"] = chars.groupby("id")["var"].shift(1)
+    # ar1_results = []
 
-        # Subset data for valid conditions
-        valid_subset = chars[
-            chars["valid"] &
-            chars["lag_ok"] &
-            ~chars["var"].isin([0.5]) &
-            chars["var"].notna() &
-            chars["var_l1"].notna()
-            ].copy()
+    # for feature in tqdm(features, desc="Processing features"):
+    #     chars["var"] = chars[feature]
+    #     chars["var_l1"] = chars.groupby("id")["var"].shift(1)
 
-        # Group by ID and ensure at least 60 observations
-        valid_subset["n"] = valid_subset.groupby("id")["id"].transform("size")
-        valid_subset = valid_subset[valid_subset["n"] >= 12 * 5]
+    #     valid_subset = chars[
+    #         chars["valid"] &
+    #         chars["lag_ok"] &
+    #         ~chars["var"].isin([0.5]) &
+    #         chars["var"].notna() &
+    #         chars["var_l1"].notna()
+    #     ].copy()
 
-        # Calculate AR1 for each ID
-        id_ar1 = valid_subset.groupby("id").apply(
-            lambda group: np.corrcoef(group["var"], group["var_l1"])[0, 1] if len(group) > 1 else np.nan
-        ).dropna().reset_index(name="ar1")
+    #     valid_subset["n"] = valid_subset.groupby("id")["id"].transform("size")
+    #     valid_subset = valid_subset[valid_subset["n"] >= 12 * 5]
 
-        # Compute mean AR1 for the feature
-        ar1_mean = id_ar1["ar1"].mean()
-        ar1_results.append({"char": feature, "ar1": ar1_mean})
+    #     id_ar1 = valid_subset.groupby("id").apply(
+    #         lambda group: np.corrcoef(group["var"], group["var_l1"])[0, 1] if len(group) > 1 else np.nan
+    #     ).dropna().reset_index(name="ar1")
 
-    ar1_df = pd.DataFrame(ar1_results)
-    ar1_df = ar1_df.merge(cluster_labels, left_on="char", right_on="characteristic")
+    #     ar1_mean = id_ar1["ar1"].mean()
+    #     ar1_results.append({"char": feature, "ar1": ar1_mean})
 
-    # Compute cluster-level averages for sorting
-    cluster_means = (
-        ar1_df.groupby("cluster")["ar1"]
-        .mean()
-        .sort_values()
-        .index
-    )
+    # ar1_df = pd.DataFrame(ar1_results)
+    # ar1_df = ar1_df.merge(cluster_labels, left_on="char", right_on="characteristic")
 
-    # Update cluster names for presentation
-    ar1_df["pretty_name"] = ar1_df["cluster"]
-    ar1_df["pretty_name"] = pd.Categorical(ar1_df["pretty_name"], categories=cluster_means, ordered=True)
+    # cluster_means = (
+    #     ar1_df.groupby("cluster")["ar1"]
+    #     .mean()
+    #     .sort_values()
+    #     .index
+    # )
 
-    # Sort features within clusters
-    ar1_df["sort_var"] = ar1_df.groupby("cluster")["ar1"].transform("mean") + ar1_df["ar1"] / 100000
-    ar1_df = ar1_df.sort_values(by=["pretty_name", "sort_var"], ascending=[True, True])
+    # ar1_df["pretty_name"] = ar1_df["cluster"]
+    # ar1_df["pretty_name"] = pd.Categorical(ar1_df["pretty_name"], categories=cluster_means, ordered=True)
 
-    # Plot setup (seaborn)
+    # ar1_df["sort_var"] = ar1_df.groupby("cluster")["ar1"].transform("mean") + ar1_df["ar1"] / 100000
+    # ar1_df = ar1_df.sort_values(by=["pretty_name", "sort_var"], ascending=[True, True])
+
+    ar1_df = pd.read_pickle("ar1_data.pkl")
+
+    # Plot setup
     sns.set_theme(style="whitegrid")
-    plt.figure(figsize=(12, 14))  # Wider and taller
+    plt.figure(figsize=(14, 16))
+
+    # Get unique clusters
     unique_themes = ar1_df["pretty_name"].cat.categories
-    palette = sns.color_palette("tab10", n_colors=len(unique_themes))
+
+    # Create a custom palette excluding color at index 13 (pink)
+    base_palette = sns.color_palette("tab20", 20)
+    cleaned_palette = [c for i, c in enumerate(base_palette) if i not in [8, 11, 12, 13]]
+
+    # Map cleaned colors to themes
+    palette = cleaned_palette[:len(unique_themes)]
     theme_colors = dict(zip(unique_themes, palette))
 
-    # Plot AR1
     ax = sns.barplot(
         data=ar1_df,
         y="char",
@@ -911,16 +983,23 @@ def compute_ar1_plot(chars, features, cluster_labels, output_path):
     ax.set_title("Average Monthly Autocorrelation (AR1) by Characteristic", fontsize=16)
     ax.set_xlabel("Average Monthly Autocorrelation", fontsize=12)
     ax.set_ylabel("")
-    ax.tick_params(axis='y', labelsize=9)  # Smaller y-axis font
+    ax.tick_params(axis='y', labelsize=9)
     ax.tick_params(axis='x', labelsize=10)
-    ax.legend(title="Theme", loc="center right", bbox_to_anchor=(1, 0.5), frameon=False)
-    plt.gca().invert_yaxis()
 
+    # Legend outside the plot
+    ax.legend(title="Theme", loc="center left", bbox_to_anchor=(1.02, 0.5), frameon=False)
+    plt.gca().invert_yaxis()
     plt.tight_layout(rect=[0, 0, 0.8, 1])
-    AR1_fig = plt.gcf()
+
+    fig = plt.gcf()
+
+    if output_path:
+        fig.savefig(output_path, bbox_inches="tight")
+
     plt.show()
 
-    return AR1_fig
+    return fig
+
 
 
 # Features with sufficient coverage ------------------
