@@ -1,2 +1,0 @@
-# Parameters for script
-horizon = 6
