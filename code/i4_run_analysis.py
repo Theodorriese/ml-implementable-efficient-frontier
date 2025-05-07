@@ -214,7 +214,6 @@ fig_hyper, fig_tuning = plot_optimal_hyperparameters(
 fig_hyper.savefig(os.path.join(output_path, "optimal_hyperparameters.png"), bbox_inches="tight", dpi=300)
 fig_tuning.savefig(os.path.join(output_path, "portfolio_tuning_results.png"), bbox_inches="tight", dpi=300)
 
-
 # -------------------- 7) Autocorrelation plot --------------------
 ar1_plot = compute_ar1_plot(
     chars=chars,

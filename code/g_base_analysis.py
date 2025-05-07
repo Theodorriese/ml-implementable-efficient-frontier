@@ -243,7 +243,6 @@ def ts_plot(pfs, main_types, start_date, end_date, save_path=None):
     return figures
 
 
-
 # Portfolio time series with manual y-axis ----------------
 def ts_plot_manual_ylim(pfs, main_types, start_date, end_date, save_path=None):
     """
