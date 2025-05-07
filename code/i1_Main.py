@@ -30,7 +30,7 @@ txt_size = 10
 # Data settings dictionary
 settings = {
     "region": "USA",
-    "multi_process": True,
+    "multi_process": False,
     # "data_path": "C:\Master",
     "data_path": "/work/frontier_ml_g10/",
     "parallel": True,
@@ -53,7 +53,8 @@ settings = {
         "start": pd.Timestamp("1986-01-01"),
         "end": pd.Timestamp("2023-12-31"),
         "feat_pct": 0.5,
-        "nyse_stocks": True
+        "nyse_stocks": True,
+        "size_screen": "perc_low50_high100_min50",
     },
     "pi": 0.1,
     "rff": {
