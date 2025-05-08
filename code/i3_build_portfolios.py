@@ -16,7 +16,7 @@ config_params = {
     "wealth": pf_set["wealth"],
     "gamma_rel": pf_set["gamma_rel"],
     "industry_cov": settings["cov_set"]["industries"],
-    "update_base": False,
+    "update_base": True,
     "update_fi_base": True,
     "update_fi_ief": True,
     "update_fi_ret": True,
