@@ -32,7 +32,7 @@ settings = {
     "region": "USA",
     "multi_process": False,
     # "data_path": "C:\Master",
-    "data_path": "/work/frontier_ml_g10/",
+    "data_path": "/work/frontier_ml_g10_h1/",
     "parallel": True,
     "seed_no": 1,
     "months": False,
@@ -74,7 +74,8 @@ settings = {
                 "k": [1, 2, 3],
                 "u": [0.25, 0.5, 1],
                 "g": [0, 1, 2],
-                "K": 12
+                # "K": 12, # set to 12 if we run all horizons
+                "K": 1
             },
             "static": {
                 "k": [1 / 1, 1 / 3, 1 / 5],
