@@ -30,7 +30,7 @@ txt_size = 10
 # Data settings dictionary
 settings = {
     "region": "USA",
-    "multi_process": False,
+    "multi_process": True,
     # "data_path": "C:\Master",
     "data_path": "/work/frontier_ml_g10_h1/",
     "parallel": True,
