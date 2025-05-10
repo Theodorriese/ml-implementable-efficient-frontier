@@ -5,7 +5,6 @@ from d_estimate_cov_matrix import prepare_cluster_data
 from e_prepare_portfolio_data import run_prepare_portfolio_data
 from f_feature_importance_base import run_feature_importance_base
 from f_feature_importance_IEF import run_feature_importance_ief
-from f_feature_importance_ret import run_feature_importance_ret
 from f_base_case import run_f_base_case
 from i1_Main import settings, pf_set, features
 
@@ -252,19 +251,6 @@ if config_params.get('update_fi_ief', True):
         lambda_list=portfolio_data['lambda_list'],
         output_path=output_path,
         cluster_labels=cluster_labels
-    )
-
-# ---------------- Feature importance - Expected return models ---------------- #
-if config_params.get('update_fi_ret', True):
-    print("Running Counterfactual Estimation...")
-
-    run_feature_importance_ret(
-        chars=portfolio_data['chars'],
-        cluster_labels=cluster_labels,
-        features=features,
-        settings=settings,
-        output_path=output_path,
-        model_folder=get_from_path_model
     )
 
 

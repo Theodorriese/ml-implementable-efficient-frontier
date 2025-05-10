@@ -23,7 +23,7 @@ def load_pfml(output_path):
 
 
 def implement_pfml_cf_ief(chars, barra_cov, wealth, dates_oos, risk_free, settings, pf_set, lambda_list,
-                          output_path, cluster_labels):
+                          output_path, cluster_labels, features):
     """
     Implement Portfolio-ML - IEF and PFML for specified clusters with lambda_list.
     """
@@ -52,7 +52,7 @@ def implement_pfml_cf_ief(chars, barra_cov, wealth, dates_oos, risk_free, settin
             features=features,
             cluster_labels=cluster_labels
         )
-        cluster_result["gamma_rel"] = gamma_rel
+        cluster_result["gamma_rel"] = pf_set["gamma_rel"]
         return cluster_result
 
     if settings.get("multi_process", False):
@@ -72,7 +72,6 @@ def implement_pfml_cf_ief(chars, barra_cov, wealth, dates_oos, risk_free, settin
     return pfml_cf_ief_combined
 
 
-
 def run_feature_importance_ief(chars, barra_cov, wealth, dates_oos, risk_free, settings, pf_set, lambda_list,
                                output_path, cluster_labels):
     """
@@ -89,5 +88,6 @@ def run_feature_importance_ief(chars, barra_cov, wealth, dates_oos, risk_free, s
         pf_set=pf_set,
         lambda_list=lambda_list,
         output_path=output_path,
-        cluster_labels=cluster_labels
+        cluster_labels=cluster_labels,
+        features=features
     )

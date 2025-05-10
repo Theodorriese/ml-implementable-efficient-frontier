@@ -24,7 +24,6 @@ from g_feature_importance import (
     calculate_ief_summary,
     plot_with_trading_costs,
     plot_counterfactual_ef_without_tc,
-    plot_feature_importance_for_return_predictions,
     analyze_seasonality_effect
 )
 from i1_Main import (settings, pf_set, features, pf_order, pf_order_new, main_types,
@@ -295,17 +294,5 @@ print("Plotting counterfactual efficient frontier without trading costs...")
 # Plot counterfactual efficient frontier without trading costs and save the plot
 plot_counterfactual_ef_without_tc(latest_folder, colours_theme, save_path=f"{output_path}/counterfactual_ef_without_tc.png")
 
-# # NOT RUN
-# # -------------------- 16) FEATURE IMPORTANCE FOR RETURN PREDICTION MODELS --------------------
-# print("Plotting feature importance for return prediction models...")
-
-# # Plot feature importance for return prediction models and save the plot
-# plot_feature_importance_for_return_predictions(latest_folder, colours_theme, save_path=f"{output_path}/feature_importance_return_predictions.png")
-
-# # -------------------- 17) ANALYZE SEASONALITY EFFECT --------------------
-# print("Analyzing seasonality effect...")
-
-# # Analyze seasonality effect and save the plot
-# analyze_seasonality_effect(chars, save_path=f"{output_path}/seasonality_effect.png")
 
 print("Done.")
