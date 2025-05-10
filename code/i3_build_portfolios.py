@@ -18,7 +18,6 @@ config_params = {
     "update_base": True,
     "update_fi_base": True,
     "update_fi_ief": True,
-    "update_fi_ret": True,
 }
 
 # Print config for verification
