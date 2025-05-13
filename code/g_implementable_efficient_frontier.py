@@ -341,7 +341,6 @@ def get_indifference_points(ef_all_ss):
     ].copy()
 
 
-
 def create_indifference_curves(points):
     """
     Generates indifference curves for a given set of utility levels and gamma values per row.
@@ -414,12 +413,11 @@ def plot_figure_1A(ef_all_ss, mv_ss, indifference_curves, points, output_path):
     Returns:
         None: Saves the figure to disk as 'figure_1A.png'.
     """
-
     fig, ax = plt.subplots(figsize=(10, 6))
 
     # 1. Gross tangency line (Markowitz-ML gross)
     tpf_df = ef_all_ss[ef_all_ss['type'] == 'Markowitz-ML'].dropna(subset=['sr_gross'])
-    tpf_slope = tpf_df['sr_gross'].iloc[0]  # You can also use .median() if you prefer
+    tpf_slope = tpf_df['sr_gross'].iloc[0]
     x_vals = np.linspace(0, 0.4, 100)
     ax.plot(x_vals, tpf_slope * x_vals, label="Markowitz-ML (gross)", linestyle='-', color='gray')
 
@@ -428,18 +426,39 @@ def plot_figure_1A(ef_all_ss, mv_ss, indifference_curves, points, output_path):
         df = ef_all_ss[ef_all_ss['type'] == strategy].dropna(subset=['sd', 'r_tc'])
         ax.plot(df['sd'], df['r_tc'], label=strategy)
 
-    # 3. Plot points for fixed strategies
+    # 3. Plot fixed strategy points with dynamic gamma-based markers
     fixed_strategies = ['Portfolio-ML', 'Static-ML*', 'Static-ML']
-    markers = {'Portfolio-ML': 'o', 'Static-ML*': '^', 'Static-ML': 's'}
-    colors = {'Portfolio-ML': 'tab:blue', 'Static-ML*': 'tab:green', 'Static-ML': 'black'}
+    colors = {
+        'Portfolio-ML': 'tab:blue',
+        'Static-ML*': 'tab:green',
+        'Static-ML': 'black'
+    }
 
-    for strategy in fixed_strategies:
-        row = points[points['type'] == strategy]
-        if not row.empty:
-            ax.scatter(row['sd_annual'], row['r_tc_annual'],
-                       marker=markers[strategy],
-                       color=colors[strategy],
-                       label=strategy)
+    # Dynamically assign markers to (strategy, gamma) combinations
+    available_markers = ['o', '^', 's', 'D', 'P', 'X', 'v', 'H']
+    marker_map = {}
+    marker_idx = 0
+
+    for _, row in points[points['type'].isin(fixed_strategies)].iterrows():
+        strategy = row['type']
+        gamma = row.get('gamma_rel', None)
+        key = (strategy, gamma)
+
+        if key not in marker_map:
+            marker_map[key] = available_markers[marker_idx % len(available_markers)]
+            marker_idx += 1
+
+        marker = marker_map[key]
+        color = colors.get(strategy, 'gray')
+
+        label = f"{strategy} (γ={gamma})" if gamma is not None else strategy
+
+        ax.scatter(
+            row['sd_annual'], row['r_tc_annual'],
+            marker=marker,
+            color=color,
+            label=label
+        )
 
     # 4. Annotate Static-ML specifically
     static_row = points[points['type'] == 'Static-ML']
@@ -449,10 +468,9 @@ def plot_figure_1A(ef_all_ss, mv_ss, indifference_curves, points, output_path):
                     xytext=(sr['sd'], 0.05), ha='center',
                     arrowprops=dict(arrowstyle='->', lw=0.5))
 
-    # 4b. Draw lines through Static-ML and Portfolio-ML across gammas
+    # 4b. Draw lines through Static-ML* and Portfolio-ML across gammas
     try:
         strat_points = points.set_index(['type', 'gamma_rel'])
-
         for strat in ['Static-ML*', 'Portfolio-ML']:
             gammas = sorted(points[points['type'] == strat]['gamma_rel'].unique())
             if len(gammas) >= 2:
@@ -460,12 +478,8 @@ def plot_figure_1A(ef_all_ss, mv_ss, indifference_curves, points, output_path):
                 p1 = strat_points.loc[(strat, g1), ['sd_annual', 'r_tc_annual']].values.ravel()
                 p2 = strat_points.loc[(strat, g2), ['sd_annual', 'r_tc_annual']].values.ravel()
 
-                # Line from origin to first point
                 ax.plot([0, p1[0]], [0, p1[1]], color='black', linestyle='-', alpha=0.7)
-
-                # Line from first point to second point
                 ax.plot([p1[0], p2[0]], [p1[1], p2[1]], color='black', linestyle='-', alpha=0.7)
-
     except Exception as e:
         print(f"Could not draw strategy lines across gammas: {e}")
 
@@ -474,7 +488,7 @@ def plot_figure_1A(ef_all_ss, mv_ss, indifference_curves, points, output_path):
         curve = indifference_curves[indifference_curves['u'] == u_val]
         ax.plot(curve['sd'], curve['r_tc'], linestyle='dashed', color='gray', alpha=0.4)
 
-    # Labels and formatting
+    # 6. Labels and formatting
     ax.set_xlim(0, 0.4)
     ax.set_ylim(-0.5, 0.8)
     ax.set_xlabel("Volatility")
@@ -482,6 +496,7 @@ def plot_figure_1A(ef_all_ss, mv_ss, indifference_curves, points, output_path):
     ax.set_title("Implementable Efficient Frontier")
     ax.legend()
 
+    # 7. Save figure
     save_path = os.path.join(output_path, "figure_1A.png")
     fig.savefig(save_path, bbox_inches='tight')
     print(f"Figure 1A saved to: {save_path}")

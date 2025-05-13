@@ -29,13 +29,6 @@ from g_plot_splits import plot_training_val_test_split
 from g_plot_distr import plot_combined_return_distributions
 
 
-# # -------------------- CONFIGURATION (local) --------------------
-# data_path = r"C:\Master"
-# base_path = r"C:\Master\Data\Generated\Portfolios"
-# output_path = r"C:\Master\Data\Generated\Analysis"
-# latest_folder = r"C:\Master\Data\Generated\Portfolios\demo"
-# model_folder = r"C:\Master\Outputs"
-
 # -------------------- CONFIGURATION --------------------
 data_path = "/work/frontier_ml_g10"
 base_path = "/work/frontier_ml_g10/data/Portfolios"
@@ -205,11 +198,9 @@ ar1_plot = compute_ar1_plot(
 )
 ar1_plot.savefig(os.path.join(output_path, "ar1_plot.png"), bbox_inches="tight", dpi=300)
 
-
 # -------------------- 8) Implementable  Efficient Frontier --------------------
 print("Running initial IEF script...")
 ef_all_ss, ef_ss = run_ief(chars, dates_oos, pf_set, wealth, barra_cov, market_data, risk_free, settings, latest_folder, output_path)
-
 
 # -------------------- 9) PORTFOLIO WEIGHTS ANALYSIS --------------------
 print("Analyzing portfolio weights...")
