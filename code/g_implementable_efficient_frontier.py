@@ -233,18 +233,22 @@ def get_ief_portfolios(output_path, settings, pf_set):
 
     all_portfolios = []
 
-    if settings.get("ief_multi_gamma", False):
+    # Default is multi-gamma if key is missing
+    if settings.get("ief_multi_gamma", True):
         for folder in os.listdir(output_path):
             folder_path = os.path.join(output_path, folder)
-            if not os.path.isdir(folder_path) or not folder.startswith("gamma_"):
+
+            if not os.path.isdir(folder_path):
                 continue
-            try:
-                gamma_val = float(folder.split("_")[1])
-            except (IndexError, ValueError):
-                continue
-            all_portfolios.extend(load_ief_portfolio_folder(folder_path, gamma_val))
+
+            if folder.startswith("gamma_"):
+                try:
+                    gamma_val = float(folder.split("_")[1])
+                    all_portfolios.extend(load_ief_portfolio_folder(folder_path, gamma_val))
+                except (IndexError, ValueError):
+                    print(f"Skipping malformed folder name: {folder}")
+                    continue
     else:
-        # SINGLE-GAMMA mode — always inject gamma from pf_set
         gamma_val = pf_set["gamma_rel"]
         all_portfolios.extend(load_ief_portfolio_folder(output_path, gamma_val))
 
@@ -252,7 +256,7 @@ def get_ief_portfolios(output_path, settings, pf_set):
     ief_ss = pd.concat(all_portfolios, ignore_index=True)
 
     # Duplicate check
-    duplicate_check = ief_ss.groupby(['type', 'eom_ret']).size()
+    duplicate_check = ief_ss.groupby(['type', 'gamma_rel', 'eom_ret']).size()
     if (duplicate_check > 1).any():
         raise ValueError("Found duplicates in the IEF portfolios!")
 
@@ -327,42 +331,42 @@ def build_ief_input(factor_summary, tpf_summary, ief_result, pf_set):
     return ef_all_ss
 
 
-def get_indifference_points(ef_all_ss, pf_set):
+def get_indifference_points(ef_all_ss):
     """
-    Extracts only the IEF strategies (Portfolio-ML, Static-ML*, Static-ML)
-    with matching wealth and gamma, to be used for indifference curve generation.
+    Extracts only the IEF strategies (Portfolio-ML, Static-ML*, Markowitz-ML)
+    across all gamma values.
     """
     return ef_all_ss[
-        ef_all_ss['type'].isin(['Portfolio-ML', 'Static-ML*', 'Static-ML']) &
-        (ef_all_ss['gamma_rel'] == pf_set['gamma_rel'])
-        ].copy()
+        ef_all_ss['type'].isin(['Portfolio-ML', 'Static-ML*', 'Markowitz-ML'])
+    ].copy()
 
 
-# 6) Indifference curve generation
-def create_indifference_curves(points, gamma_rel):
+
+def create_indifference_curves(points):
     """
-    Generates indifference curves for a given set of utility levels and a specified risk aversion parameter.
+    Generates indifference curves for a given set of utility levels and gamma values per row.
 
     Parameters:
-        points (pd.DataFrame): DataFrame containing 'obj' column (target utility values).
-        gamma_rel (float): Relative risk aversion parameter.
+        points (pd.DataFrame): DataFrame containing 'obj' (target utility) and 'gamma_rel' per row.
 
     Returns:
-        pd.DataFrame: Combined DataFrame of indifference curves with columns ['sd', 'r_tc', 'u'].
+        pd.DataFrame: Combined DataFrame of indifference curves with columns ['sd', 'r_tc', 'u', 'gamma_rel'].
     """
-
     curves = []
     for _, row in points.iterrows():
         u_target = row['obj']
+        gamma = row['gamma_rel']
         vol_space = np.linspace(0, 0.4, 41)
-        r_tc = u_target + 0.5 * gamma_rel * vol_space ** 2
+        r_tc = u_target + 0.5 * gamma * vol_space ** 2
         curve = pd.DataFrame({
             'sd': vol_space,
             'r_tc': r_tc,
-            'u': u_target
+            'u': u_target,
+            'gamma_rel': gamma
         })
         curves.append(curve)
     return pd.concat(curves, ignore_index=True)
+
 
 
 # 7) Plot indifference curves
@@ -445,17 +449,37 @@ def plot_figure_1A(ef_all_ss, mv_ss, indifference_curves, points, output_path):
                     xytext=(sr['sd'], 0.05), ha='center',
                     arrowprops=dict(arrowstyle='->', lw=0.5))
 
+    # 4b. Draw lines through Static-ML and Portfolio-ML across gammas
+    try:
+        strat_points = points.set_index(['type', 'gamma_rel'])
+
+        for strat in ['Static-ML*', 'Portfolio-ML']:
+            gammas = sorted(points[points['type'] == strat]['gamma_rel'].unique())
+            if len(gammas) >= 2:
+                g1, g2 = gammas[1], gammas[0]
+                p1 = strat_points.loc[(strat, g1), ['sd_annual', 'r_tc_annual']].values.ravel()
+                p2 = strat_points.loc[(strat, g2), ['sd_annual', 'r_tc_annual']].values.ravel()
+
+                # Line from origin to first point
+                ax.plot([0, p1[0]], [0, p1[1]], color='black', linestyle='-', alpha=0.7)
+
+                # Line from first point to second point
+                ax.plot([p1[0], p2[0]], [p1[1], p2[1]], color='black', linestyle='-', alpha=0.7)
+
+    except Exception as e:
+        print(f"Could not draw strategy lines across gammas: {e}")
+
     # 5. Plot indifference curves
     for u_val in points['obj']:
         curve = indifference_curves[indifference_curves['u'] == u_val]
         ax.plot(curve['sd'], curve['r_tc'], linestyle='dashed', color='gray', alpha=0.4)
 
     # Labels and formatting
-    ax.set_xlim(0, 0.35)
-    ax.set_ylim(-0.2, 0.54)
+    ax.set_xlim(0, 0.4)
+    ax.set_ylim(-0.5, 0.8)
     ax.set_xlabel("Volatility")
     ax.set_ylabel("Excess returns (net of trading cost)")
-    ax.set_title("Figure 1A: Implementable Efficient Frontier")
+    ax.set_title("Implementable Efficient Frontier")
     ax.legend()
 
     save_path = os.path.join(output_path, "figure_1A.png")
@@ -488,8 +512,8 @@ def run_ief(chars, dates_oos, pf_set, wealth, barra_cov, market_data, risk_free,
     ief_result = get_ief_portfolios(latest_folder, settings, pf_set)
     ef_all_ss = build_ief_input(factor_ss, tpf_ss, ief_result, pf_set)
 
-    points = get_indifference_points(ef_all_ss, pf_set)
-    indifference_curves = create_indifference_curves(points, pf_set['gamma_rel'])
+    points = get_indifference_points(ef_all_ss)
+    indifference_curves = create_indifference_curves(points)
 
     # Plot 1A
     plot_figure_1A(ef_all_ss, mv_ss, indifference_curves, points, output_path)

@@ -31,6 +31,7 @@ txt_size = 10
 settings = {
     "region": "USA",
     "multi_process": True,
+    "ief_multi_gamma": True,
     # "data_path": "C:\Master",
     "data_path": "/work/frontier_ml_g10_h1/",
     "parallel": True,
