@@ -15,9 +15,9 @@ config_params = {
     "wealth": pf_set["wealth"],
     "gamma_rel": pf_set["gamma_rel"],
     "industry_cov": settings["cov_set"]["industries"],
-    "update_base": True,
+    "update_base": False,
     "update_fi_base": True,
-    "update_fi_ief": True,
+    "update_fi_ief": False,
 }
 
 # Print config for verification
@@ -31,14 +31,6 @@ settings["cov_set"]["industries"] = config_params["industry_cov"]
 pf_set["wealth"] = config_params["wealth"]
 pf_set["gamma_rel"] = config_params["gamma_rel"]
 
-# # -------------------- DEFINE PATHS --------------------
-# data_path = settings["data_path"]
-# portfolios_dir = os.path.join(data_path, "Data", "Generated", "Portfolios")
-# get_from_path_model = os.path.join(data_path, "Outputs")
-
-# latest_folder = os.path.join(portfolios_dir, "demo")
-# output_path = os.path.join(portfolios_dir, "demo")
-
 # -------------------- DEFINE PATHS --------------------
 data_path = settings["data_path"]
 portfolios_dir = os.path.join(data_path, "data", "Portfolios")
@@ -48,7 +40,6 @@ latest_folder = os.path.join(portfolios_dir, "demo")
 output_path = os.path.join(portfolios_dir, "demo")
 
 # Save config for reproducibility
-
 pd.to_pickle(settings, os.path.join(output_path, "settings.pkl"))
 pd.to_pickle(pf_set, os.path.join(output_path, "pf_set.pkl"))
 
@@ -101,36 +92,13 @@ fitted_models = pd.read_pickle(fitted_models_path)
 # -------------------- Step 2: Estimate Covariance Matrix --------------------
 print("Step 2: Estimating covariance matrix...")
 
-# cov_results = prepare_cluster_data(
-#     chars=chars,
-#     cluster_labels=cluster_labels,
-#     daily=daily_returns,
-#     settings=settings,
-#     features=features
-# )
-
-# # Extract components
-# cluster_data_d = cov_results["cluster_data_d"]
-# fct_ret = cov_results["fct_ret"]
-# factor_cov = cov_results["factor_cov"]
-# spec_risk = cov_results["spec_risk"]
-# barra_cov = cov_results["barra_cov"]
-
-# # Save covariance results
-# pd.to_pickle(cov_results, os.path.join(output_path, "cov_results.pkl"))
-
-# Load covariance results
-
-# Use the latest folder
-cov_results_path = os.path.join(latest_folder, "cov_results.pkl")
-
-# Check if file exists
-if not os.path.exists(cov_results_path):
-    raise FileNotFoundError(f"Covariance results file not found in latest folder: {cov_results_path}")
-
-# Load covariance results
-cov_results = pd.read_pickle(cov_results_path)
-print(f"Loaded covariance results from: {cov_results_path}")
+cov_results = prepare_cluster_data(
+    chars=chars,
+    cluster_labels=cluster_labels,
+    daily=daily_returns,
+    settings=settings,
+    features=features
+)
 
 # Extract components
 cluster_data_d = cov_results["cluster_data_d"]
@@ -139,50 +107,27 @@ factor_cov = cov_results["factor_cov"]
 spec_risk = cov_results["spec_risk"]
 barra_cov = cov_results["barra_cov"]
 
+# Save covariance results
+pd.to_pickle(cov_results, os.path.join(output_path, "cov_results.pkl"))
+
 # -------------------- Step 3: Prepare Portfolio Data --------------------
 print("Step 3: Preparing portfolio data...")
 
-# # Run the portfolio data preparation function and extract its outputs
-# portfolio_data = run_prepare_portfolio_data(
-#     chars=chars,
-#     get_from_path_model=get_from_path_model,
-#     settings=settings,
-#     pf_set=pf_set,
-#     barra_cov=cov_results["barra_cov"]
-# )
+# Run the portfolio data preparation function and extract its outputs
+portfolio_data = run_prepare_portfolio_data(
+    chars=chars,
+    get_from_path_model=get_from_path_model,
+    settings=settings,
+    pf_set=pf_set,
+    barra_cov=cov_results["barra_cov"]
+)
 
-# # Save additional processed portfolio data
-# pd.to_pickle(portfolio_data["chars"], os.path.join(output_path, "chars_with_predictions.pkl"))
-# pd.to_pickle(portfolio_data["lambda_list"], os.path.join(output_path, "lambda_list.pkl"))
-# pd.to_pickle(portfolio_data["dates"], os.path.join(output_path, "dates.pkl"))
+# Save additional processed portfolio data
+pd.to_pickle(portfolio_data["chars"], os.path.join(output_path, "chars_with_predictions.pkl"))
+pd.to_pickle(portfolio_data["lambda_list"], os.path.join(output_path, "lambda_list.pkl"))
+pd.to_pickle(portfolio_data["dates"], os.path.join(output_path, "dates.pkl"))
 
-# # Extract dates from portfolio_data
-# dates_m1, dates_m2, dates_oos, dates_hp, hp_years = (
-#     portfolio_data["dates"]["dates_m1"],
-#     portfolio_data["dates"]["dates_m2"],
-#     portfolio_data["dates"]["dates_oos"],
-#     portfolio_data["dates"]["dates_hp"],
-#     portfolio_data["dates"]["hp_years"]
-# )
-
-# Load the portfolio data
-chars_path = os.path.join(latest_folder, "chars_with_predictions.pkl")
-lambda_list_path = os.path.join(latest_folder, "lambda_list.pkl")
-dates_path = os.path.join(latest_folder, "dates.pkl")
-
-# Check existence
-for path in [chars_path, lambda_list_path, dates_path]:
-    if not os.path.exists(path):
-        raise FileNotFoundError(f"Required file not found: {path}")
-
-# Load data
-portfolio_data = {
-    "chars": pd.read_pickle(chars_path),
-    "lambda_list": pd.read_pickle(lambda_list_path),
-    "dates": pd.read_pickle(dates_path)
-}
-
-# Extract dates
+# Extract dates from portfolio_data
 dates_m1, dates_m2, dates_oos, dates_hp, hp_years = (
     portfolio_data["dates"]["dates_m1"],
     portfolio_data["dates"]["dates_m2"],
@@ -191,27 +136,26 @@ dates_m1, dates_m2, dates_oos, dates_hp, hp_years = (
     portfolio_data["dates"]["hp_years"]
 )
 
-print("Loaded portfolio data from latest folder.")
 
 # -------------------------- Step 4: Run Base Case ------------------------------
-# if config_params["update_base"]:
-#     print("Running Base Case...")
+if config_params["update_base"]:
+    print("Running Base Case...")
 
-#     run_f_base_case(
-#         chars=portfolio_data["chars"],
-#         barra_cov=barra_cov,
-#         wealth=wealth,
-#         dates_oos=dates_oos,
-#         pf_set=pf_set,
-#         settings=settings,
-#         lambda_list=portfolio_data["lambda_list"],
-#         risk_free=risk_free,
-#         features=features,
-#         dates_m2=dates_m2,
-#         dates_hp=dates_hp,
-#         hp_years=hp_years,
-#         output_path=output_path
-#     )
+    run_f_base_case(
+        chars=portfolio_data["chars"],
+        barra_cov=barra_cov,
+        wealth=wealth,
+        dates_oos=dates_oos,
+        pf_set=pf_set,
+        settings=settings,
+        lambda_list=portfolio_data["lambda_list"],
+        risk_free=risk_free,
+        features=features,
+        dates_m2=dates_m2,
+        dates_hp=dates_hp,
+        hp_years=hp_years,
+        output_path=output_path
+    )
 
 
 # ----------------- Step 5: Run the feature importance scripts -----------------
@@ -253,5 +197,4 @@ if config_params.get('update_fi_ief', True):
     )
 
 
-# -------------------- Finalization --------------------
 print(f"Portfolio construction script completed")

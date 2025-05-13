@@ -127,7 +127,9 @@ def prepare_and_fit_models(settings, pf_set, features, output_path):
         print("Computed daily return data for EU.")
 
     print("Step 15: Showing investable universe and summary...")
-    show_investable_universe(chars)
+    save_path_universe = os.path.join(settings["data_path"], "investable_universe.png")
+    show_investable_universe(chars, save_path=save_path_universe)
+
     valid_summary(chars)
 
     # Saving files to pkl
@@ -139,22 +141,6 @@ def prepare_and_fit_models(settings, pf_set, features, output_path):
     ########################################################################
 
     # -------------------- Step 2: Model Fitting --------------------
-
-    # To just load them
-    # print("Loading monthly return data and characteristics data...")
-    # # data_ret = pd.read_csv(os.path.join(settings["data_path"], "data_ret_processed.csv"))
-    # # chars = pd.read_csv(os.path.join(settings["data_path"], "chars_processed.csv"))
-    #
-    # data_ret_path = os.path.join(settings["data_path"], "data_ret_processed.pkl")
-    # data_ret = pd.read_pickle(data_ret_path)
-    #
-    # chars_path = os.path.join(settings["data_path"], "chars_processed.pkl")
-    # chars = pd.read_pickle(chars_path)
-    #
-    # data_ret["eom"] = pd.to_datetime(data_ret["eom"])
-    # data_ret["eom_m"] = pd.to_datetime(data_ret["eom_m"])
-    # chars["eom"] = pd.to_datetime(chars["eom"])
-
     # To fit them
     print("Step 16: Fitting return prediction models...")
     models = fit_models(

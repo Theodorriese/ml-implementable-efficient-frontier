@@ -1,8 +1,8 @@
-# Imports
 import os
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.ticker as mtick
 from a_general_functions import size_screen_fun, addition_deletion_fun, long_horizon_ret
 import datetime as dt
 
@@ -642,7 +642,7 @@ def apply_addition_deletion_rule(chars, settings):
     return chars
 
 
-def show_investable_universe(chars, colours=None):
+def show_investable_universe(chars, colours=None, save_path=None):
     """
     Plot the number of valid stocks over time and print summary statistics.
 
@@ -691,7 +691,11 @@ def show_investable_universe(chars, colours=None):
     ax.yaxis.set_major_formatter(mtick.StrMethodFormatter("{x:,.0f}"))
 
     fig.tight_layout()
-    plt.show()
+
+    if save_path:
+        plt.savefig(save_path, dpi=300, bbox_inches="tight")
+    else:
+        plt.show()
 
 
 def valid_summary(chars):
