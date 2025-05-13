@@ -91,18 +91,21 @@ def calculate_feature_importance(pf_set, latest_folder, save_path=None):
         .set_index("cluster")["fi"]
         .sort_values()
     )
-    df["cluster"] = pd.Categorical(df["cluster"], categories=sort_order.index.tolist(), ordered=True)
+    ordered_clusters = sort_order.index.tolist()
+    df["cluster"] = pd.Categorical(df["cluster"], categories=ordered_clusters, ordered=True)
 
     # --- Plot ---
     fig, axes = plt.subplots(1, 2, figsize=(14, 7), sharey=True)
 
-    pfml_plot = df[df["type"] == "Portfolio-ML"]
+    # Sort plots by cluster to enforce bar order
+    pfml_plot = df[df["type"] == "Portfolio-ML"].sort_values("cluster")
+    marko_plot = df[df["type"] == "Markowitz-ML"].sort_values("cluster")
+
     axes[0].barh(pfml_plot["cluster"], pfml_plot["fi"], color="#1f77b4")
     axes[0].set_title("Portfolio-ML")
     axes[0].set_xlabel("Drop in realized utility")
     axes[0].invert_yaxis()
 
-    marko_plot = df[df["type"] == "Markowitz-ML"]
     axes[1].barh(marko_plot["cluster"], marko_plot["fi"], color="#2ca02c")
     axes[1].set_title("Markowitz-ML")
     axes[1].set_xlabel("Drop in realized utility")
@@ -114,7 +117,6 @@ def calculate_feature_importance(pf_set, latest_folder, save_path=None):
         plt.savefig(save_path.replace(".png", "_ranked_fi.png"))
     else:
         plt.show()
-
 
 
 def calc_group_stats(group):
@@ -139,164 +141,9 @@ def calc_group_stats(group):
     })
 
 
-def calculate_ief_summary(output_path, ef_ss, pf_set, save_path=None):
-    """
-    Calculates and visualizes summary statistics for the Incremental Efficiency Frontier (IEF)
-    under counterfactual (shuffled) conditions across clusters.
-
-    Parameters:
-        output_path (str): Directory containing the 'pfml_cf_ief.csv' file.
-        ef_ss (pd.DataFrame): Benchmark statistics for the original (non-shuffled) portfolios.
-        pf_set (list): List of portfolio identifiers (not used directly in this function).
-        save_path (str, optional): File path to save the plot. If None, displays the plot interactively.
-
-    Returns:
-        pd.DataFrame: Combined summary statistics of shuffled and benchmark portfolios.
-    """
-
-    file_path = os.path.join(output_path, "pfml_cf_ief.csv")
-    pfml_cf_ief = pd.read_csv(file_path)
-
-    # Compute per-cluster stats
-    ef_cf_ss = (
-        pfml_cf_ief
-        .groupby("cluster")
-        .apply(calc_group_stats)
-        .reset_index()
-        .rename(columns={"cluster": "shuffled"})
-    )
-
-    # Append benchmark data
-    benchmark_data = ef_ss[["gamma_rel", "obj", "r_tc_annual", "sd_annual", "sr_net"]].copy()
-    benchmark_data["shuffled"] = "none"
-
-    ef_cf_ss = pd.concat([ef_cf_ss, benchmark_data], ignore_index=True)
-
-    # Optional: sort x-axis so 'none' is last
-    ef_cf_ss['shuffled'] = pd.Categorical(
-        ef_cf_ss['shuffled'],
-        categories=sorted(ef_cf_ss['shuffled'].unique(), key=lambda x: (x != 'none', x)),
-        ordered=True
-    )
-
-    # Plot
-    plt.figure(figsize=(12, 6))
-    sns.barplot(
-        data=ef_cf_ss,
-        x="shuffled",
-        y="obj",
-        hue="gamma_rel",
-        dodge=True,
-    )
-    plt.xlabel("")
-    plt.ylabel("Objective Function Value")
-    plt.title("IEF Summary Statistics by Theme")
-    plt.legend(title="Gamma Rel", loc="upper right")
-    plt.xticks(rotation=45)
-    plt.tight_layout()
-
-    if save_path:
-        plt.savefig(save_path)
-        print(f"Saved to {save_path}")
-    else:
-        plt.show()
-
-    return ef_cf_ss
-
-
-
-# With trading costs
-def plot_with_trading_costs(ef_cf_ss, colours_theme, save_path=None):
-    """
-    Plot excess returns (net of trading cost) against volatility with trading costs.
-
-    Parameters:
-        ef_cf_ss (pd.DataFrame): Summary statistics for feature importance in IEF.
-        colours_theme (list): List of colors for visualizations.
-        save_path (str): Path to save the plot (optional).
-
-    Returns:
-        None
-    """
-    # Define relevant themes
-    sub = ["Quality", "Value", "Short-Term Reversal", "None"]
-
-    # Add zero-volatility and zero-return entries for each shuffled category
-    zero_entries = pd.DataFrame({
-        "shuffled": ef_cf_ss["shuffled"].unique(),
-        "sd": 0,
-        "r_tc": 0
-    })
-
-    # Combine the main data with the zero entries
-    combined_data = pd.concat([ef_cf_ss, zero_entries], ignore_index=True)
-
-    # Format and clean the `shuffled` column
-    combined_data["shuffled"] = (
-        combined_data["shuffled"]
-        .str.replace("_", " ")
-        .str.replace("short term", "short-term")
-        .str.title()
-    )
-
-    # Create a categorical column with the desired order
-    combined_data["shuffled"] = pd.Categorical(
-        combined_data["shuffled"],
-        categories=["None", "Quality", "Value", "Short-Term Reversal", "Momentum"],
-        ordered=True
-    )
-
-    # Filter for the selected themes
-    filtered_data = combined_data[combined_data["shuffled"].isin(sub)]
-
-    # Plot the data
-    plt.figure(figsize=(10, 6))
-    sns.lineplot(
-        data=filtered_data,
-        x="sd",
-        y="r_tc",
-        hue="shuffled",
-        style="shuffled",
-        size="gamma_rel",
-        markers=True,
-        palette=colours_theme,
-        linewidth=1.5
-    )
-    sns.scatterplot(
-        data=filtered_data,
-        x="sd",
-        y="r_tc",
-        hue="shuffled",
-        style="gamma_rel",
-        s=50,
-        palette=colours_theme,
-        legend=False
-    )
-
-    plt.xlim(0, 0.25)
-    plt.ylim(0, 0.28)
-    plt.xlabel("Volatility")
-    plt.ylabel("Excess returns (net of trading cost)")
-
-    plt.legend(
-        title="Theme permuted:",
-        loc="upper center",
-        bbox_to_anchor=(0.5, 0.97),
-        ncol=3,
-        frameon=True
-    )
-
-    plt.title("Excess Returns vs Volatility with Trading Costs")
-    plt.tight_layout()
-
-    if save_path:
-        plt.savefig(save_path)  # Save the plot
-    else:
-        plt.show()  # Otherwise, show the plot
-
 
 # Counterfactual EF without TC --------------------------
-def plot_counterfactual_ef_without_tc(output_path, colours_theme, save_path=None):
+def plot_counterfactual(output_path, colours_theme, save_path=None):
     """
     Plot counterfactual efficient frontier (EF) without trading costs.
 
@@ -384,65 +231,3 @@ def plot_counterfactual_ef_without_tc(output_path, colours_theme, save_path=None
         plt.savefig(save_path)
     else:
         plt.show()
-
-
-# Seasonality effect
-def analyze_seasonality_effect(chars, save_path=None):
-    """
-    Analyze seasonality effects by correlating predictors with returns.
-
-    Parameters:
-        chars (pd.DataFrame): DataFrame containing 'id', 'eom', predictors ('pred_ld1' to 'pred_ld12'),
-                              and other return metrics ('ret_1_0', 'ret_12_1', etc.).
-        save_path (str): Path to save the plot (optional).
-
-    Returns:
-        None
-    """
-    # Filter relevant columns and reshape to long format
-    predictors = [f"pred_ld{i}" for i in range(1, 13)]
-    relevant_columns = ["id", "eom"] + predictors + ["ret_1_0", "ret_12_1", "be_me", "gp_at"]
-    data = chars[relevant_columns].dropna(subset=["pred_ld1"])
-
-    melted = data.melt(id_vars=["id", "eom"] + predictors, var_name="variable", value_name="value")
-
-    # Calculate correlations
-    correlations = (
-        melted.groupby(["variable", "eom"])
-        .apply(lambda group: {col: group["value"].corr(group[col]) for col in predictors})
-        .apply(pd.Series)
-        .reset_index()
-    )
-
-    # Average correlations across periods
-    correlations = (
-        correlations.groupby("variable", as_index=False)
-        .mean()
-        .drop(columns=["eom"])
-        .melt(id_vars=["variable"], var_name="h", value_name="cor")
-    )
-
-    # Extract horizon (h) as a numeric value
-    correlations["h"] = correlations["h"].str.replace("pred_ld", "").astype(int)
-
-    # Plot correlations
-    plt.figure(figsize=(12, 6))
-    sns.lineplot(
-        data=correlations,
-        x="h",
-        y="cor",
-        hue="variable",
-        marker="o"
-    )
-    plt.axhline(0, color="black", linestyle="--", linewidth=0.8)
-    plt.xlabel("Horizon (Months)")
-    plt.ylabel("Correlation")
-    plt.title("Correlations of Predictors with Returns Across Horizons")
-    plt.legend(title="Variable", loc="upper center", bbox_to_anchor=(0.5, 1.1), ncol=3, frameon=True)
-    plt.tight_layout()
-
-    if save_path:
-        plt.savefig(save_path)  # Save the plot
-    else:
-        plt.show()  # Otherwise, show the plot
-

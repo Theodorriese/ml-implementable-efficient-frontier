@@ -10,7 +10,6 @@ from g_base_analysis import (
     compute_probability_of_outperformance,
     compute_and_plot_portfolio_statistics_over_time, compute_and_plot_correlation_matrix,
     plot_liquid_vs_illiquid, plot_optimal_hyperparameters, compute_ar1_plot,
-    process_features_with_sufficient_coverage,
     ts_plot, ts_plot_manual_ylim
 )
 from g_economic_intuition import (
@@ -21,20 +20,14 @@ from g_economic_intuition import (
 )
 from g_feature_importance import (
     calculate_feature_importance,
-    calculate_ief_summary,
-    plot_with_trading_costs,
-    plot_counterfactual_ef_without_tc,
-    analyze_seasonality_effect
+    plot_counterfactual
 )
 from i1_Main import (settings, pf_set, features, pf_order, pf_order_new, main_types,
                      cluster_order, feat_excl)
 from g_implementable_efficient_frontier import run_ief
+from g_plot_splits import plot_training_val_test_split
+from g_plot_distr import plot_combined_return_distributions
 
-# from g_alpha_analysis import (
-#     plot_alpha_decay_cumulative_continuous,
-#     plot_alpha_decay_rolling_tstat,
-#     compute_signal_rank_stability
-# )
 
 # # -------------------- CONFIGURATION (local) --------------------
 # data_path = r"C:\Master"
@@ -104,17 +97,7 @@ tpf = base_case["tpf"]
 factor_ml = base_case["factor_ml"]
 mkt = base_case["mkt"]
 
-# # # 0) Extra plots
-# # features=["market_equity", "dolvol_126d", "ami_126d", "prc",
-# #          "rmax1_21d", "rmax5_21d", "beta_dimson_21d"]
-# # # features = features[:30]
-
-# # plot_alpha_decay_cumulative_continuous(chars, features, output_path)
-# # plot_alpha_decay_rolling_tstat(chars, features, output_path)
-# # compute_signal_rank_stability(chars, features, output_path)
-
-# # print("Done with the alphas")
-
+# -------------------- PORTFOLIOS --------------------
 # Combine portfolios
 pfs = combine_portfolios(pfml, static, bm_pfs, pf_order, gamma_rel)
 
@@ -223,24 +206,16 @@ ar1_plot = compute_ar1_plot(
 ar1_plot.savefig(os.path.join(output_path, "ar1_plot.png"), bbox_inches="tight", dpi=300)
 
 
-# -------------------- 8) Coverage plot --------------------
-data, coverage = process_features_with_sufficient_coverage(features, feat_excl, settings, data_path)
+# -------------------- 8) Implementable  Efficient Frontier --------------------
+print("Running initial IEF script...")
+ef_all_ss, ef_ss = run_ief(chars, dates_oos, pf_set, wealth, barra_cov, market_data, risk_free, settings, latest_folder, output_path)
 
 
-# # -------------------- 9) Implementable  Efficient Frontier --------------------
-# print("Running initial IEF script...")
-# ef_all_ss, ef_ss = run_ief(chars, dates_oos, pf_set, wealth, barra_cov, market_data, risk_free, settings, latest_folder, output_path)
-
-
-# -------------------- 10) PORTFOLIO WEIGHTS ANALYSIS --------------------
+# -------------------- 9) PORTFOLIO WEIGHTS ANALYSIS --------------------
 print("Analyzing portfolio weights...")
 
 # Combine portfolio weights
 weights_combined = combine_portfolio_weights(static, pfml, mkt, tpf, chars, date="2023-11-30")
-
-# NOT RUN
-# # Calculate and plot weight differences
-# calculate_and_plot_weight_differences(weights_combined, settings, save_path=f"{output_path}/weight_differences.png")
 
 # Sample once
 np.random.seed(settings["seed_no"])
@@ -263,36 +238,34 @@ calculate_and_plot_weight_differences_rel(
     save_path=f"{output_path}/rel_weights_2.png"
 )
 
-# -------------------- 11) Perform Portfolio Analysis --------------------
+# -------------------- 10) Perform Portfolio Analysis --------------------
 print("Performing portfolio analysis...")
 
 # Perform portfolio analysis
 portfolio_analysis(static, pfml, mkt, tpf, chars, colours_theme, save_path=f"{output_path}/portfolio_analysis.png")
 
-# -------------------- 12) FEATURE IMPORTANCE IN BASE CASE --------------------
+# -------------------- 11) FEATURE IMPORTANCE IN BASE CASE --------------------
 print("Calculating feature importance...")
 
 # Calculate and plot feature importance
 calculate_feature_importance(pf_set, latest_folder, save_path=f"{output_path}/feature_importance_demo.png")
 
-# # NOT RUN
-# # -------------------- 13) IEF SUMMARY --------------------
-# print("Calculating IEF summary...")
-
-# # Calculate summary statistics for IEF and save the plot
-# ief_summary = calculate_ief_summary(latest_folder, ef_ss, pf_set, save_path=f"{output_path}/ief_summary.png")
-
-# # -------------------- 14) PLOT WITH TRADING COSTS --------------------
-# print("Plotting excess returns vs volatility with trading costs...")
-
-# # Plot excess returns vs volatility and save the plot
-# plot_with_trading_costs(ef_cf_ss, colours_theme, save_path=f"{output_path}/excess_returns_vs_volatility_with_tc.png")
-
-# -------------------- 15) COUNTERFACTUAL EF WITHOUT TRADING COSTS --------------------
+# -------------------- 12) COUNTERFACTUAL EF WITHOUT TRADING COSTS --------------------
 print("Plotting counterfactual efficient frontier without trading costs...")
 
-# Plot counterfactual efficient frontier without trading costs and save the plot
-plot_counterfactual_ef_without_tc(latest_folder, colours_theme, save_path=f"{output_path}/counterfactual_ef_without_tc.png")
+# Plot counterfactual efficient frontier
+plot_counterfactual(latest_folder, colours_theme, save_path=f"{output_path}/counterfactual_ef_without_tc.png")
 
+# -------------------- 13) Plot training/val/test split  --------------------
+print("Plotting training/val/test split...")
+plot_training_val_test_split(settings, output_path)
+
+# -------------------- 14) RETURN DISTRIBUTION PLOTS --------------------
+print("Plotting return distributions...")
+
+usa_monthly = pd.read_csv(os.path.join(data_path, "world_ret_monthly.csv"))
+usa_daily = pd.read_csv(os.path.join(data_path, "usa_dsf.csv"))
+
+plot_combined_return_distributions(usa_monthly, usa_daily)
 
 print("Done.")

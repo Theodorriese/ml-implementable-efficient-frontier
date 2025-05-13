@@ -642,24 +642,55 @@ def apply_addition_deletion_rule(chars, settings):
     return chars
 
 
-def show_investable_universe(chars):
+def show_investable_universe(chars, colours=None):
     """
-    Plot the number of valid stocks over time.
+    Plot the number of valid stocks over time and print summary statistics.
 
     Parameters:
-        chars (pd.DataFrame): The dataset containing stock data.
+        chars (pd.DataFrame): The dataset containing stock data (must include 'eom' and 'valid').
+        colours (list of str, optional): List of colors [main_line, avg_line, _]. Defaults to standard.
     """
-    investable_counts = chars[chars["valid"] == True].groupby("eom").size()
+    if colours is None:
+        colours = ["steelblue", "darkorange", "gray"]
 
-    print("\nInvestable stock counts over time:\n")
-    print(investable_counts)
+    # Filter and group
+    investable = chars[chars["valid"]].groupby("eom").size()
 
-    plt.figure(figsize=(10, 5))
-    plt.scatter(investable_counts.index, investable_counts.values, alpha=0.7)
-    plt.axhline(y=0, color='black', linestyle='dashed')
-    plt.xlabel("End of Month (eom)")
-    plt.ylabel("Valid Stocks")
-    plt.title("Investable Universe Over Time")
+    # Summary stats
+    print("\nInvestable stock counts over time:\n", investable)
+    print("\nSummary Statistics:")
+    print(f"  Minimum: {investable.min():,}")
+    print(f"  Maximum: {investable.max():,}")
+    print(f"  Median:  {int(investable.median()):,}")
+    print(f"  Average: {int(investable.mean()):,}")
+
+    # Plot
+    fig, ax = plt.subplots(figsize=(10, 5))
+    ax.grid(False)
+
+    # Time series line
+    ax.plot(
+        investable.index, investable.values,
+        color=colours[0], linewidth=2,
+        label="Valid Stocks in Sample"
+    )
+
+    # Average line
+    ax.axhline(
+        y=investable.mean(),
+        color=colours[1] if len(colours) > 1 else "black",
+        linestyle='--', linewidth=2,
+        label=f"Sample Average = {int(investable.mean()):,}"
+    )
+
+    # Labels and formatting
+    ax.set_xlabel("Date (End of Month)")
+    ax.set_ylabel("Valid Stocks")
+    ax.set_title("Investable Universe Over Time")
+    ax.legend(loc="upper right")
+    ax.yaxis.set_major_formatter(mtick.StrMethodFormatter("{x:,.0f}"))
+
+    fig.tight_layout()
     plt.show()
 
 

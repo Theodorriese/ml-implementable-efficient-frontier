@@ -908,53 +908,53 @@ def compute_ar1_plot(chars, features, cluster_labels, output_path=None):
         matplotlib.figure.Figure: AR1 plot figure.
     """
 
-    # # Sort by ID and EOM (end of month)
-    # chars = chars.sort_values(by=["id", "eom"]).copy()
-    # chars["prev_eom"] = chars.groupby("id")["eom"].shift(1)
-    # chars["lag_ok"] = (chars["eom"] == (chars["prev_eom"] + pd.DateOffset(months=1)).apply(
-    #     lambda x: x + pd.offsets.MonthEnd(0)))
+    # Sort by ID and EOM (end of month)
+    chars = chars.sort_values(by=["id", "eom"]).copy()
+    chars["prev_eom"] = chars.groupby("id")["eom"].shift(1)
+    chars["lag_ok"] = (chars["eom"] == (chars["prev_eom"] + pd.DateOffset(months=1)).apply(
+        lambda x: x + pd.offsets.MonthEnd(0)))
 
-    # ar1_results = []
+    ar1_results = []
 
-    # for feature in tqdm(features, desc="Processing features"):
-    #     chars["var"] = chars[feature]
-    #     chars["var_l1"] = chars.groupby("id")["var"].shift(1)
+    for feature in tqdm(features, desc="Processing features"):
+        chars["var"] = chars[feature]
+        chars["var_l1"] = chars.groupby("id")["var"].shift(1)
 
-    #     valid_subset = chars[
-    #         chars["valid"] &
-    #         chars["lag_ok"] &
-    #         ~chars["var"].isin([0.5]) &
-    #         chars["var"].notna() &
-    #         chars["var_l1"].notna()
-    #     ].copy()
+        valid_subset = chars[
+            chars["valid"] &
+            chars["lag_ok"] &
+            ~chars["var"].isin([0.5]) &
+            chars["var"].notna() &
+            chars["var_l1"].notna()
+        ].copy()
 
-    #     valid_subset["n"] = valid_subset.groupby("id")["id"].transform("size")
-    #     valid_subset = valid_subset[valid_subset["n"] >= 12 * 5]
+        valid_subset["n"] = valid_subset.groupby("id")["id"].transform("size")
+        valid_subset = valid_subset[valid_subset["n"] >= 12 * 5]
 
-    #     id_ar1 = valid_subset.groupby("id").apply(
-    #         lambda group: np.corrcoef(group["var"], group["var_l1"])[0, 1] if len(group) > 1 else np.nan
-    #     ).dropna().reset_index(name="ar1")
+        id_ar1 = valid_subset.groupby("id").apply(
+            lambda group: np.corrcoef(group["var"], group["var_l1"])[0, 1] if len(group) > 1 else np.nan
+        ).dropna().reset_index(name="ar1")
 
-    #     ar1_mean = id_ar1["ar1"].mean()
-    #     ar1_results.append({"char": feature, "ar1": ar1_mean})
+        ar1_mean = id_ar1["ar1"].mean()
+        ar1_results.append({"char": feature, "ar1": ar1_mean})
 
-    # ar1_df = pd.DataFrame(ar1_results)
-    # ar1_df = ar1_df.merge(cluster_labels, left_on="char", right_on="characteristic")
+    ar1_df = pd.DataFrame(ar1_results)
+    ar1_df = ar1_df.merge(cluster_labels, left_on="char", right_on="characteristic")
 
-    # cluster_means = (
-    #     ar1_df.groupby("cluster")["ar1"]
-    #     .mean()
-    #     .sort_values()
-    #     .index
-    # )
+    cluster_means = (
+        ar1_df.groupby("cluster")["ar1"]
+        .mean()
+        .sort_values()
+        .index
+    )
 
-    # ar1_df["pretty_name"] = ar1_df["cluster"]
-    # ar1_df["pretty_name"] = pd.Categorical(ar1_df["pretty_name"], categories=cluster_means, ordered=True)
+    ar1_df["pretty_name"] = ar1_df["cluster"]
+    ar1_df["pretty_name"] = pd.Categorical(ar1_df["pretty_name"], categories=cluster_means, ordered=True)
 
-    # ar1_df["sort_var"] = ar1_df.groupby("cluster")["ar1"].transform("mean") + ar1_df["ar1"] / 100000
-    # ar1_df = ar1_df.sort_values(by=["pretty_name", "sort_var"], ascending=[True, True])
+    ar1_df["sort_var"] = ar1_df.groupby("cluster")["ar1"].transform("mean") + ar1_df["ar1"] / 100000
+    ar1_df = ar1_df.sort_values(by=["pretty_name", "sort_var"], ascending=[True, True])
 
-    ar1_df = pd.read_pickle("ar1_data.pkl")
+    # ar1_df = pd.read_pickle("ar1_data.pkl")
 
     # Plot setup
     sns.set_theme(style="whitegrid")
@@ -998,113 +998,3 @@ def compute_ar1_plot(chars, features, cluster_labels, output_path=None):
     plt.show()
 
     return fig
-
-
-
-# Features with sufficient coverage ------------------
-def process_features_with_sufficient_coverage(features, feat_excl, settings, data_path):
-    """
-    Processes the dataset by filtering and computing features with sufficient coverage.
-
-    Parameters:
-        features (list): List of primary features.
-        feat_excl (list): List of excluded features.
-        settings (dict): Dictionary containing screen settings.
-
-    Returns:
-        pd.DataFrame: Filtered dataset.
-    """
-    # Combine features and feat_excl
-    features_all = list(set(features + feat_excl))
-
-    # Define the necessary IDs and columns to load
-    ids = [
-        "source_crsp", "common", "obs_main", "primary_sec", "exch_main", "id",
-        "eom", "sic", "ff49", "size_grp", "me", "rvol_21d", "dolvol_126d"
-    ]
-
-    # Load the data
-    data = pd.read_csv(
-        os.path.join(data_path, "usa.csv"),
-        usecols=list(set(ids + features_all)),
-        dtype={"eom": str, "sic": str}
-    )
-
-    # The rest of the code remains the same
-    data["eom"] = pd.to_datetime(data["eom"], format="%Y%m%d")
-    data["dolvol"] = data["dolvol_126d"]
-    data["rvol_m"] = data["rvol_252d"] * np.sqrt(21)
-
-    # Filter dataset based on settings
-    data = data[
-        (data["source_crsp"] == 1) &
-        (data["common"] == 1) &
-        (data["obs_main"] == 1) &
-        (data["primary_sec"] == 1) &
-        (data["exch_main"] == 1)
-        ]
-
-    # Screen data: Start date
-    # Create a numeric column explicitly: 1 for True, 0 for False
-    start_screen = np.zeros(len(data), dtype=int)  # Initialize with 0
-    start_screen[data["eom"] < settings["screens"]["start"]] = 1  # Set to 1 where condition is True
-    excluded_start = round(np.mean(start_screen) * 100, 2)
-    print(f"Start date screen excludes {excluded_start}% of the observations")
-
-    # Apply start date filter
-    data = data[data["eom"] >= settings["screens"]["start"]]
-
-    # Monitor screen impact
-    n_start = len(data)
-    me_start = data["me"].sum(skipna=True)
-
-    # Require 'me'
-    me_missing = np.zeros(len(data), dtype=int)  # Initialize with 0
-    me_missing[data["me"].isna()] = 1  # Set to 1 where 'me' is missing
-    excluded_me = round(np.mean(me_missing) * 100, 2)
-    print(f"Non-missing 'me' excludes {excluded_me}% of the observations")
-    data = data[~data["me"].isna()]
-
-    # Require 'rvol_m'
-    if settings["screens"]["require_rvol"]:
-        rvol_missing = np.zeros(len(data), dtype=int)  # Initialize with 0
-        rvol_missing[data["rvol_m"].isna()] = 1  # Set to 1 where 'rvol_m' is missing
-        excluded_rvol = round(np.mean(rvol_missing) * 100, 2)
-        print(f"Non-missing 'rvol_252d' excludes {excluded_rvol}% of the observations")
-        data = data[~data["rvol_m"].isna()]
-
-    # Require 'dolvol'
-    if settings["screens"]["require_dolvol"]:
-        dolvol_missing = np.zeros(len(data), dtype=int)  # Initialize with 0
-        dolvol_missing[data["dolvol"].isna()] = 1  # Set to 1 where 'dolvol' is missing
-        excluded_dolvol = round(np.mean(dolvol_missing) * 100, 2)
-        print(f"Non-missing 'dolvol_126d' excludes {excluded_dolvol}% of the observations")
-        data = data[~data["dolvol"].isna()]
-
-    # Size screen
-    size_screen = np.zeros(len(data), dtype=int)  # Initialize with 0
-    size_screen[
-        ~data["size_grp"].isin(settings["screens"]["size_grps"])] = 1  # Set to 1 where size group is not in the list
-    excluded_size = round(np.mean(size_screen) * 100, 2)
-    print(f"Size screen excludes {excluded_size}% of the observations")
-    data = data[data["size_grp"].isin(settings["screens"]["size_grps"])]
-
-    # Feature screen
-    feat_available = data[features_all].notna().sum(axis=1)
-    min_feat = math.floor(len(features_all) * settings["screens"]["feat_pct"])
-    excluded_feat_coverage = np.zeros(len(data), dtype=int)  # Initialize with 0
-    excluded_feat_coverage[feat_available < min_feat] = 1  # Set to 1 where feature coverage is insufficient
-    excluded_feat_coverage_pct = round(np.mean(excluded_feat_coverage) * 100, 2)
-    print(
-        f"At least {settings['screens']['feat_pct'] * 100}% of feature excludes {excluded_feat_coverage_pct}% of the observations")
-    data = data[feat_available >= min_feat]
-
-    # Summary
-    final_obs_pct = round((len(data) / n_start) * 100, 2)
-    final_market_cap_pct = round((data["me"].sum() / me_start) * 100, 2)
-    print(
-        f"In total, the final dataset has {final_obs_pct}% of the observations and {final_market_cap_pct}% of the market cap in the post {settings['screens']['start']} data")
-
-    # Check coverage by 'eom'
-    coverage = data[features_all].notna().groupby(data["eom"]).mean()
-    return data, coverage
